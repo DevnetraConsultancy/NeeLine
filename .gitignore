@@ -43,3 +43,5 @@ next-env.d.ts
 # local development state
 /.freebuff/
 /dev.db
+
+.vercel

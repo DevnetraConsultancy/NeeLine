@@ -1,8 +1,12 @@
-import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt";
 
-export default auth((req) => {
-  const isLoggedIn = !!req.auth;
+export default async function middleware(req: Request & { nextUrl: URL; url: string }) {
+  const token = await getToken({
+    req,
+    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  });
+  const isLoggedIn = !!token;
   const isAuthPage = req.nextUrl.pathname === "/";
   const isApiAuth = req.nextUrl.pathname.startsWith("/api/auth");
   const isProtected =
@@ -25,7 +29,7 @@ export default auth((req) => {
   }
 
   return NextResponse.next();
-});
+}
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico|public).*)"],

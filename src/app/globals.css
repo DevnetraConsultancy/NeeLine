@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+:root {
+  --color-bg: #0a1628;
+  --color-bg-light: #0f1f38;
+  --color-spine: #c9a84c;
+  --color-tick: #c9a84c;
+  --color-text: #f5f0e8;
+  --color-text-muted: #f5f0e880;
+  --color-accent: #c9a84c;
+  --color-accent-dim: #c9a84c33;
+  --color-danger: #c94c4c;
+  --font-display: var(--font-display), "Georgia", serif;
+  --font-body: var(--font-body), "Helvetica Neue", sans-serif;
+  --font-mono: var(--font-mono), "Courier New", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-accent-dim);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-spine);
+}
+
+/* Selection */
+::selection {
+  background: var(--color-spine);
+  color: var(--color-bg);
+}
+
+/* Input styling */
+input,
+select,
+textarea {
+  font-family: var(--font-body);
+}
+
+/* Tooltip styling */
+[data-tooltip] {
+  position: relative;
+}
+[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  background: #1a2a44;
+  color: var(--color-text);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  border-radius: 4px;
+  border: 1px solid var(--color-accent-dim);
+  pointer-events: none;
+  z-index: 100;
+}

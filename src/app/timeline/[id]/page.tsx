@@ -204,22 +204,29 @@ export default function TimelinePage() {
       setUploading(true);
       try {
         const text = await file.text();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const data = JSON.parse(text);
-        const items: any[] = Array.isArray(data) ? data : data.events || [];
+        const data: unknown = JSON.parse(text);
+        const rawItems = Array.isArray(data)
+          ? data
+          : data && typeof data === "object" && "events" in data && Array.isArray(data.events)
+            ? data.events
+            : [];
+        const items = rawItems.filter(
+          (item): item is Record<string, unknown> =>
+            typeof item === "object" && item !== null
+        );
         for (const item of items) {
           await fetch("/api/events", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               timelineId,
-              year: item.year ?? 0,
-              isBce: item.isBce ?? false,
-              month: item.month ?? null,
-              day: item.day ?? null,
-              title: item.title || "Untitled",
-              description: item.description || null,
-              color: item.color || "#c9a84c",
+              year: typeof item.year === "number" ? item.year : 0,
+              isBce: typeof item.isBce === "boolean" ? item.isBce : false,
+              month: typeof item.month === "number" ? item.month : null,
+              day: typeof item.day === "number" ? item.day : null,
+              title: typeof item.title === "string" && item.title ? item.title : "Untitled",
+              description: typeof item.description === "string" ? item.description : null,
+              color: typeof item.color === "string" && item.color ? item.color : "#c9a84c",
             }),
           });
         }

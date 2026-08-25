@@ -1,4 +1,4 @@
 {
-  "buildCommand": "prisma generate && next build --turbopack",
+  "buildCommand": "prisma generate && next build",
   "installCommand": "npm install"
 }

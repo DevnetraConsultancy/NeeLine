@@ -26,9 +26,6 @@ export function exportTimelineAsPng(
   context.fillStyle = bgColor;
   context.fillRect(0, 0, width, height);
 
-  // Draw each SVG element by reading computed styles from the live DOM
-  const svgRect = svgEl.getBoundingClientRect();
-
   // Process all children of the SVG (lines, circles, rects, text, groups)
   function drawElement(el: SVGElement) {
     const computed = window.getComputedStyle(el);

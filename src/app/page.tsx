@@ -18,10 +18,14 @@ export default function LandingPage() {
   async function handleGuestLogin() {
     setGuestLoading(true);
     try {
-      await signIn("credentials", { guest: "true", redirect: false });
+      const result = await signIn("credentials", { guest: "true", redirect: false });
+      if (result?.error) {
+        throw new Error(result.error);
+      }
       router.push("/dashboard");
     } catch {
       setGuestLoading(false);
+      alert("Guest sign-in is unavailable. Check the database configuration.");
     }
   }
 

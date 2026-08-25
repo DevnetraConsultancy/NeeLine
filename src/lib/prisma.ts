@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { PrismaLibSql } from "@prisma/adapter-libsql";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -8,13 +8,13 @@ if (!databaseUrl) {
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
-  prismaAdapter: PrismaLibSql | undefined;
+  prismaAdapter: PrismaPg | undefined;
 };
 
 const adapter =
   globalForPrisma.prismaAdapter ??
-  new PrismaLibSql({
-    url: databaseUrl,
+  new PrismaPg({
+    connectionString: databaseUrl,
   });
 
 export const prisma =

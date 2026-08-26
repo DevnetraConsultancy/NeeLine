@@ -3,8 +3,10 @@ import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
+import { authConfig } from "@/lib/auth.config";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  ...authConfig,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   adapter: PrismaAdapter(prisma as any),
   providers: [
@@ -34,10 +36,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: {
     strategy: "jwt",
   },
-  pages: {
-    signIn: "/",
-  },
   callbacks: {
+    ...authConfig.callbacks,
     async jwt({ token, user }) {
       // On sign-in, persist user id and guest flag into the JWT
       if (user) {
@@ -45,15 +45,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.isGuest = user.email?.endsWith("@chronoscope.local") ?? false;
       }
       return token;
-    },
-    async session({ session, token }) {
-      if (session.user && token) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (session.user as any).id = token.id as string;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (session.user as any).isGuest = token.isGuest as boolean;
-      }
-      return session;
     },
   },
 });

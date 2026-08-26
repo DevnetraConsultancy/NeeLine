@@ -1,35 +1,29 @@
 import { NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt";
+import { auth } from "@/lib/auth";
 
-export default async function middleware(req: Request & { nextUrl: URL; url: string }) {
-  const token = await getToken({
-    req,
-    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
-  });
-  const isLoggedIn = !!token;
-  const isAuthPage = req.nextUrl.pathname === "/";
-  const isApiAuth = req.nextUrl.pathname.startsWith("/api/auth");
+export default auth((req) => {
+  const isLoggedIn = !!req.auth;
+  const { pathname } = req.nextUrl;
+
+  const isAuthPage = pathname === "/";
+  const isApiAuth = pathname.startsWith("/api/auth");
   const isProtected =
-    req.nextUrl.pathname.startsWith("/dashboard") ||
-    req.nextUrl.pathname.startsWith("/timeline");
+    pathname.startsWith("/dashboard") || pathname.startsWith("/timeline");
 
-  // Allow API auth routes
   if (isApiAuth) {
     return NextResponse.next();
   }
 
-  // Redirect logged-in users away from landing page
   if (isLoggedIn && isAuthPage) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  // Redirect unauthenticated users from protected pages
   if (isProtected && !isLoggedIn) {
     return NextResponse.redirect(new URL("/", req.url));
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico|public).*)"],

@@ -1,5 +1,11 @@
+import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { authConfig } from "@/lib/auth.config";
+
+// A separate, lightweight NextAuth instance built ONLY from the edge-safe
+// config (no Prisma, no adapter). This keeps the middleware bundle small
+// enough for Vercel's Edge Runtime.
+const { auth } = NextAuth(authConfig);
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth;

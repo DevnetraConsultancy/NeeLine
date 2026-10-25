@@ -400,10 +400,9 @@ export default function EventForm({
 
                 {/* Center Badge with Title & Chronicle Notes Indicator */}
                 <div
-                  className="relative z-10 px-3 py-1 rounded-md border text-xs font-semibold flex items-center gap-1.5 shadow-sm"
+                  className="relative z-10 px-3 py-1 rounded-md border text-xs font-semibold flex items-center gap-1.5 shadow-sm bg-white dark:bg-[#0a101c]"
                   style={{
                     borderColor: color,
-                    backgroundColor: "rgba(10, 16, 28, 0.95)",
                     color,
                     fontFamily: "var(--font-display)",
                   }}
@@ -466,6 +465,12 @@ export default function EventForm({
               </div>
             ) : (
               <div className="flex items-center gap-2">
+                {/* Visual Period Color Indicator Pill */}
+                <div
+                  className="w-3.5 h-3.5 rounded-full shrink-0 shadow-sm border border-black/20 dark:border-white/20 transition-all"
+                  style={{ backgroundColor: color }}
+                  title="Active Period Color"
+                />
                 <select
                   value={selectedLayer}
                   onChange={(e) => {
@@ -474,16 +479,37 @@ export default function EventForm({
                     const found = availableLayers.find((l) => l.name === lyr);
                     if (found) setColor(found.color);
                   }}
-                  className="w-full px-3.5 py-2 rounded-xl theme-input text-xs font-mono outline-none focus:border-[#c9a84c] focus:ring-1 focus:ring-[#c9a84c]/40 transition-all cursor-pointer"
+                  className="w-full px-3.5 py-2 rounded-xl theme-input text-xs font-mono outline-none focus:border-[#c9a84c] focus:ring-1 focus:ring-[#c9a84c]/40 transition-all cursor-pointer bg-white dark:bg-[#0d1527] text-[#0f172a] dark:text-[#f5f0e8]"
+                  style={{
+                    backgroundColor: "var(--color-bg-light, #0d1527)",
+                    color: "var(--color-text, #f5f0e8)",
+                  }}
                 >
                   {availableLayers.length > 0 ? (
                     availableLayers.map((l) => (
-                      <option key={l.id || l.name} value={l.name}>
+                      <option
+                        key={l.id || l.name}
+                        value={l.name}
+                        className="bg-white dark:bg-[#0d1527] text-[#0f172a] dark:text-[#f5f0e8]"
+                        style={{
+                          backgroundColor: "var(--color-bg-light, #0d1527)",
+                          color: "var(--color-text, #f5f0e8)",
+                        }}
+                      >
                         {l.name}
                       </option>
                     ))
                   ) : (
-                    <option value="General">General Chronicle</option>
+                    <option
+                      value="General"
+                      className="bg-white dark:bg-[#0d1527] text-[#0f172a] dark:text-[#f5f0e8]"
+                      style={{
+                        backgroundColor: "var(--color-bg-light, #0d1527)",
+                        color: "var(--color-text, #f5f0e8)",
+                      }}
+                    >
+                      General Chronicle
+                    </option>
                   )}
                 </select>
               </div>
@@ -502,11 +528,32 @@ export default function EventForm({
                 <select
                   onChange={(e) => handleSelectStartEvent(e.target.value)}
                   defaultValue=""
-                  className="px-2 py-0.5 rounded text-[10px] font-mono theme-input outline-none cursor-pointer text-[#c9a84c]"
+                  className="px-2 py-0.5 rounded text-[10px] font-mono theme-input outline-none cursor-pointer text-[#c9a84c] bg-white dark:bg-[#0d1527]"
+                  style={{
+                    backgroundColor: "var(--color-bg-light, #0d1527)",
+                  }}
                 >
-                  <option value="" disabled>Link start to milestone...</option>
+                  <option
+                    value=""
+                    disabled
+                    className="bg-white dark:bg-[#0d1527] text-[#0f172a] dark:text-[#f5f0e8]"
+                    style={{
+                      backgroundColor: "var(--color-bg-light, #0d1527)",
+                      color: "var(--color-text, #f5f0e8)",
+                    }}
+                  >
+                    Link start to milestone...
+                  </option>
                   {existingEvents.map((ev) => (
-                    <option key={`start-${ev.id}`} value={ev.id}>
+                    <option
+                      key={`start-${ev.id}`}
+                      value={ev.id}
+                      className="bg-white dark:bg-[#0d1527] text-[#0f172a] dark:text-[#f5f0e8]"
+                      style={{
+                        backgroundColor: "var(--color-bg-light, #0d1527)",
+                        color: "var(--color-text, #f5f0e8)",
+                      }}
+                    >
                       {ev.title} ({ev.year} {ev.isBce ? "BCE" : "CE"})
                     </option>
                   ))}
@@ -610,11 +657,32 @@ export default function EventForm({
                   <select
                     onChange={(e) => handleSelectEndEvent(e.target.value)}
                     defaultValue=""
-                    className="px-2 py-0.5 rounded text-[10px] font-mono theme-input outline-none cursor-pointer text-[#38bdf8]"
+                    className="px-2 py-0.5 rounded text-[10px] font-mono theme-input outline-none cursor-pointer text-[#38bdf8] bg-white dark:bg-[#0d1527]"
+                    style={{
+                      backgroundColor: "var(--color-bg-light, #0d1527)",
+                    }}
                   >
-                    <option value="" disabled>Link end to milestone...</option>
+                    <option
+                      value=""
+                      disabled
+                      className="bg-white dark:bg-[#0d1527] text-[#0f172a] dark:text-[#f5f0e8]"
+                      style={{
+                        backgroundColor: "var(--color-bg-light, #0d1527)",
+                        color: "var(--color-text, #f5f0e8)",
+                      }}
+                    >
+                      Link end to milestone...
+                    </option>
                     {existingEvents.map((ev) => (
-                      <option key={`end-${ev.id}`} value={ev.id}>
+                      <option
+                        key={`end-${ev.id}`}
+                        value={ev.id}
+                        className="bg-white dark:bg-[#0d1527] text-[#0f172a] dark:text-[#f5f0e8]"
+                        style={{
+                          backgroundColor: "var(--color-bg-light, #0d1527)",
+                          color: "var(--color-text, #f5f0e8)",
+                        }}
+                      >
                         {ev.title} ({ev.year} {ev.isBce ? "BCE" : "CE"})
                       </option>
                     ))}

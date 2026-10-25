@@ -3,6 +3,7 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
+  color-scheme: dark;
   --color-bg: #070c16;
   --color-bg-light: #0d1527;
   --color-spine: #c9a84c;
@@ -18,7 +19,12 @@
   --font-mono: var(--font-mono), "JetBrains Mono", monospace;
 }
 
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
 html[data-theme="light"] {
+  color-scheme: light;
   --color-bg: #fcfbf7;
   --color-bg-light: #ffffff;
   --color-spine: #b47c0e;
@@ -258,11 +264,43 @@ html[data-theme="light"] .theme-hud-btn:hover {
   color: rgba(245, 240, 232, 0.3);
 }
 
+select.theme-input {
+  background-color: #0d1527;
+}
+
+select,
+input,
+textarea {
+  color-scheme: dark;
+}
+
+select option,
+select optgroup {
+  background-color: #0d1527 !important;
+  color: #f5f0e8 !important;
+}
+
 html[data-theme="light"] .theme-input {
   background: #ffffff;
   border: 1px solid rgba(201, 168, 76, 0.38);
   color: #0f172a;
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+html[data-theme="light"] select.theme-input {
+  background-color: #ffffff;
+}
+
+html[data-theme="light"] select,
+html[data-theme="light"] input,
+html[data-theme="light"] textarea {
+  color-scheme: light;
+}
+
+html[data-theme="light"] select option,
+html[data-theme="light"] select optgroup {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
 }
 
 html[data-theme="light"] .theme-input::placeholder {

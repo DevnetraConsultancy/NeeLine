@@ -372,10 +372,22 @@ export default function ImportModal({
                       <select
                         value={selectedExistingLayer}
                         onChange={(e) => setSelectedExistingLayer(e.target.value)}
-                        className="w-full px-3 py-1.5 rounded-lg theme-input text-xs font-mono outline-none focus:ring-1 focus:ring-[#c9a84c]"
+                        className="w-full px-3 py-1.5 rounded-lg theme-input text-xs font-mono outline-none focus:ring-1 focus:ring-[#c9a84c] bg-white dark:bg-[#0d1527] text-[#0f172a] dark:text-[#f5f0e8]"
+                        style={{
+                          backgroundColor: "var(--color-bg-light, #0d1527)",
+                          color: "var(--color-text, #f5f0e8)",
+                        }}
                       >
                         {availableLayers.map((l) => (
-                          <option key={l.id || l.name} value={l.name}>
+                          <option
+                            key={l.id || l.name}
+                            value={l.name}
+                            className="bg-white dark:bg-[#0d1527] text-[#0f172a] dark:text-[#f5f0e8]"
+                            style={{
+                              backgroundColor: "var(--color-bg-light, #0d1527)",
+                              color: "var(--color-text, #f5f0e8)",
+                            }}
+                          >
                             {l.name}
                           </option>
                         ))}

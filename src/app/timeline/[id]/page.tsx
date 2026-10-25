@@ -149,6 +149,25 @@ export default function TimelinePage() {
 
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
+  // Synchronize global theme changes with canvas
+  const [currentTheme, setCurrentTheme] = useState<"dark" | "light">("dark");
+
+  useEffect(() => {
+    const getTheme = () =>
+      (document.documentElement.getAttribute("data-theme") as "dark" | "light") || "dark";
+    setCurrentTheme(getTheme());
+
+    const handleThemeChange = (e: Event) => {
+      const customEvent = e as CustomEvent<"dark" | "light">;
+      if (customEvent.detail) {
+        setCurrentTheme(customEvent.detail);
+      }
+    };
+
+    window.addEventListener("neeline_theme_change", handleThemeChange);
+    return () => window.removeEventListener("neeline_theme_change", handleThemeChange);
+  }, []);
+
   // Load gap border preference from localStorage
   useEffect(() => {
     const saved = localStorage.getItem("neeline_gap_border");
@@ -248,10 +267,13 @@ export default function TimelinePage() {
       // Register any event layers in fetchedLayers if not already present
       distinctEventLayers.forEach((layerName) => {
         if (!fetchedLayers.some((l) => l.name.toLowerCase() === layerName.toLowerCase())) {
+          const sampleEvent = fetchedEvents.find(
+            (ev) => ((ev.layer && ev.layer.trim()) || "General").toLowerCase() === layerName.toLowerCase()
+          );
           fetchedLayers.push({
             id: `layer-${layerName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
             name: layerName,
-            color: "#c9a84c",
+            color: (sampleEvent && sampleEvent.color && sampleEvent.color.startsWith("#")) ? sampleEvent.color : "#38bdf8",
           });
         }
       });
@@ -286,13 +308,15 @@ export default function TimelinePage() {
     fetchData();
   }, [fetchData]);
 
-  // Toggle single layer visibility
+  // Toggle single layer visibility (case-insensitive)
   const handleToggleLayer = useCallback(
     (name: string) => {
       setActiveLayerNames((prev) => {
+        const target = name.trim().toLowerCase();
+        const exists = prev.some((l) => l.trim().toLowerCase() === target);
         let updated: string[];
-        if (prev.includes(name)) {
-          updated = prev.filter((l) => l !== name);
+        if (exists) {
+          updated = prev.filter((l) => l.trim().toLowerCase() !== target);
         } else {
           updated = [...prev, name];
         }
@@ -312,6 +336,51 @@ export default function TimelinePage() {
     },
     [layers, timelineId]
   );
+
+  // Canvas Colors synchronized with global theme unless explicitly customized
+  const canvasColors = useMemo(() => {
+    if (!timeline) {
+      return {
+        bg: currentTheme === "light" ? "#faf8f5" : "#070c16",
+        spine: currentTheme === "light" ? "#b47c0e" : "#c9a84c",
+        tick: currentTheme === "light" ? "#b47c0e" : "#c9a84c",
+        text: currentTheme === "light" ? "#0f172a" : "#f5f0e8",
+      };
+    }
+
+    const isDefaultDark =
+      timeline.bgColor === "#070c16" &&
+      timeline.textColor === "#f5f0e8" &&
+      timeline.spineColor === "#c9a84c";
+    const isDefaultLight =
+      (timeline.bgColor === "#fcfbf7" || timeline.bgColor === "#faf8f5" || timeline.bgColor === "#f5f0e8") &&
+      (timeline.textColor === "#0f172a" || timeline.textColor === "#1a1a1a");
+
+    if (isDefaultDark || isDefaultLight) {
+      if (currentTheme === "light") {
+        return {
+          bg: "#faf8f5",
+          spine: "#b47c0e",
+          tick: "#b47c0e",
+          text: "#0f172a",
+        };
+      } else {
+        return {
+          bg: "#070c16",
+          spine: "#c9a84c",
+          tick: "#c9a84c",
+          text: "#f5f0e8",
+        };
+      }
+    }
+
+    return {
+      bg: timeline.bgColor,
+      spine: timeline.spineColor,
+      tick: timeline.tickColor,
+      text: timeline.textColor,
+    };
+  }, [timeline, currentTheme]);
 
   // Create new layer/period
   const handleCreateLayer = useCallback(
@@ -1137,10 +1206,10 @@ export default function TimelinePage() {
         <TimelineRenderer
           ref={rendererRef}
           events={events}
-          bgColor={timeline.bgColor}
-          spineColor={timeline.spineColor}
-          tickColor={timeline.tickColor}
-          textColor={timeline.textColor}
+          bgColor={canvasColors.bg}
+          spineColor={canvasColors.spine}
+          tickColor={canvasColors.tick}
+          textColor={canvasColors.text}
           showGapBorder={showGapBorder}
           layers={layers}
           activeLayerNames={activeLayerNames}
@@ -1193,10 +1262,10 @@ export default function TimelinePage() {
       {/* Canvas Settings Modal */}
       {showSettings && (
         <TimelineSettings
-          bgColor={timeline.bgColor}
-          spineColor={timeline.spineColor}
-          tickColor={timeline.tickColor}
-          textColor={timeline.textColor}
+          bgColor={canvasColors.bg}
+          spineColor={canvasColors.spine}
+          tickColor={canvasColors.tick}
+          textColor={canvasColors.text}
           showGapBorder={showGapBorder}
           onToggleGapBorder={handleToggleGapBorder}
           onSave={handleSaveColors}

@@ -170,18 +170,21 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, [showLayersMenu]);
 
-  // Color lookup map for each layer
+  // Color lookup map for each layer (normalized case-insensitive)
   const layerColorMap = useMemo(() => {
     const map = new Map<string, string>();
-    layers.forEach((l) => map.set(l.name, l.color));
+    layers.forEach((l) => {
+      map.set(l.name, l.color);
+      map.set(l.name.trim().toLowerCase(), l.color);
+    });
     return map;
   }, [layers]);
 
-  // Count events per layer
+  // Count events per layer (normalized case-insensitive)
   const layerEventCounts = useMemo(() => {
     const counts = new Map<string, number>();
     events.forEach((e) => {
-      const lyr = e.layer || "General";
+      const lyr = ((e.layer && e.layer.trim()) || "General").toLowerCase();
       counts.set(lyr, (counts.get(lyr) || 0) + 1);
     });
     return counts;
@@ -1538,8 +1541,14 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
               {/* Layer Checkbox List */}
               <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5">
                 {layers.map((layer) => {
-                  const isActive = activeLayerNames.includes(layer.name);
-                  const count = layerEventCounts.get(layer.name) || 0;
+                  const normalizedLayerName = layer.name.trim().toLowerCase();
+                  const isActive = activeLayerNames.some(
+                    (n) => n.trim().toLowerCase() === normalizedLayerName
+                  );
+                  const count =
+                    layerEventCounts.get(normalizedLayerName) ??
+                    layerEventCounts.get(layer.name) ??
+                    0;
 
                   return (
                     <div

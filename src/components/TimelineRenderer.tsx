@@ -20,6 +20,7 @@ import {
   Trash2,
   CheckSquare,
   Square,
+  BookOpen,
   X,
   Sparkles,
 } from "lucide-react";
@@ -60,6 +61,8 @@ interface TimelineRendererProps {
   showGapBorder?: boolean;
   layers?: LayerItem[];
   activeLayerNames?: string[];
+  chronicleNotes?: string | null;
+  onOpenChronicleNotes?: () => void;
   onToggleLayer?: (name: string) => void;
   onToggleAllLayers?: (all: boolean) => void;
   onCreateLayer?: (name: string, color: string) => Promise<LayerItem>;
@@ -97,6 +100,8 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       showGapBorder = true,
       layers = [],
       activeLayerNames = [],
+      chronicleNotes,
+      onOpenChronicleNotes,
       onToggleLayer,
       onToggleAllLayers,
       onCreateLayer,
@@ -124,6 +129,8 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
   const [showAddPeriodInput, setShowAddPeriodInput] = useState(false);
   const [creatingLayer, setCreatingLayer] = useState(false);
   const layersMenuRef = useRef<HTMLDivElement>(null);
+  const [hudNotesHovered, setHudNotesHovered] = useState(false);
+  const hudNotesTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Drag state
   const isDragging = useRef(false);
@@ -383,14 +390,12 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
   const exportPng = useCallback(
     (filename: string) => {
       fitAll();
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const svgEl = document.getElementById("timeline-canvas-svg") as SVGSVGElement | null;
-          if (svgEl) {
-            exportTimelineAsPng(svgEl, bgColor, filename);
-          }
-        });
-      });
+      setTimeout(() => {
+        const svgEl = document.getElementById("timeline-canvas-svg") as SVGSVGElement | null;
+        if (svgEl) {
+          exportTimelineAsPng(svgEl, bgColor, filename);
+        }
+      }, 160);
     },
     [fitAll, bgColor]
   );
@@ -1535,6 +1540,75 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                     <span>New Period / Layer</span>
                   </button>
                 )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Chronicle Notes Canvas HUD Button (Beside Layers button) */}
+        <div className="relative">
+          <button
+            onClick={() => onOpenChronicleNotes?.()}
+            onMouseEnter={() => {
+              if (hudNotesTimeout.current) clearTimeout(hudNotesTimeout.current);
+              setHudNotesHovered(true);
+            }}
+            onMouseLeave={() => {
+              hudNotesTimeout.current = setTimeout(() => setHudNotesHovered(false), 250);
+            }}
+            className="h-8 px-3 rounded-xl theme-hud text-[11px] font-mono flex items-center gap-1.5 transition-all cursor-pointer theme-hud-btn hover:border-[#c9a84c]/50 text-[#c9a84c]"
+            title="View & Edit Chronicle Scope & Archival Notes"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Notes</span>
+            {chronicleNotes ? (
+              <span className="w-1.5 h-1.5 rounded-full bg-[#c9a84c] shadow-[0_0_6px_rgba(201,168,76,0.8)]" />
+            ) : null}
+          </button>
+
+          {/* Canvas HUD Notes Hover Popover */}
+          {hudNotesHovered && (
+            <div
+              className="absolute left-0 top-full mt-2 w-80 sm:w-96 rounded-2xl glass-panel p-4 shadow-[0_20px_50px_rgba(0,0,0,0.85)] border border-black/10 dark:border-white/[0.12] z-50 animate-in fade-in zoom-in-95 duration-150 text-left pointer-events-auto"
+              onMouseEnter={() => {
+                if (hudNotesTimeout.current) clearTimeout(hudNotesTimeout.current);
+                setHudNotesHovered(true);
+              }}
+              onMouseLeave={() => {
+                hudNotesTimeout.current = setTimeout(() => setHudNotesHovered(false), 250);
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenChronicleNotes?.();
+              }}
+            >
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-black/[0.08] dark:border-white/[0.08]">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-[#c9a84c]/15 text-[#c9a84c] border border-[#c9a84c]/30 flex items-center justify-center">
+                    <BookOpen className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="text-xs font-bold font-mono text-[#c9a84c]">
+                    Chronicle Scope & Notes
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono theme-text-muted px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/5">
+                  Click to Open
+                </span>
+              </div>
+
+              <div className="max-h-44 overflow-y-auto pr-1 text-xs theme-card-title font-sans font-light leading-relaxed whitespace-pre-wrap selection:bg-[#c9a84c]/30">
+                {chronicleNotes ? (
+                  chronicleNotes
+                ) : (
+                  <p className="text-xs font-mono theme-text-muted italic py-1">
+                    No chronicle overview notes added yet. Click to record overarching historical context, primary sources, or thematic notes.
+                  </p>
+                )}
+              </div>
+
+              <div className="mt-3 pt-2 border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between text-[10px] font-mono theme-text-muted">
+                <span>{visibleEvents.length} active events</span>
+                <span className="text-[#c9a84c] font-semibold hover:underline cursor-pointer">Open Full Notes →</span>
               </div>
             </div>
           )}

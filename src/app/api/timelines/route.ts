@@ -22,21 +22,25 @@ export async function GET(req: NextRequest) {
       include: {
         _count: { select: { events: true } },
         events: {
-          where: { title: "Year Zero" },
-          take: 1,
-          select: { description: true },
+          take: 5,
+          select: { title: true, description: true },
+          orderBy: { createdAt: "asc" },
         },
       },
       orderBy: { updatedAt: "desc" },
     });
 
     const enriched = timelines.map((t) => {
-      const parsed = t.events?.[0]?.description ? parseEventMetadata(t.events[0].description) : null;
+      let desc: string | null = null;
+      const seed = t.events.find((e) => e.title === "Year Zero") || t.events[0];
+      if (seed?.description) {
+        desc = parseEventMetadata(seed.description).description;
+      }
       return {
         id: t.id,
         userId: t.userId,
         name: t.name,
-        description: parsed?.description || null,
+        description: desc,
         bgColor: t.bgColor,
         spineColor: t.spineColor,
         tickColor: t.tickColor,
@@ -126,9 +130,15 @@ export async function PATCH(req: NextRequest) {
 
     if (body.description !== undefined) {
       const desc = body.description ? String(body.description).trim() : null;
-      const seedEvent = await prisma.event.findFirst({
+      let seedEvent = await prisma.event.findFirst({
         where: { timelineId: id, title: "Year Zero" },
       });
+      if (!seedEvent) {
+        seedEvent = await prisma.event.findFirst({
+          where: { timelineId: id },
+          orderBy: { createdAt: "asc" },
+        });
+      }
       if (seedEvent) {
         const meta = parseEventMetadata(seedEvent.description);
         await prisma.event.update({

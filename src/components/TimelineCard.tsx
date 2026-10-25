@@ -16,6 +16,7 @@ import {
 interface TimelineItem {
   id: string;
   name: string;
+  description?: string | null;
   deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -155,6 +156,13 @@ export default function TimelineCard({
               title={`Spine color: ${timeline.spineColor}`}
             />
           </div>
+
+          {/* Chronicle Scope / Description preview */}
+          {timeline.description && (
+            <p className="text-xs theme-text-muted font-sans font-light line-clamp-2 mt-1 mb-2 leading-relaxed">
+              {timeline.description}
+            </p>
+          )}
 
           {/* Metadata chips */}
           <div className="flex items-center gap-3 text-xs font-mono theme-text-muted mt-3">

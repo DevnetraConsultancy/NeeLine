@@ -42,7 +42,18 @@ export default function DashboardPage() {
         fetch("/api/timelines"),
         fetch("/api/timelines?trash=true"),
       ]);
-      if (allRes.ok) setTimelines(await allRes.json());
+      if (allRes.ok) {
+        const list: Timeline[] = await allRes.json();
+        const enriched = list.map((t) => ({
+          ...t,
+          description:
+            t.description ||
+            (typeof window !== "undefined"
+              ? localStorage.getItem(`neeline_desc_${t.id}`)
+              : null),
+        }));
+        setTimelines(enriched);
+      }
       if (trashRes.ok) setTrashTimelines(await trashRes.json());
     } finally {
       setLoading(false);

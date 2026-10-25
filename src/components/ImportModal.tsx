@@ -9,7 +9,8 @@ interface ImportModalProps {
   isOpen: boolean;
   timelineId: string;
   availableLayers: LayerItem[];
-  onImportComplete: (count: number, newLayer?: LayerItem) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onImportComplete: (count: number, newLayer?: LayerItem, createdEvents?: any[]) => void;
   onClose: () => void;
 }
 
@@ -191,7 +192,12 @@ export default function ImportModal({
         throw new Error("Server error during batch import");
       }
 
-      onImportComplete(payloadEvents.length, createdLayerObj);
+      const createdEvents = await res.json();
+      onImportComplete(
+        payloadEvents.length,
+        createdLayerObj,
+        Array.isArray(createdEvents) ? createdEvents : undefined
+      );
       onClose();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to import events. Please try again.";

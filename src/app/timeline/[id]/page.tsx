@@ -24,7 +24,56 @@ import {
   CheckCircle2,
   Edit2,
   Code,
+  Undo2,
+  Redo2,
+  RotateCcw,
 } from "lucide-react";
+
+export type HistoryAction =
+  | {
+      type: "ADD_EVENT";
+      description: string;
+      event: EventData;
+    }
+  | {
+      type: "EDIT_EVENT";
+      description: string;
+      eventId: string;
+      before: EventData;
+      after: EventData;
+    }
+  | {
+      type: "DELETE_EVENT";
+      description: string;
+      event: EventData;
+    }
+  | {
+      type: "RENAME_TIMELINE";
+      description: string;
+      before: string;
+      after: string;
+    }
+  | {
+      type: "SETTINGS";
+      description: string;
+      before: {
+        bgColor: string;
+        spineColor: string;
+        tickColor: string;
+        textColor: string;
+      };
+      after: {
+        bgColor: string;
+        spineColor: string;
+        tickColor: string;
+        textColor: string;
+      };
+    }
+  | {
+      type: "IMPORT_EVENTS";
+      description: string;
+      events: EventData[];
+    };
 
 interface EventData {
   id: string;
@@ -80,6 +129,23 @@ export default function TimelinePage() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showGapBorder, setShowGapBorder] = useState(true);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
+
+  // Undo / Redo History Stacks (MS Word Style)
+  const [undoStack, setUndoStack] = useState<HistoryAction[]>([]);
+  const [redoStack, setRedoStack] = useState<HistoryAction[]>([]);
+  const [isHistoryBusy, setIsHistoryBusy] = useState(false);
+  const [historyNotice, setHistoryNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!historyNotice) return;
+    const timer = setTimeout(() => setHistoryNotice(null), 3200);
+    return () => clearTimeout(timer);
+  }, [historyNotice]);
+
+  const pushAction = useCallback((action: HistoryAction) => {
+    setUndoStack((prev) => [...prev.slice(-49), action]); // preserve up to 50 actions
+    setRedoStack([]); // standard MS Word behavior: clear redo stack on new operation
+  }, []);
 
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
@@ -321,6 +387,8 @@ export default function TimelinePage() {
       const url = isEdit ? `/api/events?id=${data.id}` : "/api/events";
       const method = isEdit ? "PATCH" : "POST";
 
+      const beforeEvent = isEdit ? events.find((e) => e.id === data.id) : null;
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const body: Record<string, any> = {
         timelineId,
@@ -341,11 +409,32 @@ export default function TimelinePage() {
         endDay: data.isSpan && data.endDay ? data.endDay : null,
       };
 
-      await fetch(url, {
+      const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+
+      if (res.ok) {
+        const saved: EventData = await res.json();
+        if (isEdit && beforeEvent) {
+          pushAction({
+            type: "EDIT_EVENT",
+            description: `Edited "${saved.title}"`,
+            eventId: saved.id,
+            before: beforeEvent,
+            after: saved,
+          });
+          setEvents((prev) => prev.map((e) => (e.id === saved.id ? saved : e)));
+        } else if (!isEdit) {
+          pushAction({
+            type: "ADD_EVENT",
+            description: `Added "${saved.title}"`,
+            event: saved,
+          });
+          setEvents((prev) => [...prev, saved]);
+        }
+      }
 
       // Ensure the layer is activated so user immediately sees their new event
       if (data.layer && !activeLayerNames.includes(data.layer)) {
@@ -360,17 +449,24 @@ export default function TimelinePage() {
       setEditingEvent(null);
       fetchData();
     },
-    [timelineId, activeLayerNames, fetchData]
+    [timelineId, activeLayerNames, events, pushAction, fetchData]
   );
 
   // Delete event
   const handleDeleteEvent = useCallback(async () => {
     if (!editingEvent?.id) return;
-    await fetch(`/api/events?id=${editingEvent.id}`, { method: "DELETE" });
+    const deleted = editingEvent;
+    await fetch(`/api/events?id=${deleted.id}`, { method: "DELETE" });
+    pushAction({
+      type: "DELETE_EVENT",
+      description: `Deleted "${deleted.title}"`,
+      event: deleted,
+    });
+    setEvents((prev) => prev.filter((e) => e.id !== deleted.id));
     setShowEventForm(false);
     setEditingEvent(null);
     fetchData();
-  }, [editingEvent, fetchData]);
+  }, [editingEvent, pushAction, fetchData]);
 
   // Save colors
   const handleSaveColors = useCallback(
@@ -380,14 +476,28 @@ export default function TimelinePage() {
       tickColor: string;
       textColor: string;
     }) => {
+      if (!timeline) return;
+      const before = {
+        bgColor: timeline.bgColor,
+        spineColor: timeline.spineColor,
+        tickColor: timeline.tickColor,
+        textColor: timeline.textColor,
+      };
       await fetch(`/api/timelines?id=${timelineId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(colors),
       });
+      pushAction({
+        type: "SETTINGS",
+        description: "Updated canvas colors",
+        before,
+        after: colors,
+      });
+      setTimeline((prev) => (prev ? { ...prev, ...colors } : null));
       fetchData();
     },
-    [timelineId, fetchData]
+    [timeline, timelineId, pushAction, fetchData]
   );
 
   // Rename timeline
@@ -397,14 +507,300 @@ export default function TimelinePage() {
       setEditingName(false);
       return;
     }
+    const before = timeline?.name || "";
+    const after = nameValue.trim();
     await fetch(`/api/timelines?id=${timelineId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: nameValue.trim() }),
+      body: JSON.stringify({ name: after }),
     });
+    pushAction({
+      type: "RENAME_TIMELINE",
+      description: `Renamed to "${after}"`,
+      before,
+      after,
+    });
+    setTimeline((prev) => (prev ? { ...prev, name: after } : null));
     setEditingName(false);
     fetchData();
-  }, [nameValue, timeline?.name, timelineId, fetchData]);
+  }, [nameValue, timeline?.name, timelineId, pushAction, fetchData]);
+
+  // Undo handler (MS Word Style)
+  const handleUndo = useCallback(async () => {
+    if (undoStack.length === 0 || isHistoryBusy) return;
+    setIsHistoryBusy(true);
+
+    const action = undoStack[undoStack.length - 1];
+    setUndoStack((prev) => prev.slice(0, prev.length - 1));
+
+    try {
+      if (action.type === "ADD_EVENT") {
+        await fetch(`/api/events?id=${action.event.id}`, { method: "DELETE" });
+        setEvents((prev) => prev.filter((e) => e.id !== action.event.id));
+        setHistoryNotice(`Undid: ${action.description}`);
+      } else if (action.type === "EDIT_EVENT") {
+        const body = {
+          timelineId,
+          year: action.before.year,
+          isBce: action.before.isBce,
+          month: action.before.month,
+          day: action.before.day,
+          title: action.before.title,
+          description: action.before.description,
+          color: action.before.color,
+          layer: action.before.layer || "General",
+          endYear: action.before.endYear || null,
+          endIsBce: action.before.endIsBce || null,
+          endMonth: action.before.endMonth || null,
+          endDay: action.before.endDay || null,
+        };
+        await fetch(`/api/events?id=${action.eventId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        setEvents((prev) =>
+          prev.map((e) => (e.id === action.eventId ? action.before : e))
+        );
+        setHistoryNotice(`Undid: ${action.description}`);
+      } else if (action.type === "DELETE_EVENT") {
+        const body = {
+          timelineId,
+          year: action.event.year,
+          isBce: action.event.isBce,
+          month: action.event.month,
+          day: action.event.day,
+          title: action.event.title,
+          description: action.event.description,
+          color: action.event.color,
+          layer: action.event.layer || "General",
+          endYear: action.event.endYear || null,
+          endIsBce: action.event.endIsBce || null,
+          endMonth: action.event.endMonth || null,
+          endDay: action.event.endDay || null,
+        };
+        const res = await fetch("/api/events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (res.ok) {
+          const recreated: EventData = await res.json();
+          action.event = recreated;
+          setEvents((prev) => [...prev, recreated]);
+        }
+        setHistoryNotice(`Undid: ${action.description}`);
+      } else if (action.type === "RENAME_TIMELINE") {
+        await fetch(`/api/timelines?id=${timelineId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: action.before }),
+        });
+        setTimeline((prev) => (prev ? { ...prev, name: action.before } : null));
+        setNameValue(action.before);
+        setHistoryNotice(`Undid: ${action.description}`);
+      } else if (action.type === "SETTINGS") {
+        await fetch(`/api/timelines?id=${timelineId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(action.before),
+        });
+        setTimeline((prev) => (prev ? { ...prev, ...action.before } : null));
+        setHistoryNotice(`Undid: ${action.description}`);
+      } else if (action.type === "IMPORT_EVENTS") {
+        const ids = action.events.map((e) => e.id);
+        await fetch("/api/events", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids }),
+        });
+        const idSet = new Set(ids);
+        setEvents((prev) => prev.filter((e) => !idSet.has(e.id)));
+        setHistoryNotice(`Undid: ${action.description}`);
+      }
+
+      setRedoStack((prev) => [...prev, action]);
+    } catch (err) {
+      console.error("Undo error:", err);
+    } finally {
+      setIsHistoryBusy(false);
+    }
+  }, [undoStack, isHistoryBusy, timelineId]);
+
+  // Redo handler (MS Word Style)
+  const handleRedo = useCallback(async () => {
+    if (redoStack.length === 0 || isHistoryBusy) return;
+    setIsHistoryBusy(true);
+
+    const action = redoStack[redoStack.length - 1];
+    setRedoStack((prev) => prev.slice(0, prev.length - 1));
+
+    try {
+      if (action.type === "ADD_EVENT") {
+        const body = {
+          timelineId,
+          year: action.event.year,
+          isBce: action.event.isBce,
+          month: action.event.month,
+          day: action.event.day,
+          title: action.event.title,
+          description: action.event.description,
+          color: action.event.color,
+          layer: action.event.layer || "General",
+          endYear: action.event.endYear || null,
+          endIsBce: action.event.endIsBce || null,
+          endMonth: action.event.endMonth || null,
+          endDay: action.event.endDay || null,
+        };
+        const res = await fetch("/api/events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (res.ok) {
+          const recreated: EventData = await res.json();
+          action.event = recreated;
+          setEvents((prev) => [...prev, recreated]);
+        }
+        setHistoryNotice(`Redid: ${action.description}`);
+      } else if (action.type === "EDIT_EVENT") {
+        const body = {
+          timelineId,
+          year: action.after.year,
+          isBce: action.after.isBce,
+          month: action.after.month,
+          day: action.after.day,
+          title: action.after.title,
+          description: action.after.description,
+          color: action.after.color,
+          layer: action.after.layer || "General",
+          endYear: action.after.endYear || null,
+          endIsBce: action.after.endIsBce || null,
+          endMonth: action.after.endMonth || null,
+          endDay: action.after.endDay || null,
+        };
+        await fetch(`/api/events?id=${action.eventId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        setEvents((prev) =>
+          prev.map((e) => (e.id === action.eventId ? action.after : e))
+        );
+        setHistoryNotice(`Redid: ${action.description}`);
+      } else if (action.type === "DELETE_EVENT") {
+        await fetch(`/api/events?id=${action.event.id}`, { method: "DELETE" });
+        setEvents((prev) => prev.filter((e) => e.id !== action.event.id));
+        setHistoryNotice(`Redid: ${action.description}`);
+      } else if (action.type === "RENAME_TIMELINE") {
+        await fetch(`/api/timelines?id=${timelineId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: action.after }),
+        });
+        setTimeline((prev) => (prev ? { ...prev, name: action.after } : null));
+        setNameValue(action.after);
+        setHistoryNotice(`Redid: ${action.description}`);
+      } else if (action.type === "SETTINGS") {
+        await fetch(`/api/timelines?id=${timelineId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(action.after),
+        });
+        setTimeline((prev) => (prev ? { ...prev, ...action.after } : null));
+        setHistoryNotice(`Redid: ${action.description}`);
+      } else if (action.type === "IMPORT_EVENTS") {
+        const res = await fetch("/api/events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            timelineId,
+            events: action.events.map((e) => ({
+              title: e.title,
+              year: e.year,
+              isBce: e.isBce,
+              month: e.month,
+              day: e.day,
+              endYear: e.endYear,
+              endIsBce: e.endIsBce,
+              endMonth: e.endMonth,
+              endDay: e.endDay,
+              description: e.description,
+              color: e.color,
+              layer: e.layer,
+            })),
+          }),
+        });
+        if (res.ok) {
+          const recreated: EventData[] = await res.json();
+          action.events = recreated;
+          setEvents((prev) => [...prev, ...recreated]);
+        }
+        setHistoryNotice(`Redid: ${action.description}`);
+      }
+
+      setUndoStack((prev) => [...prev, action]);
+    } catch (err) {
+      console.error("Redo error:", err);
+    } finally {
+      setIsHistoryBusy(false);
+    }
+  }, [redoStack, isHistoryBusy, timelineId]);
+
+  // Global Keyboard Shortcuts (Ctrl+Z for Undo, Ctrl+Y or Ctrl+Shift+Z for Redo)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      if (
+        showEventForm ||
+        showSettings ||
+        showImportModal ||
+        showJsonSchemaModal ||
+        showChronicleNotes
+      ) {
+        return;
+      }
+
+      const isMac =
+        typeof navigator !== "undefined" &&
+        /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+      const isModifier = isMac ? e.metaKey : e.ctrlKey;
+
+      if (!isModifier) return;
+
+      const key = e.key.toLowerCase();
+      if (key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if (
+        (key === "y" && !e.shiftKey) ||
+        (key === "z" && e.shiftKey)
+      ) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    handleUndo,
+    handleRedo,
+    showEventForm,
+    showSettings,
+    showImportModal,
+    showJsonSchemaModal,
+    showChronicleNotes,
+  ]);
 
   // Save Chronicle Overview Notes
   const handleSaveChronicleNotes = useCallback(
@@ -584,8 +980,53 @@ export default function TimelinePage() {
           </span>
         </div>
 
-        {/* Right Studio Action Icons: Import/Export -> Canvas Settings -> Add Event */}
+        {/* Right Studio Action Icons: Undo/Redo -> Import/Export -> Canvas Settings -> Add Event */}
         <div className="flex items-center gap-2 shrink-0">
+          {/* Undo / Redo MS Word Style Segmented Control */}
+          <div
+            className="flex items-center rounded-xl theme-pill p-0.5 border border-black/10 dark:border-white/10"
+            role="group"
+            aria-label="Undo and Redo"
+          >
+            <button
+              type="button"
+              onClick={handleUndo}
+              disabled={undoStack.length === 0 || isHistoryBusy}
+              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                undoStack.length > 0 && !isHistoryBusy
+                  ? "hover:text-[#c9a84c] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer text-slate-700 dark:text-slate-200"
+                  : "opacity-30 cursor-not-allowed text-slate-400 dark:text-slate-600"
+              }`}
+              title={
+                undoStack.length > 0
+                  ? `Undo: ${undoStack[undoStack.length - 1].description} (Ctrl+Z)`
+                  : "Undo (Ctrl+Z)"
+              }
+              aria-label="Undo"
+            >
+              <Undo2 className="w-4 h-4" />
+            </button>
+            <div className="w-px h-4 bg-black/10 dark:bg-white/10" />
+            <button
+              type="button"
+              onClick={handleRedo}
+              disabled={redoStack.length === 0 || isHistoryBusy}
+              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                redoStack.length > 0 && !isHistoryBusy
+                  ? "hover:text-[#c9a84c] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer text-slate-700 dark:text-slate-200"
+                  : "opacity-30 cursor-not-allowed text-slate-400 dark:text-slate-600"
+              }`}
+              title={
+                redoStack.length > 0
+                  ? `Redo: ${redoStack[redoStack.length - 1].description} (Ctrl+Y or Ctrl+Shift+Z)`
+                  : "Redo (Ctrl+Y or Ctrl+Shift+Z)"
+              }
+              aria-label="Redo"
+            >
+              <Redo2 className="w-4 h-4" />
+            </button>
+          </div>
+
           {/* 1. Import / Export Small Icon Button */}
           <div className="relative" ref={exportMenuRef}>
             <button
@@ -784,10 +1225,17 @@ export default function TimelinePage() {
         isOpen={showImportModal}
         timelineId={timelineId}
         availableLayers={layers}
-        onImportComplete={(count, newLayer) => {
+        onImportComplete={(count, newLayer, createdEvents) => {
           if (newLayer) {
             setLayers((prev) => [...prev, newLayer]);
             setActiveLayerNames((prev) => [...prev, newLayer.name]);
+          }
+          if (createdEvents && createdEvents.length > 0) {
+            pushAction({
+              type: "IMPORT_EVENTS",
+              description: `Import ${count} events`,
+              events: createdEvents,
+            });
           }
           fetchData();
           setNoticeMessage(`Successfully imported ${count} events into the chronicle.`);
@@ -815,11 +1263,17 @@ export default function TimelinePage() {
 
       {/* Studio Micro Footer Status Bar */}
       <div className="fixed bottom-0 left-0 right-0 h-9 px-6 theme-footer z-40 flex items-center justify-between text-[11px] font-mono">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <span className="flex items-center gap-1.5 text-emerald-500 font-semibold">
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Synced</span>
           </span>
+          {historyNotice && (
+            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#c9a84c]/10 text-[#c9a84c] border border-[#c9a84c]/20 animate-fade-in font-sans font-medium text-xs">
+              <RotateCcw className="w-3 h-3" />
+              <span>{historyNotice}</span>
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

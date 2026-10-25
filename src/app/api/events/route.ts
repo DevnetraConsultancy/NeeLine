@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
         };
       });
 
-      await prisma.event.createMany({
+      const created = await prisma.event.createManyAndReturn({
         data: createData,
       });
 
@@ -132,7 +132,20 @@ export async function POST(req: NextRequest) {
         data: { updatedAt: new Date() },
       });
 
-      return NextResponse.json({ success: true, count: createData.length }, { status: 201 });
+      const formatted = created.map((e) => {
+        const parsed = parseEventMetadata(e.description);
+        return {
+          ...e,
+          layer: parsed.layer,
+          description: parsed.description,
+          endYear: parsed.endYear,
+          endIsBce: parsed.endIsBce,
+          endMonth: parsed.endMonth,
+          endDay: parsed.endDay,
+        };
+      });
+
+      return NextResponse.json(formatted, { status: 201 });
     }
 
     // Single event creation
@@ -308,7 +321,7 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-// DELETE /api/events?id=xxx
+// DELETE /api/events?id=xxx or body { ids: string[] }
 export async function DELETE(req: NextRequest) {
   try {
     const session = await auth();
@@ -318,30 +331,57 @@ export async function DELETE(req: NextRequest) {
 
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
+
+    let ids: string[] = [];
     if (!id) {
-      return NextResponse.json({ error: "Missing id" }, { status: 400 });
+      try {
+        const body = await req.json();
+        if (Array.isArray(body?.ids)) {
+          ids = body.ids;
+        }
+      } catch {
+        // no body provided
+      }
+    } else {
+      ids = [id];
     }
 
-    const existing = await prisma.event.findUnique({ where: { id } });
-    if (!existing) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (ids.length === 0) {
+      return NextResponse.json({ error: "Missing id or ids" }, { status: 400 });
     }
-    const timeline = await prisma.timeline.findFirst({
-      where: { id: existing.timelineId, userId: session.user.id },
+
+    // Verify ownership through timeline
+    const targetEvents = await prisma.event.findMany({
+      where: {
+        id: { in: ids },
+        timeline: { userId: session.user.id },
+      },
+      select: { id: true, timelineId: true },
     });
-    if (!timeline) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+
+    if (targetEvents.length === 0) {
+      return NextResponse.json(
+        { error: "No matching events found or unauthorized" },
+        { status: 404 }
+      );
     }
 
-    await prisma.event.delete({ where: { id } });
-
-    // Touch the timeline's updatedAt
-    await prisma.timeline.update({
-      where: { id: existing.timelineId },
-      data: { updatedAt: new Date() },
+    const verifiedIds = targetEvents.map((e) => e.id);
+    await prisma.event.deleteMany({
+      where: { id: { in: verifiedIds } },
     });
 
-    return NextResponse.json({ success: true });
+    const affectedTimelineIds = Array.from(new Set(targetEvents.map((e) => e.timelineId)));
+    await Promise.all(
+      affectedTimelineIds.map((tid) =>
+        prisma.timeline.update({
+          where: { id: tid },
+          data: { updatedAt: new Date() },
+        })
+      )
+    );
+
+    return NextResponse.json({ success: true, count: verifiedIds.length });
   } catch (error) {
     console.error("DELETE /api/events error:", error);
     return NextResponse.json({ error: "Failed to delete event" }, { status: 500 });

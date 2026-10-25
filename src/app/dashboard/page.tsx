@@ -58,10 +58,14 @@ export default function DashboardPage() {
       });
       if (res.ok) {
         const timeline = await res.json();
+        if (description) {
+          localStorage.setItem(`neeline_desc_${timeline.id}`, description);
+        }
         setShowCreateModal(false);
         router.push(`/timeline/${timeline.id}`);
       } else {
-        setErrorMessage("Failed to create chronicle. Please verify your connection or session.");
+        const data = await res.json().catch(() => ({}));
+        setErrorMessage(data.error || "Failed to create chronicle. Please verify your connection or session.");
       }
     } catch {
       setErrorMessage("Network error occurred while creating chronicle. Please try again.");

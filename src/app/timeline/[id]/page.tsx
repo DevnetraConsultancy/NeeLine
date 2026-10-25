@@ -119,7 +119,8 @@ export default function TimelinePage() {
         return;
       }
 
-      setTimeline(found);
+      const desc = found.description || (typeof window !== "undefined" ? localStorage.getItem(`neeline_desc_${timelineId}`) : null);
+      setTimeline({ ...found, description: desc });
       setNameValue(found.name);
 
       const fetchedEvents: EventData[] = await eventsRes.json();

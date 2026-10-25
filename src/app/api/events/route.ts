@@ -2,6 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+// Utility: parse layer name from stored description
+function parseLayer(rawDescription: string | null): { layer: string; description: string | null } {
+  if (!rawDescription) return { layer: "General", description: null };
+  const match = rawDescription.match(/^<!--layer:([^>]+)-->([\s\S]*)$/);
+  if (match) {
+    return {
+      layer: match[1].trim() || "General",
+      description: match[2].trim() || null,
+    };
+  }
+  return { layer: "General", description: rawDescription };
+}
+
+// Utility: encode layer name into stored description
+function serializeLayer(layer: string | undefined | null, description: string | null): string | null {
+  const safeLayer = layer && layer.trim() && layer.trim() !== "General" ? layer.trim() : null;
+  const safeDesc = description ? description.trim() : "";
+  if (safeLayer) {
+    return `<!--layer:${safeLayer}-->${safeDesc}`;
+  }
+  return safeDesc || null;
+}
+
 // GET /api/events?timelineId=xxx
 export async function GET(req: NextRequest) {
   try {
@@ -24,8 +47,18 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Timeline not found" }, { status: 404 });
     }
 
-    const events = await prisma.event.findMany({
+    const rawEvents = await prisma.event.findMany({
       where: { timelineId },
+    });
+
+    // Parse layer metadata out of description
+    const events = rawEvents.map((e) => {
+      const parsed = parseLayer(e.description);
+      return {
+        ...e,
+        layer: parsed.layer,
+        description: parsed.description,
+      };
     });
 
     // Sort chronologically from deepest antiquity to modern era
@@ -85,26 +118,13 @@ export async function POST(req: NextRequest) {
         month: e.month ? Math.min(12, Math.max(1, parseInt(String(e.month), 10))) : null,
         day: e.day ? Math.min(31, Math.max(1, parseInt(String(e.day), 10))) : null,
         title: String(e.title || "Untitled").trim(),
-        description: e.description ? String(e.description).trim() : null,
+        description: serializeLayer(e.layer, e.description || null),
         color: typeof e.color === "string" && e.color.startsWith("#") ? e.color : "#c9a84c",
-        layer: typeof e.layer === "string" && e.layer.trim() ? e.layer.trim() : "General",
       }));
 
-      try {
-        await prisma.event.createMany({
-          data: createData,
-        });
-      } catch {
-        // Fallback without layer field if DB schema not yet updated
-        const strippedData = createData.map((item: (typeof createData)[number]) => {
-          const { layer: _, ...rest } = item;
-          void _;
-          return rest;
-        });
-        await prisma.event.createMany({
-          data: strippedData,
-        });
-      }
+      await prisma.event.createMany({
+        data: createData,
+      });
 
       await prisma.timeline.update({
         where: { id: body.timelineId },
@@ -132,37 +152,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Timeline not found" }, { status: 404 });
     }
 
-    const safeLayer = typeof layer === "string" && layer.trim() ? layer.trim() : "General";
+    const fullDescription = serializeLayer(layer, description || null);
 
-    let event;
-    try {
-      event = await prisma.event.create({
-        data: {
-          timelineId,
-          year: Math.abs(parseInt(year, 10)),
-          isBce: Boolean(isBce),
-          month: month ? Math.min(12, Math.max(1, parseInt(month, 10))) : null,
-          day: day ? Math.min(31, Math.max(1, parseInt(day, 10))) : null,
-          title: String(title).trim(),
-          description: description ? String(description).trim() : null,
-          color: typeof color === "string" && color.startsWith("#") ? color : "#c9a84c",
-          layer: safeLayer,
-        },
-      });
-    } catch {
-      event = await prisma.event.create({
-        data: {
-          timelineId,
-          year: Math.abs(parseInt(year, 10)),
-          isBce: Boolean(isBce),
-          month: month ? Math.min(12, Math.max(1, parseInt(month, 10))) : null,
-          day: day ? Math.min(31, Math.max(1, parseInt(day, 10))) : null,
-          title: String(title).trim(),
-          description: description ? String(description).trim() : null,
-          color: typeof color === "string" && color.startsWith("#") ? color : "#c9a84c",
-        },
-      });
-    }
+    const event = await prisma.event.create({
+      data: {
+        timelineId,
+        year: Math.abs(parseInt(year, 10)),
+        isBce: Boolean(isBce),
+        month: month ? Math.min(12, Math.max(1, parseInt(month, 10))) : null,
+        day: day ? Math.min(31, Math.max(1, parseInt(day, 10))) : null,
+        title: String(title).trim(),
+        description: fullDescription,
+        color: typeof color === "string" && color.startsWith("#") ? color : "#c9a84c",
+      },
+    });
 
     // Touch the timeline's updatedAt
     await prisma.timeline.update({
@@ -170,7 +173,8 @@ export async function POST(req: NextRequest) {
       data: { updatedAt: new Date() },
     });
 
-    return NextResponse.json(event, { status: 201 });
+    const parsed = parseLayer(event.description);
+    return NextResponse.json({ ...event, ...parsed }, { status: 201 });
   } catch (error) {
     console.error("POST /api/events error:", error);
     return NextResponse.json({ error: "Failed to create event" }, { status: 500 });
@@ -216,31 +220,21 @@ export async function PATCH(req: NextRequest) {
       data.day = body.day ? Math.min(31, Math.max(1, parseInt(body.day, 10))) : null;
     }
     if (body.title !== undefined) data.title = String(body.title).trim();
-    if (body.description !== undefined) {
-      data.description = body.description ? String(body.description).trim() : null;
-    }
     if (body.color !== undefined) {
       data.color = typeof body.color === "string" && body.color.startsWith("#") ? body.color : "#c9a84c";
     }
-    if (body.layer !== undefined) {
-      data.layer = typeof body.layer === "string" && body.layer.trim() ? body.layer.trim() : "General";
+
+    if (body.description !== undefined || body.layer !== undefined) {
+      const parsed = parseLayer(existing.description);
+      const nextDesc = body.description !== undefined ? body.description : parsed.description;
+      const nextLayer = body.layer !== undefined ? body.layer : parsed.layer;
+      data.description = serializeLayer(nextLayer, nextDesc);
     }
 
-    let updated;
-    try {
-      updated = await prisma.event.update({
-        where: { id },
-        data,
-      });
-    } catch {
-      // Fallback without layer field
-      const fallbackData = { ...data };
-      delete fallbackData.layer;
-      updated = await prisma.event.update({
-        where: { id },
-        data: fallbackData,
-      });
-    }
+    const updated = await prisma.event.update({
+      where: { id },
+      data,
+    });
 
     // Touch the timeline's updatedAt
     await prisma.timeline.update({
@@ -248,7 +242,8 @@ export async function PATCH(req: NextRequest) {
       data: { updatedAt: new Date() },
     });
 
-    return NextResponse.json(updated);
+    const parsed = parseLayer(updated.description);
+    return NextResponse.json({ ...updated, ...parsed });
   } catch (error) {
     console.error("PATCH /api/events error:", error);
     return NextResponse.json({ error: "Failed to update event" }, { status: 500 });

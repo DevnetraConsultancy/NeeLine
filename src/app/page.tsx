@@ -12,7 +12,6 @@ import {
   User,
   Clock,
   ChevronRight,
-  ExternalLink,
 } from "lucide-react";
 
 const SAMPLE_EVENTS = [
@@ -93,22 +92,6 @@ export default function LandingPage() {
           >
             Nee<span className="text-[#c9a84c]">Line</span>
           </span>
-        </div>
-
-        <div className="flex items-center gap-3 text-xs text-[#f5f0e8]/50 font-mono">
-          <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.03] border border-white/[0.08]">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            v0.1 · Deep-Time Number Line
-          </span>
-          <a
-            href="https://github.com/DevnetraConsultancy/NeeLine"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-[#f5f0e8]/60 hover:text-[#c9a84c] transition-colors"
-          >
-            <span>Docs</span>
-            <ExternalLink className="w-3 h-3" />
-          </a>
         </div>
       </header>
 
@@ -382,7 +365,7 @@ export default function LandingPage() {
           <div className="flex items-center gap-2">
             <span>© {new Date().getFullYear()} NeeLine</span>
             <span>·</span>
-            <span className="text-[#f5f0e8]/60">Devnetra Consultancy</span>
+            <span className="text-[#f5f0e8]/60">Developed in Collaboration with Academia | Devnetra Consultancy</span>
           </div>
 
           <div className="flex items-center gap-6">

@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { X, Palette, Sparkles } from "lucide-react";
+import { X, Palette, Sparkles, CheckSquare, Square } from "lucide-react";
 
 interface TimelineSettingsProps {
   bgColor: string;
   spineColor: string;
   tickColor: string;
   textColor: string;
+  showGapBorder: boolean;
+  onToggleGapBorder: (show: boolean) => void;
   onSave: (colors: {
     bgColor: string;
     spineColor: string;
@@ -73,6 +75,8 @@ export default function TimelineSettings({
   spineColor,
   tickColor,
   textColor,
+  showGapBorder,
+  onToggleGapBorder,
   onSave,
   onClose,
 }: TimelineSettingsProps) {
@@ -109,7 +113,7 @@ export default function TimelineSettings({
       }}
     >
       <div className="w-full max-w-md rounded-2xl glass-panel shadow-[0_25px_60px_rgba(0,0,0,0.8)] border border-white/[0.1] overflow-hidden flex flex-col max-h-[92vh]">
-        {/* Header */}
+        {/* Header - Renamed to Canvas Settings */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] bg-white/[0.02]">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-[#c9a84c]/15 text-[#c9a84c] border border-[#c9a84c]/20 flex items-center justify-center">
@@ -120,10 +124,10 @@ export default function TimelineSettings({
                 className="text-base font-bold text-[#f5f0e8] leading-tight"
                 style={{ fontFamily: "var(--font-display)" }}
               >
-                Studio Palette & Theme
+                Canvas Settings
               </h2>
               <p className="text-[11px] font-mono text-[#f5f0e8]/40">
-                Customize canvas atmospheric chromatic values
+                Colors, chromatic theme & coordinate gap styling
               </p>
             </div>
           </div>
@@ -136,11 +140,11 @@ export default function TimelineSettings({
         </div>
 
         <div className="p-6 space-y-5 overflow-y-auto flex-1">
-          {/* Real-time Live Mini-Canvas Preview */}
+          {/* Live Mini-Canvas Preview with Gap Box */}
           <div>
             <label className="block text-[11px] font-mono text-[#f5f0e8]/40 uppercase tracking-wider mb-2 flex items-center gap-1.5">
               <Sparkles className="w-3 h-3 text-[#c9a84c]" />
-              <span>Live Theme Visualizer</span>
+              <span>Live Canvas Preview</span>
             </label>
             <div
               className="rounded-xl p-4 border border-white/[0.1] relative overflow-hidden transition-colors duration-300 shadow-inner"
@@ -167,29 +171,19 @@ export default function TimelineSettings({
                   </span>
                 </div>
 
-                {/* Center Node */}
+                {/* Simulated Gap Box */}
                 <div className="relative z-10 flex flex-col items-center">
                   <div
-                    className="px-2 py-0.5 rounded text-[10px] font-semibold border mb-1.5 shadow-sm"
+                    className="px-2 py-0.5 rounded-full text-[9px] font-mono transition-all"
                     style={{
-                      borderColor: tick,
+                      border: showGapBorder ? `1px solid ${spine}` : "none",
                       backgroundColor: bg,
                       color: text,
-                      fontFamily: "var(--font-display)",
+                      opacity: 0.8,
                     }}
                   >
-                    Example Event
+                    44 yrs
                   </div>
-                  <div
-                    className="w-2.5 h-2.5 rounded-full border transition-colors shadow-sm"
-                    style={{ backgroundColor: tick, borderColor: bg }}
-                  />
-                  <span
-                    className="text-[10px] font-mono mt-1"
-                    style={{ color: tick }}
-                  >
-                    0 CE
-                  </span>
                 </div>
 
                 {/* Right Tick */}
@@ -202,11 +196,53 @@ export default function TimelineSettings({
                     className="text-[10px] font-mono mt-2"
                     style={{ color: text }}
                   >
-                    2026 CE
+                    0 CE
                   </span>
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Gap Year Box Border Setting (Add/Remove Border) */}
+          <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.08] flex items-center justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <button
+                type="button"
+                onClick={() => onToggleGapBorder(!showGapBorder)}
+                className="mt-0.5 text-[#c9a84c] hover:opacity-80 transition-opacity cursor-pointer"
+              >
+                {showGapBorder ? (
+                  <CheckSquare className="w-4 h-4 stroke-[2.5]" />
+                ) : (
+                  <Square className="w-4 h-4 text-[#f5f0e8]/30" />
+                )}
+              </button>
+              <div>
+                <label
+                  onClick={() => onToggleGapBorder(!showGapBorder)}
+                  className="text-xs font-semibold text-[#f5f0e8] cursor-pointer block"
+                >
+                  Gap Year Box Border
+                </label>
+                <p className="text-[11px] font-mono text-[#f5f0e8]/45 mt-0.5 leading-relaxed">
+                  {showGapBorder
+                    ? "Border active on gap year indicator boxes"
+                    : "Border removed (clean borderless gap pill)"}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onToggleGapBorder(!showGapBorder)}
+              className={`text-[10px] font-mono px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                showGapBorder
+                  ? "bg-[#c9a84c]/15 text-[#c9a84c] border-[#c9a84c]/30"
+                  : "bg-white/[0.04] text-[#f5f0e8]/40 border-white/[0.08]"
+              }`}
+            >
+              {showGapBorder ? "Border ON" : "Border OFF"}
+            </button>
           </div>
 
           {/* Curated Theme Presets */}
@@ -345,10 +381,10 @@ export default function TimelineSettings({
               {saving ? (
                 <>
                   <div className="w-3.5 h-3.5 border-2 border-[#070c16]/40 border-t-[#070c16] rounded-full animate-spin" />
-                  <span>Applying Colors...</span>
+                  <span>Saving Canvas Settings...</span>
                 </>
               ) : (
-                <span>Apply Colors to Canvas</span>
+                <span>Save Canvas Settings</span>
               )}
             </button>
           </div>

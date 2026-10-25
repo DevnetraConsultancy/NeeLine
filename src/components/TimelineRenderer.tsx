@@ -26,6 +26,7 @@ interface TimelineRendererProps {
   spineColor: string;
   tickColor: string;
   textColor: string;
+  showGapBorder?: boolean;
   onEventClick: (event: EventData) => void;
   onBgClick: (year: number, isBce: boolean) => void;
 }
@@ -43,6 +44,7 @@ export default function TimelineRenderer({
   spineColor,
   tickColor,
   textColor,
+  showGapBorder = true,
   onEventClick,
   onBgClick,
 }: TimelineRendererProps) {
@@ -573,9 +575,9 @@ export default function TimelineRenderer({
                       height="16"
                       rx="8"
                       fill={bgColor}
-                      stroke={spineColor}
-                      strokeWidth="1"
-                      opacity="0.45"
+                      stroke={showGapBorder ? spineColor : "none"}
+                      strokeWidth={showGapBorder ? "1" : "0"}
+                      opacity={showGapBorder ? "0.45" : "0.25"}
                     />
                     {/* Gap label */}
                     <text

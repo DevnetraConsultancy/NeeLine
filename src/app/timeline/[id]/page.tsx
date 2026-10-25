@@ -12,12 +12,12 @@ import {
   ChevronLeft,
   Plus,
   Settings2,
+  Download,
   Upload,
   Image as ImageIcon,
   FileText,
   Calendar,
   CheckCircle2,
-  ChevronDown,
   Edit2,
 } from "lucide-react";
 
@@ -50,7 +50,7 @@ export default function TimelinePage() {
   const [events, setEvents] = useState<EventData[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal states
+  // Modal and custom states
   const [showEventForm, setShowEventForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventData | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -58,8 +58,23 @@ export default function TimelinePage() {
   const [nameValue, setNameValue] = useState("");
   const [uploading, setUploading] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showGapBorder, setShowGapBorder] = useState(true);
+
   const jsonInputRef = useRef<HTMLInputElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  // Load gap border preference from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("neeline_gap_border");
+    if (saved !== null) {
+      setShowGapBorder(saved === "true");
+    }
+  }, []);
+
+  const handleToggleGapBorder = useCallback((show: boolean) => {
+    setShowGapBorder(show);
+    localStorage.setItem("neeline_gap_border", String(show));
+  }, []);
 
   // Close export menu on outside click
   useEffect(() => {
@@ -350,7 +365,7 @@ export default function TimelinePage() {
           </span>
         </div>
 
-        {/* Right: Studio Actions */}
+        {/* Right Studio Action Icons: Import/Export -> Canvas Settings -> Add Event */}
         <div className="flex items-center gap-2 shrink-0">
           <input
             ref={jsonInputRef}
@@ -360,28 +375,27 @@ export default function TimelinePage() {
             className="hidden"
           />
 
-          {/* Import & Export Menu */}
+          {/* 1. Import / Export Small Icon Button */}
           <div className="relative" ref={exportMenuRef}>
             <button
               onClick={() => setShowExportMenu(!showExportMenu)}
               disabled={uploading}
-              className="h-9 px-3 rounded-xl bg-white/[0.03] border border-white/[0.1] hover:border-[#c9a84c]/40 text-[#f5f0e8]/80 text-xs font-mono font-medium hover:bg-white/[0.06] transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-9 h-9 rounded-xl bg-white/[0.03] border border-white/[0.1] hover:border-[#c9a84c]/40 text-[#f5f0e8]/80 hover:text-[#c9a84c] hover:bg-white/[0.06] transition-all flex items-center justify-center cursor-pointer disabled:opacity-50"
+              title="Import & Export (JSON callset, PNG image, TXT file)"
+              aria-label="Import & Export"
             >
-              <Upload className="w-3.5 h-3.5 text-[#c9a84c]" />
-              <span className="hidden sm:inline">
-                {uploading ? "Importing..." : "Data & Export"}
-              </span>
-              <ChevronDown className="w-3 h-3 opacity-60" />
+              <Download className="w-4 h-4 text-[#c9a84c]" />
             </button>
 
             {showExportMenu && (
-              <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl glass-panel p-1.5 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl glass-panel p-1.5 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150 border border-white/[0.12]">
                 <button
                   onClick={() => {
                     jsonInputRef.current?.click();
                     setShowExportMenu(false);
                   }}
                   className="w-full px-3 py-2 text-left text-xs text-[#f5f0e8]/80 hover:text-[#f5f0e8] hover:bg-white/[0.06] rounded-xl transition-colors flex items-center gap-2.5 cursor-pointer font-mono"
+                  title="Import timeline events from a JSON file"
                 >
                   <Upload className="w-3.5 h-3.5 text-[#5a9bd5]" />
                   <span>Import JSON Callset</span>
@@ -392,6 +406,7 @@ export default function TimelinePage() {
                 <button
                   onClick={handleExportPng}
                   className="w-full px-3 py-2 text-left text-xs text-[#f5f0e8]/80 hover:text-[#f5f0e8] hover:bg-white/[0.06] rounded-xl transition-colors flex items-center gap-2.5 cursor-pointer font-mono"
+                  title="Export high-resolution 2x Retina PNG image"
                 >
                   <ImageIcon className="w-3.5 h-3.5 text-[#c9a84c]" />
                   <span>Export 2x Retina PNG</span>
@@ -400,6 +415,7 @@ export default function TimelinePage() {
                 <button
                   onClick={handleExportTxt}
                   className="w-full px-3 py-2 text-left text-xs text-[#f5f0e8]/80 hover:text-[#f5f0e8] hover:bg-white/[0.06] rounded-xl transition-colors flex items-center gap-2.5 cursor-pointer font-mono"
+                  title="Export chronological events as tabular plain text"
                 >
                   <FileText className="w-3.5 h-3.5 text-[#7ab8a0]" />
                   <span>Export Tabular TXT</span>
@@ -408,11 +424,12 @@ export default function TimelinePage() {
             )}
           </div>
 
-          {/* Theme Palette Settings Trigger */}
+          {/* 2. Canvas Settings Small Icon Button (Beside Import/Export on the right) */}
           <button
             onClick={() => setShowSettings(true)}
-            className="h-9 w-9 rounded-xl bg-white/[0.03] border border-white/[0.1] hover:border-[#c9a84c]/40 text-[#f5f0e8]/70 hover:text-[#c9a84c] hover:bg-white/[0.06] transition-all flex items-center justify-center cursor-pointer relative"
-            title="Palette & Theme Settings"
+            className="w-9 h-9 rounded-xl bg-white/[0.03] border border-white/[0.1] hover:border-[#c9a84c]/40 text-[#f5f0e8]/80 hover:text-[#c9a84c] hover:bg-white/[0.06] transition-all flex items-center justify-center cursor-pointer relative"
+            title="Canvas Settings (Colors, Theme & Gap Year Borders)"
+            aria-label="Canvas Settings"
           >
             <Settings2 className="w-4 h-4" />
             <div
@@ -421,13 +438,14 @@ export default function TimelinePage() {
             />
           </button>
 
-          {/* Add Event Primary Button */}
+          {/* 3. Add Event Small Icon Button (Beside Canvas Settings on the right) */}
           <button
             onClick={() => setShowEventForm(true)}
-            className="btn-gold h-9 px-3.5 rounded-xl text-xs flex items-center gap-2 cursor-pointer font-mono tracking-tight"
+            className="btn-gold w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer shadow-md"
+            title="Add Milestone / Event (or click anywhere on the number line)"
+            aria-label="Add Milestone / Event"
           >
-            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>Add Event</span>
+            <Plus className="w-4 h-4 stroke-[2.5]" />
           </button>
         </div>
       </div>
@@ -440,6 +458,7 @@ export default function TimelinePage() {
           spineColor={timeline.spineColor}
           tickColor={timeline.tickColor}
           textColor={timeline.textColor}
+          showGapBorder={showGapBorder}
           onEventClick={(event) => {
             setEditingEvent(event);
             setShowEventForm(true);
@@ -474,13 +493,15 @@ export default function TimelinePage() {
         />
       )}
 
-      {/* Timeline Settings Modal */}
+      {/* Canvas Settings Modal (Renamed from TimelineSettings) */}
       {showSettings && (
         <TimelineSettings
           bgColor={timeline.bgColor}
           spineColor={timeline.spineColor}
           tickColor={timeline.tickColor}
           textColor={timeline.textColor}
+          showGapBorder={showGapBorder}
+          onToggleGapBorder={handleToggleGapBorder}
           onSave={handleSaveColors}
           onClose={() => setShowSettings(false)}
         />
@@ -488,24 +509,15 @@ export default function TimelinePage() {
 
       {/* Studio Micro Footer Status Bar */}
       <div className="fixed bottom-0 left-0 right-0 h-9 px-6 bg-[#070c16]/90 backdrop-blur-md border-t border-white/[0.06] z-40 flex items-center justify-between text-[11px] font-mono text-[#f5f0e8]/40">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <span className="flex items-center gap-1.5 text-emerald-400/80">
             <CheckCircle2 className="w-3 h-3" />
             <span>Synced</span>
           </span>
-          <span className="hidden md:inline text-[#f5f0e8]/25">·</span>
-          <span className="hidden md:inline">
-            Scroll: <span className="text-[#f5f0e8]/60">Zoom</span> · Drag:{" "}
-            <span className="text-[#f5f0e8]/60">Pan</span> · Click Axis:{" "}
-            <span className="text-[#f5f0e8]/60">Add</span> · Key 0:{" "}
-            <span className="text-[#f5f0e8]/60">Fit All</span>
-          </span>
         </div>
 
         <div className="flex items-center gap-2">
-          <span>NeeLine Studio</span>
-          <span>·</span>
-          <span className="text-[#f5f0e8]/60">Devnetra Consultancy</span>
+          <span className="text-[#f5f0e8]/50">Developed in Collaboration with Academia | Devnetra Consultancy</span>
         </div>
       </div>
     </div>

@@ -218,6 +218,13 @@ export default function DashboardPage() {
             ))}
           </div>
         )}
+
+        {/* Footer */}
+        <div className="mt-16 pt-6 border-t border-white/[0.06] text-center">
+          <p className="text-xs font-mono text-[#f5f0e8]/40">
+            Developed in Collaboration with Academia | Devnetra Consultancy
+          </p>
+        </div>
       </div>
     </div>
   );

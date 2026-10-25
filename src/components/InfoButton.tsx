@@ -7,11 +7,12 @@ import {
   X,
   Keyboard,
   MousePointer,
-  Sparkles,
   Mail,
   Layers,
   Download,
   Palette,
+  Sun,
+  Plus,
 } from "lucide-react";
 
 export default function InfoButton() {
@@ -20,13 +21,14 @@ export default function InfoButton() {
 
   return (
     <>
+      {/* Question mark trigger only - no text */}
       <button
         onClick={() => setShowModal(true)}
-        className="h-8 px-2.5 rounded-lg border border-white/[0.08] bg-white/[0.03] text-[#f5f0e8]/60 hover:text-[#c9a84c] hover:border-[#c9a84c]/30 hover:bg-[#c9a84c]/10 transition-all flex items-center gap-1.5 cursor-pointer font-mono text-xs"
-        title="Help, Shortcuts & About"
+        className="w-8 h-8 rounded-xl border border-white/[0.08] bg-white/[0.03] text-[#f5f0e8]/70 hover:text-[#c9a84c] hover:border-[#c9a84c]/30 hover:bg-[#c9a84c]/10 transition-all flex items-center justify-center cursor-pointer font-mono"
+        title="Guide & Studio Manual (Shortcuts, Gestures & Features)"
+        aria-label="Guide & Studio Manual"
       >
-        <HelpCircle className="w-3.5 h-3.5 text-[#c9a84c]" />
-        <span className="hidden sm:inline">Guide</span>
+        <HelpCircle className="w-4 h-4 text-[#c9a84c]" />
       </button>
 
       {showModal &&
@@ -101,7 +103,7 @@ export default function InfoButton() {
                       : "text-[#f5f0e8]/50 hover:text-[#f5f0e8]"
                   }`}
                 >
-                  Capabilities
+                  Studio Icons & Tools
                 </button>
                 <button
                   onClick={() => setActiveTab("about")}
@@ -131,9 +133,9 @@ export default function InfoButton() {
                         </kbd>
                       </div>
                       <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] text-xs">
-                        <span className="text-[#f5f0e8]/70">Add milestone at position</span>
+                        <span className="text-[#f5f0e8]/70">Add milestone at exact coordinate</span>
                         <kbd className="px-2.5 py-1 rounded-md bg-[#070c16] text-[#c9a84c] font-mono text-xs border border-white/[0.1] shadow-sm">
-                          Click Axis
+                          Click Axis Line
                         </kbd>
                       </div>
                       <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] text-xs">
@@ -143,7 +145,7 @@ export default function InfoButton() {
                         </kbd>
                       </div>
                       <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] text-xs">
-                        <span className="text-[#f5f0e8]/70">Infinite temporal zoom</span>
+                        <span className="text-[#f5f0e8]/70">Continuous temporal zoom</span>
                         <kbd className="px-2.5 py-1 rounded-md bg-[#070c16] text-[#c9a84c] font-mono text-xs border border-white/[0.1] shadow-sm">
                           Scroll Wheel / + -
                         </kbd>
@@ -170,47 +172,19 @@ export default function InfoButton() {
                 </div>
               )}
 
-              {/* Tab 2: Capabilities & Features */}
+              {/* Tab 2: Studio Icons & Tools */}
               {activeTab === "features" && (
                 <div className="space-y-3">
                   <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-start gap-3">
-                    <div className="w-7 h-7 rounded-lg bg-[#c9a84c]/15 text-[#c9a84c] flex items-center justify-center shrink-0 mt-0.5">
-                      <Layers className="w-3.5 h-3.5" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-semibold text-[#f5f0e8]">
-                        Even vs. Proportional Spacing
-                      </h4>
-                      <p className="text-[11px] text-[#f5f0e8]/50 mt-0.5 font-light leading-relaxed">
-                        Toggle instantly between mathematical physical time and balanced card density.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-start gap-3">
                     <div className="w-7 h-7 rounded-lg bg-[#5a9bd5]/15 text-[#5a9bd5] flex items-center justify-center shrink-0 mt-0.5">
-                      <Sparkles className="w-3.5 h-3.5" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-semibold text-[#f5f0e8]">
-                        Multi-Tier Collision Avoidance
-                      </h4>
-                      <p className="text-[11px] text-[#f5f0e8]/50 mt-0.5 font-light leading-relaxed">
-                        Labels automatically distribute into staggered tiers and collapse into glowing nodes during heavy density.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-start gap-3">
-                    <div className="w-7 h-7 rounded-lg bg-[#7ab8a0]/15 text-[#7ab8a0] flex items-center justify-center shrink-0 mt-0.5">
                       <Download className="w-3.5 h-3.5" />
                     </div>
                     <div>
                       <h4 className="text-xs font-semibold text-[#f5f0e8]">
-                        Retina PNG & Tabular TXT Export
+                        Import / Export Icon
                       </h4>
                       <p className="text-[11px] text-[#f5f0e8]/50 mt-0.5 font-light leading-relaxed">
-                        Generate publication-ready 2x resolution canvas graphics or export raw chronological tab-separated datasets.
+                        Top studio icon allowing one-click JSON dataset import, 2x Retina PNG graphic export, and tabular TXT export.
                       </p>
                     </div>
                   </div>
@@ -221,10 +195,52 @@ export default function InfoButton() {
                     </div>
                     <div>
                       <h4 className="text-xs font-semibold text-[#f5f0e8]">
-                        Custom Chromatic Themes
+                        Canvas Settings Icon
                       </h4>
                       <p className="text-[11px] text-[#f5f0e8]/50 mt-0.5 font-light leading-relaxed">
-                        Tailor background, spine line, ticks, and text to match historical parchment, modern dark mode, or classic paper.
+                        Customize canvas background, spine axis, tick marks, typography, and toggle Add/Remove border around gap year boxes.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-start gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-[#c9a84c]/15 text-[#c9a84c] flex items-center justify-center shrink-0 mt-0.5">
+                      <Plus className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-semibold text-[#f5f0e8]">
+                        Add Milestone Icon
+                      </h4>
+                      <p className="text-[11px] text-[#f5f0e8]/50 mt-0.5 font-light leading-relaxed">
+                        Add a new chronological event or click directly anywhere on the central number line axis.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-start gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-[#ecd58e]/15 text-[#ecd58e] flex items-center justify-center shrink-0 mt-0.5">
+                      <Sun className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-semibold text-[#f5f0e8]">
+                        Light / Dark Theme Icon
+                      </h4>
+                      <p className="text-[11px] text-[#f5f0e8]/50 mt-0.5 font-light leading-relaxed">
+                        Toggles application interface theme in global top bar. Canvas color continues to be decided by Canvas Settings.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-start gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-[#7ab8a0]/15 text-[#7ab8a0] flex items-center justify-center shrink-0 mt-0.5">
+                      <Layers className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-semibold text-[#f5f0e8]">
+                        Even vs. Proportional Spacing & Gaps
+                      </h4>
+                      <p className="text-[11px] text-[#f5f0e8]/50 mt-0.5 font-light leading-relaxed">
+                        Switch between dense even layout and true physical time proportion with elapsed year gap indicators.
                       </p>
                     </div>
                   </div>
@@ -241,7 +257,7 @@ export default function InfoButton() {
                         className="text-sm font-bold text-[#f5f0e8]"
                         style={{ fontFamily: "var(--font-display)" }}
                       >
-                        Devnetra Consultancy
+                        Developed in Collaboration with Academia | Devnetra Consultancy
                       </h3>
                     </div>
                     <p className="text-xs text-[#f5f0e8]/60 leading-relaxed font-light mb-4">

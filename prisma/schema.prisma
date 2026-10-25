@@ -58,22 +58,38 @@ model VerificationToken {
 // ─── NeeLine custom models ───────────────────────────────────────
 
 model Timeline {
-  id         String    @id @default(cuid())
-  userId     String
-  name       String
-  deletedAt  DateTime?
+  id          String    @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  deletedAt   DateTime?
 
   // Per-timeline color customization (hex colors)
-  bgColor    String    @default("#0a1628")
-  spineColor String    @default("#c9a84c")
-  tickColor  String    @default("#c9a84c")
-  textColor  String    @default("#f5f0e8")
+  bgColor     String    @default("#0a1628")
+  spineColor  String    @default("#c9a84c")
+  tickColor   String    @default("#c9a84c")
+  textColor   String    @default("#f5f0e8")
 
-  events     Event[]
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events      Event[]
+  layers      Layer[]
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Layer {
+  id         String   @id @default(cuid())
+  timelineId String
+  name       String
+  color      String   @default("#c9a84c")
+
+  timeline   Timeline @relation(fields: [timelineId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([timelineId, name])
 }
 
 model Event {
@@ -86,6 +102,7 @@ model Event {
   title       String
   description String?
   color       String   @default("#c9a84c")
+  layer       String?  @default("General")
 
   timeline    Timeline @relation(fields: [timelineId], references: [id], onDelete: Cascade)
 

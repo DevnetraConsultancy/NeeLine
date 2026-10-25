@@ -20,6 +20,7 @@ export interface LayoutItem {
   title: string;
   description: string | null;
   color: string;
+  layer?: string | null;
   x: number;
   tier: number;
   labelWidth: number;
@@ -45,6 +46,7 @@ export function layoutLabels(
     title: string;
     description: string | null;
     color: string;
+    layer?: string | null;
   }>,
   yearToX: (year: number) => number
 ): LayoutItem[] {
@@ -67,6 +69,7 @@ export function layoutLabels(
         title: e.title,
         description: e.description,
         color: e.color,
+        layer: e.layer,
         x: yearToX(effectiveYear),
         tier: 0,
         labelWidth,

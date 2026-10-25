@@ -41,22 +41,45 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const name = String(body.name || "Untitled Timeline").trim() || "Untitled Timeline";
+    const description = body.description ? String(body.description).trim() : null;
 
-    const timeline = await prisma.timeline.create({
-      data: {
-        userId: session.user.id,
-        name,
-        events: {
-          create: {
-            year: 0,
-            isBce: false,
-            title: "Year Zero",
-            color: "#c9a84c",
+    let timeline;
+    try {
+      timeline = await prisma.timeline.create({
+        data: {
+          userId: session.user.id,
+          name,
+          description,
+          events: {
+            create: {
+              year: 0,
+              isBce: false,
+              title: "Year Zero",
+              color: "#c9a84c",
+              layer: "General",
+            },
           },
         },
-      },
-      include: { events: true },
-    });
+        include: { events: true },
+      });
+    } catch {
+      // Resilient fallback if description/layer column is pending
+      timeline = await prisma.timeline.create({
+        data: {
+          userId: session.user.id,
+          name,
+          events: {
+            create: {
+              year: 0,
+              isBce: false,
+              title: "Year Zero",
+              color: "#c9a84c",
+            },
+          },
+        },
+        include: { events: true },
+      });
+    }
 
     return NextResponse.json(timeline, { status: 201 });
   } catch (error) {
@@ -92,6 +115,9 @@ export async function PATCH(req: NextRequest) {
     const data: Record<string, any> = {};
 
     if (body.name !== undefined) data.name = String(body.name).trim();
+    if (body.description !== undefined) {
+      data.description = body.description ? String(body.description).trim() : null;
+    }
     if (body.deletedAt !== undefined) data.deletedAt = body.deletedAt;
     if (body.bgColor !== undefined && typeof body.bgColor === "string") data.bgColor = body.bgColor;
     if (body.spineColor !== undefined && typeof body.spineColor === "string") data.spineColor = body.spineColor;

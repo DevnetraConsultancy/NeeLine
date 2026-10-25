@@ -6,9 +6,18 @@ import {
   Trash2,
   X,
   Sparkles,
+  Layers,
+  Plus,
 } from "lucide-react";
+import ConfirmModal from "@/components/ConfirmModal";
 
-interface EventFormData {
+export interface LayerItem {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface EventFormData {
   id?: string;
   year: number;
   isBce: boolean;
@@ -17,10 +26,13 @@ interface EventFormData {
   title: string;
   description: string;
   color: string;
+  layer?: string;
 }
 
 interface EventFormProps {
   initialData?: EventFormData;
+  availableLayers?: LayerItem[];
+  onCreateLayer?: (name: string, color: string) => Promise<LayerItem>;
   onSave: (data: EventFormData) => Promise<void>;
   onDelete?: () => Promise<void>;
   onClose: () => void;
@@ -37,10 +49,14 @@ const COLOR_PALETTE = [
   { hex: "#7cc6d4", label: "Cyan" },
   { hex: "#d4a5c9", label: "Rose" },
   { hex: "#a8b87a", label: "Olive" },
+  { hex: "#f43f5e", label: "Crimson" },
+  { hex: "#10b981", label: "Emerald" },
 ];
 
 export default function EventForm({
   initialData,
+  availableLayers = [],
+  onCreateLayer,
   onSave,
   onDelete,
   onClose,
@@ -52,7 +68,18 @@ export default function EventForm({
   const [title, setTitle] = useState(initialData?.title || "");
   const [description, setDescription] = useState(initialData?.description || "");
   const [color, setColor] = useState(initialData?.color || "#c9a84c");
+  const [selectedLayer, setSelectedLayer] = useState(
+    initialData?.layer || (availableLayers[0]?.name ?? "General")
+  );
+
+  // Quick inline new layer creation
+  const [showNewLayerInput, setShowNewLayerInput] = useState(false);
+  const [newLayerName, setNewLayerName] = useState("");
+  const [newLayerColor, setNewLayerColor] = useState("#5a9bd5");
+
   const [saving, setSaving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
 
   const isEditing = !!initialData?.id;
@@ -61,14 +88,20 @@ export default function EventForm({
     setTimeout(() => titleRef.current?.focus(), 80);
   }, []);
 
-  // Close on Escape
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+  async function handleQuickCreateLayer() {
+    const trimmed = newLayerName.trim();
+    if (!trimmed) return;
+    if (onCreateLayer) {
+      const created = await onCreateLayer(trimmed, newLayerColor);
+      setSelectedLayer(created.name);
+      setColor(created.color);
+    } else {
+      setSelectedLayer(trimmed);
+      setColor(newLayerColor);
     }
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose]);
+    setNewLayerName("");
+    setShowNewLayerInput(false);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -86,16 +119,20 @@ export default function EventForm({
       title: title.trim(),
       description: description.trim(),
       color,
+      layer: selectedLayer.trim() || "General",
     });
     setSaving(false);
   }
 
-  async function handleDelete() {
+  async function handleExecuteDelete() {
     if (!onDelete) return;
-    if (!confirm("Are you sure you want to delete this milestone?")) return;
-    setSaving(true);
-    await onDelete();
-    setSaving(false);
+    setDeleting(true);
+    try {
+      await onDelete();
+      setShowDeleteConfirm(false);
+    } finally {
+      setDeleting(false);
+    }
   }
 
   // Live formatted date label preview
@@ -111,11 +148,12 @@ export default function EventForm({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      // Backdrop click intentionally does NOT close the modal: ONLY 'X' closes it
     >
-      <div className="w-full max-w-lg rounded-2xl glass-panel shadow-[0_25px_60px_rgba(0,0,0,0.8)] border border-black/10 dark:border-white/[0.1] overflow-hidden flex flex-col max-h-[92vh]">
+      <div
+        className="w-full max-w-lg rounded-2xl glass-panel shadow-[0_25px_60px_rgba(0,0,0,0.85)] border border-black/10 dark:border-white/[0.1] overflow-hidden flex flex-col max-h-[92vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-black/[0.08] dark:border-white/[0.08] bg-black/[0.02] dark:bg-white/[0.02]">
           <div className="flex items-center gap-3">
@@ -127,16 +165,21 @@ export default function EventForm({
                 className="text-base font-bold theme-card-title leading-tight"
                 style={{ fontFamily: "var(--font-display)" }}
               >
-                {isEditing ? "Edit Milestone" : "Add Chronicle Milestone"}
+                {isEditing ? "Edit Chronicle Milestone" : "Add Chronicle Milestone"}
               </h2>
               <p className="text-[11px] font-mono theme-text-muted">
-                Temporal coordinate on the number line
+                Temporal coordinate and historical milestone
               </p>
             </div>
           </div>
+
+          {/* Close X Button: ONLY this button closes the modal */}
           <button
+            type="button"
             onClick={onClose}
             className="w-8 h-8 flex items-center justify-center rounded-xl theme-text-muted hover:opacity-100 hover:bg-black/[0.05] dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+            title="Close (X)"
+            aria-label="Close"
           >
             <X className="w-4 h-4" />
           </button>
@@ -144,11 +187,19 @@ export default function EventForm({
 
         {/* Live Interactive Card Preview */}
         <div className="px-6 pt-5 pb-3 bg-gradient-to-b from-black/[0.02] dark:from-white/[0.02] to-transparent">
-          <div className="text-[10px] font-mono uppercase tracking-wider theme-text-muted mb-2 flex items-center gap-1.5">
-            <Sparkles className="w-3 h-3 text-[#c9a84c]" />
-            <span>Canvas Representation Preview</span>
+          <div className="text-[10px] font-mono uppercase tracking-wider theme-text-muted mb-2 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <Sparkles className="w-3 h-3 text-[#c9a84c]" />
+              <span>Canvas Milestone Preview</span>
+            </span>
+            <span className="text-[10px] text-[#c9a84c] font-semibold">
+              Layer: {selectedLayer || "General"}
+            </span>
           </div>
-          <div className="p-3.5 rounded-xl bg-black/[0.04] dark:bg-[#070c16]/80 border border-black/10 dark:border-white/[0.08] flex items-center justify-between gap-3 shadow-inner">
+          <div
+            className="p-3.5 rounded-xl bg-black/[0.04] dark:bg-[#070c16]/80 border flex items-center justify-between gap-3 shadow-inner transition-colors duration-200"
+            style={{ borderColor: `${color}80` }}
+          >
             <div className="flex items-center gap-3 min-w-0">
               <div
                 className="w-3.5 h-8 rounded-md shrink-0 shadow-sm"
@@ -184,6 +235,80 @@ export default function EventForm({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4 overflow-y-auto flex-1">
+          {/* Historical Period / Layer Selection */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-[11px] font-mono theme-text-muted uppercase tracking-wider font-medium flex items-center gap-1.5">
+                <Layers className="w-3 h-3 text-[#c9a84c]" />
+                <span>Historical Period / Layer</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowNewLayerInput((prev) => !prev)}
+                className="text-[10px] font-mono text-[#c9a84c] hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <Plus className="w-3 h-3" />
+                <span>{showNewLayerInput ? "Cancel Period" : "New Period"}</span>
+              </button>
+            </div>
+
+            {showNewLayerInput ? (
+              <div className="p-3 rounded-xl bg-black/[0.03] dark:bg-white/[0.03] border border-[#c9a84c]/40 space-y-2 mb-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newLayerName}
+                    onChange={(e) => setNewLayerName(e.target.value)}
+                    placeholder="Period Name (e.g. Bronze Age, Period A)"
+                    className="flex-1 px-3 py-1.5 rounded-lg theme-input text-xs font-mono outline-none focus:ring-1 focus:ring-[#c9a84c]"
+                  />
+                  <input
+                    type="color"
+                    value={newLayerColor}
+                    onChange={(e) => setNewLayerColor(e.target.value)}
+                    className="w-8 h-8 rounded-lg cursor-pointer p-0.5 bg-transparent border border-black/15 dark:border-white/15"
+                    title="Choose Period Color"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleQuickCreateLayer}
+                    disabled={!newLayerName.trim()}
+                    className="btn-gold px-3 py-1.5 rounded-lg text-xs font-mono font-semibold cursor-pointer disabled:opacity-50"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedLayer}
+                  onChange={(e) => {
+                    const lyr = e.target.value;
+                    setSelectedLayer(lyr);
+                    const found = availableLayers.find((l) => l.name === lyr);
+                    if (found) setColor(found.color);
+                  }}
+                  className="w-full px-3.5 py-2 rounded-xl theme-input text-xs font-mono outline-none focus:border-[#c9a84c] focus:ring-1 focus:ring-[#c9a84c]/40 transition-all cursor-pointer"
+                >
+                  {availableLayers.length > 0 ? (
+                    availableLayers.map((l) => (
+                      <option key={l.id || l.name} value={l.name}>
+                        {l.name}
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="General">General Chronicle</option>
+                      <option value="Period A">Period A</option>
+                      <option value="Period B">Period B</option>
+                    </>
+                  )}
+                </select>
+              </div>
+            )}
+          </div>
+
           {/* Era and Year */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Era Toggle */}
@@ -331,7 +456,7 @@ export default function EventForm({
             {isEditing && onDelete ? (
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={() => setShowDeleteConfirm(true)}
                 disabled={saving}
                 className="px-3.5 py-2 rounded-xl text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 text-xs font-mono flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
               >
@@ -366,6 +491,19 @@ export default function EventForm({
           </div>
         </form>
       </div>
+
+      {/* Confirmation Modal for Milestone Deletion */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        title="Delete Chronicle Milestone"
+        message={`Are you sure you want to remove "${title || "this milestone"}" from the chronicle number line?`}
+        confirmLabel="Delete Milestone"
+        cancelLabel="Keep Milestone"
+        isDestructive={true}
+        isLoading={deleting}
+        onConfirm={handleExecuteDelete}
+        onClose={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

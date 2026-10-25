@@ -4,11 +4,14 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import TimelineCard from "@/components/TimelineCard";
+import CreateTimelineModal from "@/components/CreateTimelineModal";
+import ConfirmModal from "@/components/ConfirmModal";
 import { Plus, Search, Layers, Trash2, Sparkles } from "lucide-react";
 
 interface Timeline {
   id: string;
   name: string;
+  description?: string | null;
   deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -24,7 +27,9 @@ export default function DashboardPage() {
   const [tab, setTab] = useState<"all" | "trash">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const fetchTimelines = useCallback(async () => {
     try {
@@ -43,20 +48,23 @@ export default function DashboardPage() {
     fetchTimelines();
   }, [fetchTimelines]);
 
-  async function handleNewTimeline() {
+  async function handleCreateTimeline(name: string, description: string) {
     setCreating(true);
     try {
       const res = await fetch("/api/timelines", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: "Untitled Timeline" }),
+        body: JSON.stringify({ name, description }),
       });
       if (res.ok) {
         const timeline = await res.json();
+        setShowCreateModal(false);
         router.push(`/timeline/${timeline.id}`);
       } else {
-        alert("Failed to create timeline. Please verify your connection or session.");
+        setErrorMessage("Failed to create chronicle. Please verify your connection or session.");
       }
+    } catch {
+      setErrorMessage("Network error occurred while creating chronicle. Please try again.");
     } finally {
       setCreating(false);
     }
@@ -102,21 +110,12 @@ export default function DashboardPage() {
           {/* New Timeline Button */}
           <div className="flex items-center gap-3">
             <button
-              onClick={handleNewTimeline}
+              onClick={() => setShowCreateModal(true)}
               disabled={creating}
               className="btn-gold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 cursor-pointer disabled:opacity-60 font-mono tracking-wide"
             >
-              {creating ? (
-                <>
-                  <div className="w-3.5 h-3.5 border-2 border-[#070c16]/40 border-t-[#070c16] rounded-full animate-spin" />
-                  <span>Creating Studio...</span>
-                </>
-              ) : (
-                <>
-                  <Plus className="w-4 h-4 stroke-[2.5]" />
-                  <span>Create Timeline</span>
-                </>
-              )}
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <span>Create Timeline</span>
             </button>
           </div>
         </div>
@@ -201,7 +200,7 @@ export default function DashboardPage() {
             </p>
             {tab === "all" && !searchQuery && (
               <button
-                onClick={handleNewTimeline}
+                onClick={() => setShowCreateModal(true)}
                 disabled={creating}
                 className="btn-gold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 cursor-pointer font-mono font-semibold"
               >
@@ -229,6 +228,26 @@ export default function DashboardPage() {
           </p>
         </div>
       </div>
+
+      {/* In-Viewport Create Timeline Modal */}
+      <CreateTimelineModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreate={handleCreateTimeline}
+        isLoading={creating}
+      />
+
+      {/* Error Modal */}
+      <ConfirmModal
+        isOpen={errorMessage !== null}
+        title="Notice"
+        message={errorMessage || ""}
+        confirmLabel="Understood"
+        cancelLabel="Close"
+        isDestructive={false}
+        onConfirm={() => setErrorMessage(null)}
+        onClose={() => setErrorMessage(null)}
+      />
     </div>
   );
 }

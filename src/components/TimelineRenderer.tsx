@@ -7,9 +7,19 @@ import {
   ZoomOut,
   Maximize2,
   Layers,
+  Plus,
+  Trash2,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 
-interface EventData {
+export interface LayerItem {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface EventData {
   id: string;
   year: number;
   isBce: boolean;
@@ -18,6 +28,7 @@ interface EventData {
   title: string;
   description: string | null;
   color: string;
+  layer?: string | null;
 }
 
 interface TimelineRendererProps {
@@ -27,8 +38,14 @@ interface TimelineRendererProps {
   tickColor: string;
   textColor: string;
   showGapBorder?: boolean;
+  layers?: LayerItem[];
+  activeLayerNames?: string[];
+  onToggleLayer?: (name: string) => void;
+  onToggleAllLayers?: (all: boolean) => void;
+  onCreateLayer?: (name: string, color: string) => Promise<LayerItem>;
+  onDeleteLayer?: (id: string, name: string) => Promise<void>;
   onEventClick: (event: EventData) => void;
-  onBgClick: (year: number, isBce: boolean) => void;
+  onBgClick?: (year: number, isBce: boolean) => void;
 }
 
 const BASE_PIXELS_PER_YEAR = 0.05;
@@ -38,6 +55,17 @@ const MAX_ZOOM = 50;
 const TICK_HEIGHT = 14;
 const DOT_RADIUS = 5;
 
+const PRESET_LAYER_COLORS = [
+  "#c9a84c", // Imperial Gold
+  "#38bdf8", // Sky Azure
+  "#10b981", // Emerald
+  "#f43f5e", // Crimson Rose
+  "#a855f7", // Royal Purple
+  "#f97316", // Amber Orange
+  "#06b6d4", // Cyan
+  "#f472b6", // Rose Quartz
+];
+
 export default function TimelineRenderer({
   events,
   bgColor,
@@ -45,8 +73,13 @@ export default function TimelineRenderer({
   tickColor,
   textColor,
   showGapBorder = true,
+  layers = [],
+  activeLayerNames = [],
+  onToggleLayer,
+  onToggleAllLayers,
+  onCreateLayer,
+  onDeleteLayer,
   onEventClick,
-  onBgClick,
 }: TimelineRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 1200, height: 800 });
@@ -58,6 +91,14 @@ export default function TimelineRenderer({
   const [showGaps, setShowGaps] = useState(true);
   const [cursorYear, setCursorYear] = useState<number | null>(null);
   const [cursorX, setCursorX] = useState<number | null>(null);
+
+  // Layers Popover Menu state
+  const [showLayersMenu, setShowLayersMenu] = useState(false);
+  const [newPeriodName, setNewPeriodName] = useState("");
+  const [newPeriodColor, setNewPeriodColor] = useState("#38bdf8");
+  const [showAddPeriodInput, setShowAddPeriodInput] = useState(false);
+  const [creatingLayer, setCreatingLayer] = useState(false);
+  const layersMenuRef = useRef<HTMLDivElement>(null);
 
   // Drag state
   const isDragging = useRef(false);
@@ -83,11 +124,59 @@ export default function TimelineRenderer({
     return () => ro.disconnect();
   }, []);
 
-  // Year-to-x coordinate mapping
+  // Close layers menu on outside click
+  useEffect(() => {
+    if (!showLayersMenu) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (layersMenuRef.current && !layersMenuRef.current.contains(e.target as Node)) {
+        setShowLayersMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [showLayersMenu]);
+
+  // Color lookup map for each layer
+  const layerColorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    layers.forEach((l) => map.set(l.name, l.color));
+    return map;
+  }, [layers]);
+
+  // Count events per layer
+  const layerEventCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    events.forEach((e) => {
+      const lyr = e.layer || "General";
+      counts.set(lyr, (counts.get(lyr) || 0) + 1);
+    });
+    return counts;
+  }, [events]);
+
+  // Filter visible events based on active layers selection & assign layer colors
+  const visibleEvents = useMemo(() => {
+    const activeSet = new Set(activeLayerNames);
+    return events
+      .filter((e) => {
+        const lyr = e.layer || "General";
+        // If activeLayerNames is empty, show all; otherwise check set membership
+        return activeLayerNames.length === 0 || activeSet.has(lyr);
+      })
+      .map((e) => {
+        const lyr = e.layer || "General";
+        const customColor = layerColorMap.get(lyr) || e.color;
+        return {
+          ...e,
+          color: customColor,
+        };
+      });
+  }, [events, activeLayerNames, layerColorMap]);
+
+  // Year-to-x coordinate mapping based on visible events
   const baseEventPositions = useMemo(() => {
     const map = new Map<string, number>();
-    if (events.length === 0) return map;
-    const sorted = [...events].sort((a, b) => {
+    if (visibleEvents.length === 0) return map;
+    const sorted = [...visibleEvents].sort((a, b) => {
       const ya = a.isBce ? -Math.abs(a.year) : a.year;
       const yb = b.isBce ? -Math.abs(b.year) : b.year;
       return ya - yb;
@@ -99,7 +188,7 @@ export default function TimelineRenderer({
       map.set(e.id, start + i * SPACING);
     });
     return map;
-  }, [events]);
+  }, [visibleEvents]);
 
   // Year-to-x mapping (supports both modes)
   const yearToX = useCallback(
@@ -108,7 +197,7 @@ export default function TimelineRenderer({
         return dimensions.width / 2 + year * BASE_PIXELS_PER_YEAR * zoom + panX;
       }
       // Even mode: find event or interpolate
-      const match = events.find(
+      const match = visibleEvents.find(
         (e) => (e.isBce ? -Math.abs(e.year) : e.year) === year
       );
       if (match) {
@@ -118,7 +207,7 @@ export default function TimelineRenderer({
         }
       }
       // Interpolate between nearest events
-      const sorted = events
+      const sorted = visibleEvents
         .map((e) => ({
           ey: e.isBce ? -Math.abs(e.year) : e.year,
           x:
@@ -140,7 +229,7 @@ export default function TimelineRenderer({
       }
       return dimensions.width / 2;
     },
-    [events, baseEventPositions, layoutMode, zoom, panX, dimensions.width]
+    [visibleEvents, baseEventPositions, layoutMode, zoom, panX, dimensions.width]
   );
 
   // X-to-year: inverse of yearToX
@@ -149,7 +238,7 @@ export default function TimelineRenderer({
       if (layoutMode === "proportional") {
         return (x - dimensions.width / 2 - panX) / (BASE_PIXELS_PER_YEAR * zoom);
       }
-      const sorted = events
+      const sorted = visibleEvents
         .map((e) => ({
           ey: e.isBce ? -Math.abs(e.year) : e.year,
           x:
@@ -171,36 +260,36 @@ export default function TimelineRenderer({
       }
       return 0;
     },
-    [events, baseEventPositions, layoutMode, zoom, panX, dimensions.width]
+    [visibleEvents, baseEventPositions, layoutMode, zoom, panX, dimensions.width]
   );
 
-  // Check if any event is at year 0
+  // Check if any visible event is at year 0
   const hasYearZero = useMemo(
-    () => events.some((e) => e.year === 0 && !e.isBce),
-    [events]
+    () => visibleEvents.some((e) => e.year === 0 && !e.isBce),
+    [visibleEvents]
   );
 
   // Sorted events for gap calculation
   const sortedEvents = useMemo(() => {
-    return [...events].sort((a, b) => {
+    return [...visibleEvents].sort((a, b) => {
       const ya = a.isBce ? -Math.abs(a.year) : a.year;
       const yb = b.isBce ? -Math.abs(b.year) : b.year;
       return ya - yb;
     });
-  }, [events]);
+  }, [visibleEvents]);
 
-  // Layout labels
+  // Layout labels for visible events
   const layoutItems = useMemo(
-    () => layoutLabels(events, yearToX),
-    [events, yearToX]
+    () => layoutLabels(visibleEvents, yearToX),
+    [visibleEvents, yearToX]
   );
 
   // Compute spine extents
-  const hasEvents = events.length > 0;
+  const hasEvents = visibleEvents.length > 0;
   const spineLeft = useMemo(() => {
     if (!hasEvents) return 0;
     if (layoutMode === "proportional") {
-      const years = events.map((e) => (e.isBce ? -Math.abs(e.year) : e.year));
+      const years = visibleEvents.map((e) => (e.isBce ? -Math.abs(e.year) : e.year));
       years.push(0);
       const minYear = Math.min(...years);
       return yearToX(minYear) - 80;
@@ -209,12 +298,12 @@ export default function TimelineRenderer({
       (bx) => dimensions.width / 2 + bx * zoom + panX
     );
     return Math.min(...positions) - 100;
-  }, [hasEvents, baseEventPositions, layoutMode, events, zoom, panX, dimensions.width, yearToX]);
+  }, [hasEvents, baseEventPositions, layoutMode, visibleEvents, zoom, panX, dimensions.width, yearToX]);
 
   const spineRight = useMemo(() => {
     if (!hasEvents) return 0;
     if (layoutMode === "proportional") {
-      const years = events.map((e) => (e.isBce ? -Math.abs(e.year) : e.year));
+      const years = visibleEvents.map((e) => (e.isBce ? -Math.abs(e.year) : e.year));
       years.push(0);
       const maxYear = Math.max(...years);
       return yearToX(maxYear) + 80;
@@ -223,16 +312,16 @@ export default function TimelineRenderer({
       (bx) => dimensions.width / 2 + bx * zoom + panX
     );
     return Math.max(...positions) + 100;
-  }, [hasEvents, baseEventPositions, layoutMode, events, zoom, panX, dimensions.width, yearToX]);
+  }, [hasEvents, baseEventPositions, layoutMode, visibleEvents, zoom, panX, dimensions.width, yearToX]);
 
   const spineY = dimensions.height / 2;
   const originX = yearToX(0);
 
-  // Fit all events
+  // Fit all visible events to viewport
   const fitAll = useCallback(() => {
-    if (events.length === 0) return;
+    if (visibleEvents.length === 0) return;
     if (layoutMode === "proportional") {
-      const years = events.map((e) => (e.isBce ? -Math.abs(e.year) : e.year));
+      const years = visibleEvents.map((e) => (e.isBce ? -Math.abs(e.year) : e.year));
       years.push(0);
       const minYear = Math.min(...years);
       const maxYear = Math.max(...years);
@@ -252,26 +341,26 @@ export default function TimelineRenderer({
       return;
     }
     const SPACING = 200;
-    const totalSpan = (events.length - 1) * SPACING;
+    const totalSpan = (visibleEvents.length - 1) * SPACING;
     const padding = 140;
     const availableWidth = dimensions.width - padding * 2;
-    const newZoom = events.length > 1 ? availableWidth / totalSpan : 1;
+    const newZoom = visibleEvents.length > 1 ? availableWidth / totalSpan : 1;
     setZoom(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom)));
     setPanX(0);
-  }, [events, layoutMode, dimensions.width]);
+  }, [visibleEvents, layoutMode, dimensions.width]);
 
-  // Auto-fit on first load and when events change
-  const prevEventCount = useRef(events.length);
+  // Auto-fit on first load and when visible events change
+  const prevEventCount = useRef(visibleEvents.length);
   useEffect(() => {
-    if (events.length !== prevEventCount.current || prevEventCount.current === 0) {
-      prevEventCount.current = events.length;
-      if (events.length > 0) {
+    if (visibleEvents.length !== prevEventCount.current || prevEventCount.current === 0) {
+      prevEventCount.current = visibleEvents.length;
+      if (visibleEvents.length > 0) {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => fitAllRef.current());
         });
       }
     }
-  }, [events.length, fitAll]);
+  }, [visibleEvents.length, fitAll]);
 
   // Auto-fit when layout mode changes
   const fitAllRef = useRef(fitAll);
@@ -393,24 +482,15 @@ export default function TimelineRenderer({
     pinchDist.current = null;
   }, []);
 
-  // Click on background to add event at that coordinate
-  const handleSvgClick = useCallback(
-    (e: React.MouseEvent) => {
-      if (hasDragged.current) return;
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
+  // SVG Canvas Click: Deselects / closes popovers.
+  // Crucially: Clicking empty canvas DOES NOT open the Add Milestone modal.
+  const handleSvgClick = useCallback(() => {
+    if (hasDragged.current) return;
+    setShowLayersMenu(false);
+    setHoveredEvent(null);
+  }, []);
 
-      const svgX = e.clientX - rect.left;
-      const year = xToYear(svgX);
-      const roundedYear = Math.round(year);
-      const isBce = roundedYear < 0;
-
-      onBgClick(Math.abs(roundedYear), isBce);
-    },
-    [xToYear, onBgClick]
-  );
-
-  // Manual Zoom In / Zoom Out functions
+  // Zoom In / Zoom Out functions
   const zoomIn = useCallback(() => {
     setZoom((z) => Math.min(MAX_ZOOM, z * 1.25));
   }, []);
@@ -418,6 +498,20 @@ export default function TimelineRenderer({
   const zoomOut = useCallback(() => {
     setZoom((z) => Math.max(MIN_ZOOM, z / 1.25));
   }, []);
+
+  // Quick Layer Creation inside popover
+  async function handleCreatePeriod() {
+    const trimmed = newPeriodName.trim();
+    if (!trimmed || !onCreateLayer) return;
+    setCreatingLayer(true);
+    try {
+      await onCreateLayer(trimmed, newPeriodColor);
+      setNewPeriodName("");
+      setShowAddPeriodInput(false);
+    } finally {
+      setCreatingLayer(false);
+    }
+  }
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -600,7 +694,7 @@ export default function TimelineRenderer({
             {/* Event ticks, connectors, and cards */}
             {layoutItems.map((item) => (
               <g key={item.eventId} className="event-group">
-                {/* Vertical tick on axis */}
+                {/* Vertical tick on axis with layer's unique color */}
                 <line
                   x1={item.x}
                   y1={spineY - TICK_HEIGHT / 2}
@@ -611,7 +705,7 @@ export default function TimelineRenderer({
                   opacity="0.95"
                 />
 
-                {/* Spine dot node */}
+                {/* Spine dot node with layer's unique color */}
                 <circle
                   cx={item.x}
                   cy={spineY}
@@ -642,6 +736,7 @@ export default function TimelineRenderer({
                           title: item.title,
                           description: item.description,
                           color: item.color,
+                          layer: item.layer,
                         });
                       }
                     }}
@@ -669,7 +764,7 @@ export default function TimelineRenderer({
                     />
                   </g>
                 ) : (
-                  // Full Label Card
+                  // Full Label Card with Layer's Unique Line & Border Color
                   <g
                     style={{ cursor: "pointer" }}
                     onClick={(e) => {
@@ -684,22 +779,23 @@ export default function TimelineRenderer({
                           title: item.title,
                           description: item.description,
                           color: item.color,
+                          layer: item.layer,
                         });
                       }
                     }}
                   >
-                    {/* Connector line from spine tick to label */}
+                    {/* Connector line with layer color */}
                     <line
                       x1={item.x}
                       y1={spineY - TICK_HEIGHT / 2}
                       x2={item.x}
                       y2={spineY - TICK_HEIGHT / 2 - 8 - item.tier * TIER_SPACING}
                       stroke={item.color}
-                      strokeWidth="1.2"
-                      opacity="0.65"
+                      strokeWidth="1.5"
+                      opacity="0.8"
                     />
 
-                    {/* Card background */}
+                    {/* Card background with layer's unique border color */}
                     <rect
                       x={item.x - item.labelWidth / 2}
                       y={spineY - TICK_HEIGHT / 2 - 26 - item.tier * TIER_SPACING}
@@ -708,7 +804,7 @@ export default function TimelineRenderer({
                       rx="6"
                       fill={bgColor}
                       stroke={item.color}
-                      strokeWidth="1.5"
+                      strokeWidth="1.8"
                       opacity="0.95"
                     />
 
@@ -749,33 +845,31 @@ export default function TimelineRenderer({
               <g className="cursor-guide pointer-events-none">
                 <line
                   x1={cursorX}
-                  y1={spineY - 30}
+                  y1={0}
                   x2={cursorX}
-                  y2={spineY + 30}
-                  stroke="#c9a84c"
-                  strokeWidth="1"
+                  y2={dimensions.height}
+                  stroke={spineColor}
+                  strokeWidth="0.8"
                   strokeDasharray="3 3"
-                  opacity="0.5"
+                  opacity="0.25"
                 />
-                <circle cx={cursorX} cy={spineY} r="3" fill="#c9a84c" opacity="0.8" />
               </g>
             )}
           </>
         )}
 
-        {/* Empty Canvas Welcome State */}
+        {/* Empty State when no visible events */}
         {!hasEvents && (
-          <g>
-            {/* Axis preview line */}
+          <g className="empty-state select-none">
             <line
-              x1={dimensions.width / 2 - 200}
+              x1={dimensions.width * 0.15}
               y1={dimensions.height / 2}
-              x2={dimensions.width / 2 + 200}
+              x2={dimensions.width * 0.85}
               y2={dimensions.height / 2}
               stroke={spineColor}
               strokeWidth="2"
-              strokeDasharray="6 6"
               opacity="0.3"
+              strokeDasharray="6 6"
             />
             <circle
               cx={dimensions.width / 2}
@@ -786,7 +880,7 @@ export default function TimelineRenderer({
             />
             <text
               x={dimensions.width / 2}
-              y={dimensions.height / 2 - 30}
+              y={dimensions.height / 2 - 25}
               textAnchor="middle"
               fill={textColor}
               fontSize="16"
@@ -794,7 +888,9 @@ export default function TimelineRenderer({
               fontWeight="600"
               opacity="0.85"
             >
-              Empty Chronicle Axis
+              {events.length === 0
+                ? "Empty Chronicle Axis"
+                : "No Milestones Visible in Selected Layers"}
             </text>
             <text
               x={dimensions.width / 2}
@@ -805,7 +901,9 @@ export default function TimelineRenderer({
               fontFamily="var(--font-mono)"
               opacity="0.4"
             >
-              Click anywhere on this axis or press + Add Event to begin
+              {events.length === 0
+                ? "Press + Add Event in the studio bar above to plot milestones"
+                : "Enable layers from the [Layers] button above to view events"}
             </text>
           </g>
         )}
@@ -886,6 +984,185 @@ export default function TimelineRenderer({
           <Layers className="w-3.5 h-3.5" />
           <span>Gaps</span>
         </button>
+
+        {/* Layers / Historical Periods Button (Beside Gaps button) */}
+        <div className="relative" ref={layersMenuRef}>
+          <button
+            onClick={() => setShowLayersMenu((v) => !v)}
+            className={`h-8 px-3 rounded-xl theme-hud text-[11px] font-mono flex items-center gap-2 transition-all cursor-pointer ${
+              showLayersMenu || (layers.length > 0 && activeLayerNames.length < layers.length)
+                ? "border-[#c9a84c]/50 text-[#c9a84c] bg-[#c9a84c]/15 font-semibold shadow-md"
+                : "theme-hud-btn"
+            }`}
+            title="Manage and toggle historical period layers"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Layers</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10 font-bold">
+              {activeLayerNames.length}/{layers.length || 1}
+            </span>
+          </button>
+
+          {/* Floating Layers Popover Dock */}
+          {showLayersMenu && (
+            <div className="absolute right-0 top-full mt-2 w-72 rounded-2xl glass-panel p-3 shadow-2xl z-50 border border-black/10 dark:border-white/[0.1] animate-in fade-in slide-in-from-top-2 duration-150">
+              {/* Popover Header */}
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-black/[0.08] dark:border-white/[0.08]">
+                <div className="flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-[#c9a84c]" />
+                  <span className="text-xs font-bold font-mono theme-card-title">
+                    Historical Periods
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 text-[10px] font-mono">
+                  <button
+                    onClick={() => onToggleAllLayers && onToggleAllLayers(true)}
+                    className="px-1.5 py-0.5 rounded text-[#c9a84c] hover:bg-[#c9a84c]/10 cursor-pointer font-medium"
+                    title="Select all layers"
+                  >
+                    All
+                  </button>
+                  <span className="opacity-30">|</span>
+                  <button
+                    onClick={() => onToggleAllLayers && onToggleAllLayers(false)}
+                    className="px-1.5 py-0.5 rounded theme-text-muted hover:opacity-100 cursor-pointer"
+                    title="Deselect all layers"
+                  >
+                    None
+                  </button>
+                </div>
+              </div>
+
+              {/* Layer Checkbox List */}
+              <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5">
+                {layers.map((layer) => {
+                  const isActive = activeLayerNames.includes(layer.name);
+                  const count = layerEventCounts.get(layer.name) || 0;
+
+                  return (
+                    <div
+                      key={layer.id || layer.name}
+                      className={`flex items-center justify-between p-2 rounded-xl transition-colors cursor-pointer group ${
+                        isActive
+                          ? "bg-black/[0.04] dark:bg-white/[0.04] border border-black/10 dark:border-white/10"
+                          : "opacity-60 hover:opacity-100 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
+                      }`}
+                      onClick={() => onToggleLayer && onToggleLayer(layer.name)}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {isActive ? (
+                          <CheckSquare
+                            className="w-4 h-4 shrink-0 transition-transform active:scale-90"
+                            style={{ color: layer.color }}
+                          />
+                        ) : (
+                          <Square className="w-4 h-4 shrink-0 opacity-40" />
+                        )}
+
+                        <div
+                          className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
+                          style={{ backgroundColor: layer.color }}
+                        />
+
+                        <span
+                          className={`text-xs truncate font-mono ${
+                            isActive ? "font-semibold theme-card-title" : "theme-text-muted"
+                          }`}
+                        >
+                          {layer.name}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 opacity-70">
+                          {count}
+                        </span>
+
+                        {layer.name !== "General" && onDeleteLayer && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteLayer(layer.id, layer.name);
+                            }}
+                            className="p-1 opacity-0 group-hover:opacity-100 hover:text-rose-500 rounded transition-opacity cursor-pointer"
+                            title="Delete period"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Add New Period Section */}
+              <div className="mt-2.5 pt-2.5 border-t border-black/[0.08] dark:border-white/[0.08]">
+                {showAddPeriodInput ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={newPeriodName}
+                        onChange={(e) => setNewPeriodName(e.target.value)}
+                        placeholder="Period name (e.g. Bronze Age)"
+                        className="flex-1 px-2.5 py-1.5 rounded-lg theme-input text-xs font-mono outline-none focus:ring-1 focus:ring-[#c9a84c]"
+                        autoFocus
+                      />
+                      <input
+                        type="color"
+                        value={newPeriodColor}
+                        onChange={(e) => setNewPeriodColor(e.target.value)}
+                        className="w-7 h-7 rounded-lg cursor-pointer p-0.5 bg-transparent border border-black/15 dark:border-white/15 shrink-0"
+                        title="Period Color"
+                      />
+                    </div>
+
+                    {/* Quick color preset swatches */}
+                    <div className="flex items-center gap-1.5 py-1 overflow-x-auto">
+                      {PRESET_LAYER_COLORS.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setNewPeriodColor(c)}
+                          className={`w-4 h-4 rounded-full shrink-0 transition-transform cursor-pointer ${
+                            newPeriodColor === c ? "scale-125 ring-1 ring-[#c9a84c]" : "hover:scale-110 opacity-70 hover:opacity-100"
+                          }`}
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-1.5 justify-end">
+                      <button
+                        onClick={() => setShowAddPeriodInput(false)}
+                        className="px-2.5 py-1 rounded-lg theme-pill text-[11px] font-mono cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleCreatePeriod}
+                        disabled={creatingLayer || !newPeriodName.trim()}
+                        className="btn-gold px-3 py-1 rounded-lg text-[11px] font-mono font-semibold cursor-pointer disabled:opacity-50"
+                      >
+                        {creatingLayer ? "Adding..." : "Add Layer"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowAddPeriodInput(true)}
+                    className="w-full py-1.5 px-2 rounded-xl text-xs font-mono text-[#c9a84c] hover:bg-[#c9a84c]/10 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>New Period / Layer</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Floating HUD: Bottom-Right Zoom & Fit Dock */}

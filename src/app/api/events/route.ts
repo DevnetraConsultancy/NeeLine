@@ -67,21 +67,44 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Timeline not found" }, { status: 404 });
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const createData = body.events.map((e: any) => ({
-        timelineId: body.timelineId,
-        year: Math.abs(parseInt(e.year || 0, 10)),
+      interface RawEventItem {
+        year?: number | string;
+        isBce?: boolean;
+        month?: number | string | null;
+        day?: number | string | null;
+        title?: string;
+        description?: string | null;
+        color?: string;
+        layer?: string | null;
+      }
+
+      const createData = (body.events as RawEventItem[]).map((e) => ({
+        timelineId: body.timelineId as string,
+        year: Math.abs(parseInt(String(e.year || 0), 10)),
         isBce: Boolean(e.isBce),
-        month: e.month ? Math.min(12, Math.max(1, parseInt(e.month, 10))) : null,
-        day: e.day ? Math.min(31, Math.max(1, parseInt(e.day, 10))) : null,
+        month: e.month ? Math.min(12, Math.max(1, parseInt(String(e.month), 10))) : null,
+        day: e.day ? Math.min(31, Math.max(1, parseInt(String(e.day), 10))) : null,
         title: String(e.title || "Untitled").trim(),
         description: e.description ? String(e.description).trim() : null,
         color: typeof e.color === "string" && e.color.startsWith("#") ? e.color : "#c9a84c",
+        layer: typeof e.layer === "string" && e.layer.trim() ? e.layer.trim() : "General",
       }));
 
-      await prisma.event.createMany({
-        data: createData,
-      });
+      try {
+        await prisma.event.createMany({
+          data: createData,
+        });
+      } catch {
+        // Fallback without layer field if DB schema not yet updated
+        const strippedData = createData.map((item: (typeof createData)[number]) => {
+          const { layer: _, ...rest } = item;
+          void _;
+          return rest;
+        });
+        await prisma.event.createMany({
+          data: strippedData,
+        });
+      }
 
       await prisma.timeline.update({
         where: { id: body.timelineId },
@@ -92,7 +115,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Single event creation
-    const { timelineId, year, isBce, month, day, title, description, color } = body;
+    const { timelineId, year, isBce, month, day, title, description, color, layer } = body;
 
     if (!timelineId || year === undefined || !title) {
       return NextResponse.json(
@@ -109,18 +132,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Timeline not found" }, { status: 404 });
     }
 
-    const event = await prisma.event.create({
-      data: {
-        timelineId,
-        year: Math.abs(parseInt(year, 10)),
-        isBce: Boolean(isBce),
-        month: month ? Math.min(12, Math.max(1, parseInt(month, 10))) : null,
-        day: day ? Math.min(31, Math.max(1, parseInt(day, 10))) : null,
-        title: String(title).trim(),
-        description: description ? String(description).trim() : null,
-        color: typeof color === "string" && color.startsWith("#") ? color : "#c9a84c",
-      },
-    });
+    const safeLayer = typeof layer === "string" && layer.trim() ? layer.trim() : "General";
+
+    let event;
+    try {
+      event = await prisma.event.create({
+        data: {
+          timelineId,
+          year: Math.abs(parseInt(year, 10)),
+          isBce: Boolean(isBce),
+          month: month ? Math.min(12, Math.max(1, parseInt(month, 10))) : null,
+          day: day ? Math.min(31, Math.max(1, parseInt(day, 10))) : null,
+          title: String(title).trim(),
+          description: description ? String(description).trim() : null,
+          color: typeof color === "string" && color.startsWith("#") ? color : "#c9a84c",
+          layer: safeLayer,
+        },
+      });
+    } catch {
+      event = await prisma.event.create({
+        data: {
+          timelineId,
+          year: Math.abs(parseInt(year, 10)),
+          isBce: Boolean(isBce),
+          month: month ? Math.min(12, Math.max(1, parseInt(month, 10))) : null,
+          day: day ? Math.min(31, Math.max(1, parseInt(day, 10))) : null,
+          title: String(title).trim(),
+          description: description ? String(description).trim() : null,
+          color: typeof color === "string" && color.startsWith("#") ? color : "#c9a84c",
+        },
+      });
+    }
 
     // Touch the timeline's updatedAt
     await prisma.timeline.update({
@@ -180,11 +222,25 @@ export async function PATCH(req: NextRequest) {
     if (body.color !== undefined) {
       data.color = typeof body.color === "string" && body.color.startsWith("#") ? body.color : "#c9a84c";
     }
+    if (body.layer !== undefined) {
+      data.layer = typeof body.layer === "string" && body.layer.trim() ? body.layer.trim() : "General";
+    }
 
-    const updated = await prisma.event.update({
-      where: { id },
-      data,
-    });
+    let updated;
+    try {
+      updated = await prisma.event.update({
+        where: { id },
+        data,
+      });
+    } catch {
+      // Fallback without layer field
+      const fallbackData = { ...data };
+      delete fallbackData.layer;
+      updated = await prisma.event.update({
+        where: { id },
+        data: fallbackData,
+      });
+    }
 
     // Touch the timeline's updatedAt
     await prisma.timeline.update({

@@ -4,9 +4,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
-import TimelineRenderer from "@/components/TimelineRenderer";
-import EventForm from "@/components/EventForm";
+import TimelineRenderer, { LayerItem } from "@/components/TimelineRenderer";
+import EventForm, { EventFormData } from "@/components/EventForm";
 import TimelineSettings from "@/components/TimelineSettings";
+import ConfirmModal from "@/components/ConfirmModal";
 import { exportTimelineAsPng, exportTimelineAsTxt } from "@/components/PngExport";
 import {
   ChevronLeft,
@@ -30,16 +31,22 @@ interface EventData {
   title: string;
   description: string | null;
   color: string;
+  layer?: string | null;
 }
 
 interface TimelineData {
   id: string;
   name: string;
+  description?: string | null;
   bgColor: string;
   spineColor: string;
   tickColor: string;
   textColor: string;
 }
+
+const DEFAULT_LAYERS: LayerItem[] = [
+  { id: "layer-general", name: "General", color: "#c9a84c" },
+];
 
 export default function TimelinePage() {
   const params = useParams();
@@ -48,6 +55,8 @@ export default function TimelinePage() {
 
   const [timeline, setTimeline] = useState<TimelineData | null>(null);
   const [events, setEvents] = useState<EventData[]>([]);
+  const [layers, setLayers] = useState<LayerItem[]>(DEFAULT_LAYERS);
+  const [activeLayerNames, setActiveLayerNames] = useState<string[]>(["General"]);
   const [loading, setLoading] = useState(true);
 
   // Modal and custom states
@@ -59,6 +68,7 @@ export default function TimelinePage() {
   const [uploading, setUploading] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showGapBorder, setShowGapBorder] = useState(true);
+  const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
 
   const jsonInputRef = useRef<HTMLInputElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -88,12 +98,13 @@ export default function TimelinePage() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showExportMenu]);
 
-  // Fetch timeline + events
+  // Fetch timeline, events, and layers
   const fetchData = useCallback(async () => {
     try {
-      const [timelinesRes, eventsRes] = await Promise.all([
+      const [timelinesRes, eventsRes, layersRes] = await Promise.all([
         fetch(`/api/timelines`),
         fetch(`/api/events?timelineId=${timelineId}`),
+        fetch(`/api/layers?timelineId=${timelineId}`),
       ]);
 
       if (!timelinesRes.ok || !eventsRes.ok) {
@@ -110,7 +121,75 @@ export default function TimelinePage() {
 
       setTimeline(found);
       setNameValue(found.name);
-      setEvents(await eventsRes.json());
+
+      const fetchedEvents: EventData[] = await eventsRes.json();
+      setEvents(fetchedEvents);
+
+      // Process layers
+      let fetchedLayers: LayerItem[] = [];
+      if (layersRes.ok) {
+        try {
+          fetchedLayers = await layersRes.json();
+        } catch {
+          fetchedLayers = [];
+        }
+      }
+
+      // Check localStorage for offline/cached layers
+      const cachedLayersKey = `neeline_layers_${timelineId}`;
+      const savedLayers = localStorage.getItem(cachedLayersKey);
+      if (savedLayers) {
+        try {
+          const parsed = JSON.parse(savedLayers);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            // merge cached with fetched
+            const map = new Map<string, LayerItem>();
+            parsed.forEach((l: LayerItem) => map.set(l.name, l));
+            fetchedLayers.forEach((l: LayerItem) => map.set(l.name, l));
+            fetchedLayers = Array.from(map.values());
+          }
+        } catch {
+          // ignore cache parse errors
+        }
+      }
+
+      // Ensure "General" layer exists
+      if (!fetchedLayers.some((l) => l.name === "General")) {
+        fetchedLayers.unshift({ id: "layer-general", name: "General", color: "#c9a84c" });
+      }
+
+      // Discover any distinct layers present in events
+      fetchedEvents.forEach((ev) => {
+        const evLayer = ev.layer || "General";
+        if (!fetchedLayers.some((l) => l.name === evLayer)) {
+          fetchedLayers.push({
+            id: `layer-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            name: evLayer,
+            color: ev.color || "#5a9bd5",
+          });
+        }
+      });
+
+      setLayers(fetchedLayers);
+      localStorage.setItem(cachedLayersKey, JSON.stringify(fetchedLayers));
+
+      // Active layers
+      const activeKey = `neeline_active_layers_${timelineId}`;
+      const savedActive = localStorage.getItem(activeKey);
+      if (savedActive) {
+        try {
+          const parsed = JSON.parse(savedActive);
+          if (Array.isArray(parsed)) {
+            setActiveLayerNames(parsed);
+          } else {
+            setActiveLayerNames(fetchedLayers.map((l) => l.name));
+          }
+        } catch {
+          setActiveLayerNames(fetchedLayers.map((l) => l.name));
+        }
+      } else {
+        setActiveLayerNames(fetchedLayers.map((l) => l.name));
+      }
     } catch {
       router.push("/dashboard");
     } finally {
@@ -122,37 +201,103 @@ export default function TimelinePage() {
     fetchData();
   }, [fetchData]);
 
-  // Add event via click on background
-  const handleBgClick = useCallback(
-    (year: number, isBce: boolean) => {
-      setEditingEvent(null);
-      setEditingEvent({
-        id: "",
-        year,
-        isBce,
-        month: null,
-        day: null,
-        title: "",
-        description: null,
-        color: "#c9a84c",
+  // Toggle single layer visibility
+  const handleToggleLayer = useCallback(
+    (name: string) => {
+      setActiveLayerNames((prev) => {
+        let updated: string[];
+        if (prev.includes(name)) {
+          updated = prev.filter((l) => l !== name);
+        } else {
+          updated = [...prev, name];
+        }
+        localStorage.setItem(`neeline_active_layers_${timelineId}`, JSON.stringify(updated));
+        return updated;
       });
-      setShowEventForm(true);
     },
-    []
+    [timelineId]
+  );
+
+  // Toggle all layers
+  const handleToggleAllLayers = useCallback(
+    (all: boolean) => {
+      const updated = all ? layers.map((l) => l.name) : [];
+      setActiveLayerNames(updated);
+      localStorage.setItem(`neeline_active_layers_${timelineId}`, JSON.stringify(updated));
+    },
+    [layers, timelineId]
+  );
+
+  // Create new layer/period
+  const handleCreateLayer = useCallback(
+    async (name: string, color: string): Promise<LayerItem> => {
+      let createdLayer: LayerItem = {
+        id: `layer-${Date.now()}`,
+        name,
+        color,
+      };
+
+      try {
+        const res = await fetch("/api/layers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ timelineId, name, color }),
+        });
+        if (res.ok) {
+          createdLayer = await res.json();
+        }
+      } catch (err) {
+        console.warn("Failed to save layer to backend API, cached locally", err);
+      }
+
+      setLayers((prev) => {
+        const updated = [...prev.filter((l) => l.name !== name), createdLayer];
+        localStorage.setItem(`neeline_layers_${timelineId}`, JSON.stringify(updated));
+        return updated;
+      });
+
+      setActiveLayerNames((prev) => {
+        const updated = prev.includes(name) ? prev : [...prev, name];
+        localStorage.setItem(`neeline_active_layers_${timelineId}`, JSON.stringify(updated));
+        return updated;
+      });
+
+      return createdLayer;
+    },
+    [timelineId]
+  );
+
+  // Delete layer
+  const handleDeleteLayer = useCallback(
+    async (id: string, name: string) => {
+      if (name === "General") return;
+
+      try {
+        if (id && !id.startsWith("layer-")) {
+          await fetch(`/api/layers?id=${id}`, { method: "DELETE" });
+        }
+      } catch (err) {
+        console.warn("Failed to delete layer on backend", err);
+      }
+
+      setLayers((prev) => {
+        const updated = prev.filter((l) => l.name !== name);
+        localStorage.setItem(`neeline_layers_${timelineId}`, JSON.stringify(updated));
+        return updated;
+      });
+
+      setActiveLayerNames((prev) => {
+        const updated = prev.filter((l) => l !== name);
+        localStorage.setItem(`neeline_active_layers_${timelineId}`, JSON.stringify(updated));
+        return updated;
+      });
+    },
+    [timelineId]
   );
 
   // Save event (create or update)
   const handleSaveEvent = useCallback(
-    async (data: {
-      id?: string;
-      year: number;
-      isBce: boolean;
-      month: string;
-      day: string;
-      title: string;
-      description: string;
-      color: string;
-    }) => {
+    async (data: EventFormData) => {
       const isEdit = !!data.id;
       const url = isEdit ? `/api/events?id=${data.id}` : "/api/events";
       const method = isEdit ? "PATCH" : "POST";
@@ -167,6 +312,7 @@ export default function TimelinePage() {
         title: data.title,
         description: data.description || null,
         color: data.color,
+        layer: data.layer || "General",
       };
 
       await fetch(url, {
@@ -175,11 +321,20 @@ export default function TimelinePage() {
         body: JSON.stringify(body),
       });
 
+      // Ensure the layer is activated so user immediately sees their new event
+      if (data.layer && !activeLayerNames.includes(data.layer)) {
+        setActiveLayerNames((prev) => {
+          const updated = [...prev, data.layer!];
+          localStorage.setItem(`neeline_active_layers_${timelineId}`, JSON.stringify(updated));
+          return updated;
+        });
+      }
+
       setShowEventForm(false);
       setEditingEvent(null);
       fetchData();
     },
-    [timelineId, fetchData]
+    [timelineId, activeLayerNames, fetchData]
   );
 
   // Delete event
@@ -257,6 +412,7 @@ export default function TimelinePage() {
                 title: typeof item.title === "string" && item.title.trim() ? item.title.trim() : "Untitled",
                 description: typeof item.description === "string" ? item.description.trim() : null,
                 color: typeof item.color === "string" && item.color.startsWith("#") ? item.color : "#c9a84c",
+                layer: typeof item.layer === "string" && item.layer.trim() ? item.layer.trim() : "General",
               })),
             }),
           });
@@ -264,7 +420,7 @@ export default function TimelinePage() {
         }
         fetchData();
       } catch {
-        alert("Invalid JSON file. Expected an array of events.");
+        setNoticeMessage("Invalid JSON file. Expected an array of milestone events.");
       } finally {
         setUploading(false);
         if (jsonInputRef.current) jsonInputRef.current.value = "";
@@ -394,7 +550,7 @@ export default function TimelinePage() {
             </button>
 
             {showExportMenu && (
-              <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl glass-panel p-1.5 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl glass-panel p-1.5 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150 border border-black/10 dark:border-white/[0.08]">
                 <button
                   onClick={() => {
                     jsonInputRef.current?.click();
@@ -446,17 +602,20 @@ export default function TimelinePage() {
 
           {/* 3. Add Event Small Icon Button (Beside Canvas Settings on the right) */}
           <button
-            onClick={() => setShowEventForm(true)}
+            onClick={() => {
+              setEditingEvent(null);
+              setShowEventForm(true);
+            }}
             className="btn-gold w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer shadow-md"
-            title="Add Milestone / Event (or click anywhere on the number line)"
-            aria-label="Add Milestone / Event"
+            title="Add Chronicle Milestone"
+            aria-label="Add Chronicle Milestone"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
           </button>
         </div>
       </div>
 
-      {/* Main Interactive Canvas Area (Retains custom canvas background) */}
+      {/* Main Interactive Canvas Area */}
       <div className="flex-1 mt-[112px] mb-[36px] relative">
         <TimelineRenderer
           events={events}
@@ -465,15 +624,20 @@ export default function TimelinePage() {
           tickColor={timeline.tickColor}
           textColor={timeline.textColor}
           showGapBorder={showGapBorder}
+          layers={layers}
+          activeLayerNames={activeLayerNames}
+          onToggleLayer={handleToggleLayer}
+          onToggleAllLayers={handleToggleAllLayers}
+          onCreateLayer={handleCreateLayer}
+          onDeleteLayer={handleDeleteLayer}
           onEventClick={(event) => {
             setEditingEvent(event);
             setShowEventForm(true);
           }}
-          onBgClick={handleBgClick}
         />
       </div>
 
-      {/* Event Add/Edit Modal */}
+      {/* Event Add/Edit Modal: ONLY 'X' closes it */}
       {showEventForm && (
         <EventForm
           initialData={
@@ -487,9 +651,12 @@ export default function TimelinePage() {
                   title: editingEvent.title,
                   description: editingEvent.description || "",
                   color: editingEvent.color,
+                  layer: editingEvent.layer || "General",
                 }
               : undefined
           }
+          availableLayers={layers}
+          onCreateLayer={handleCreateLayer}
           onSave={handleSaveEvent}
           onDelete={editingEvent?.id ? handleDeleteEvent : undefined}
           onClose={() => {
@@ -512,6 +679,18 @@ export default function TimelinePage() {
           onClose={() => setShowSettings(false)}
         />
       )}
+
+      {/* In-Viewport Notification / Error Modal */}
+      <ConfirmModal
+        isOpen={noticeMessage !== null}
+        title="Notice"
+        message={noticeMessage || ""}
+        confirmLabel="Understood"
+        cancelLabel="Close"
+        isDestructive={false}
+        onConfirm={() => setNoticeMessage(null)}
+        onClose={() => setNoticeMessage(null)}
+      />
 
       {/* Studio Micro Footer Status Bar */}
       <div className="fixed bottom-0 left-0 right-0 h-9 px-6 theme-footer z-40 flex items-center justify-between text-[11px] font-mono">

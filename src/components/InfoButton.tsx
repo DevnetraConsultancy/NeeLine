@@ -35,9 +35,6 @@ export default function InfoButton() {
         createPortal(
           <div
             className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) setShowModal(false);
-            }}
           >
             <div
               className="glass-panel rounded-2xl p-6 max-w-lg w-full shadow-[0_25px_60px_rgba(0,0,0,0.85)] border border-black/10 dark:border-white/[0.12] max-h-[88vh] overflow-y-auto flex flex-col"
@@ -133,9 +130,9 @@ export default function InfoButton() {
                         </kbd>
                       </div>
                       <div className="flex items-center justify-between p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.06] text-xs">
-                        <span className="theme-text-muted">Add milestone at exact coordinate</span>
+                        <span className="theme-text-muted">Add new chronicle milestone</span>
                         <kbd className="px-2.5 py-1 rounded-md bg-black/[0.06] dark:bg-[#070c16] text-[#c9a84c] font-mono text-xs border border-black/10 dark:border-white/[0.1] shadow-sm font-semibold">
-                          Click Axis Line
+                          + Add Event Button
                         </kbd>
                       </div>
                       <div className="flex items-center justify-between p-2.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.06] text-xs">
@@ -241,6 +238,20 @@ export default function InfoButton() {
                       </h4>
                       <p className="text-[11px] theme-text-muted mt-0.5 font-light leading-relaxed">
                         Switch between dense even layout and true physical time proportion with elapsed year gap indicators.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.06] dark:border-white/[0.06] flex items-start gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-[#38bdf8]/15 text-[#38bdf8] flex items-center justify-center shrink-0 mt-0.5">
+                      <Layers className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-semibold theme-card-title">
+                        Layers & Historical Periods
+                      </h4>
+                      <p className="text-[11px] theme-text-muted mt-0.5 font-light leading-relaxed">
+                        Located beside the Gaps button. Group events into distinct historical periods (e.g. Period A, Period B, Bronze Age) with unique chromatic lines and borders. Selectively toggle layers via checkboxes to isolate or cross-compare specific periods.
                       </p>
                     </div>
                   </div>

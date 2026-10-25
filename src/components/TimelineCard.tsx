@@ -12,6 +12,7 @@ import {
   Check,
   X,
 } from "lucide-react";
+import ConfirmModal from "@/components/ConfirmModal";
 
 interface TimelineCardProps {
   timeline: {
@@ -33,6 +34,8 @@ export default function TimelineCard({ timeline, onUpdate }: TimelineCardProps) 
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(timeline.name);
   const [saving, setSaving] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<"trash" | "delete" | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const isTrashed = !!timeline.deletedAt;
   const eventCount = timeline._count.events;
@@ -65,20 +68,30 @@ export default function TimelineCard({ timeline, onUpdate }: TimelineCardProps) 
     onUpdate();
   }
 
-  async function handlePermanentDelete() {
-    if (!confirm("Permanently delete this timeline? This cannot be undone.")) return;
-    await fetch(`/api/timelines?id=${timeline.id}&permanent=true`, {
-      method: "DELETE",
-    });
-    onUpdate();
+  async function executePermanentDelete() {
+    setDeleting(true);
+    try {
+      await fetch(`/api/timelines?id=${timeline.id}&permanent=true`, {
+        method: "DELETE",
+      });
+      setConfirmModal(null);
+      onUpdate();
+    } finally {
+      setDeleting(false);
+    }
   }
 
-  async function handleSoftDelete() {
-    if (!confirm("Move this timeline to trash?")) return;
-    await fetch(`/api/timelines?id=${timeline.id}`, {
-      method: "DELETE",
-    });
-    onUpdate();
+  async function executeSoftDelete() {
+    setDeleting(true);
+    try {
+      await fetch(`/api/timelines?id=${timeline.id}`, {
+        method: "DELETE",
+      });
+      setConfirmModal(null);
+      onUpdate();
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
@@ -190,7 +203,7 @@ export default function TimelineCard({ timeline, onUpdate }: TimelineCardProps) 
                 <span>Restore</span>
               </button>
               <button
-                onClick={handlePermanentDelete}
+                onClick={() => setConfirmModal("delete")}
                 className="flex items-center justify-center gap-1.5 text-xs py-2 px-3 rounded-lg bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 border border-rose-500/30 font-medium transition-colors cursor-pointer font-mono"
                 title="Permanently remove"
               >
@@ -209,7 +222,7 @@ export default function TimelineCard({ timeline, onUpdate }: TimelineCardProps) 
               </Link>
 
               <button
-                onClick={handleSoftDelete}
+                onClick={() => setConfirmModal("trash")}
                 className="p-1.5 opacity-40 hover:opacity-100 hover:text-rose-500 rounded-lg transition-colors cursor-pointer"
                 title="Move to trash"
               >
@@ -219,6 +232,23 @@ export default function TimelineCard({ timeline, onUpdate }: TimelineCardProps) 
           )}
         </div>
       </div>
+
+      {/* In-Viewport Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmModal !== null}
+        title={confirmModal === "delete" ? "Permanently Delete Timeline" : "Move Timeline to Trash"}
+        message={
+          confirmModal === "delete"
+            ? `Are you sure you want to permanently delete "${timeline.name}"? This action cannot be reversed and all chronological events will be erased.`
+            : `Are you sure you want to move "${timeline.name}" to the trash? You can restore it later from the Trash tab.`
+        }
+        confirmLabel={confirmModal === "delete" ? "Delete Permanently" : "Move to Trash"}
+        cancelLabel="Keep Timeline"
+        isDestructive={true}
+        isLoading={deleting}
+        onConfirm={confirmModal === "delete" ? executePermanentDelete : executeSoftDelete}
+        onClose={() => setConfirmModal(null)}
+      />
     </div>
   );
 }

@@ -83,8 +83,9 @@ export function layoutLabels(
     .map((e) => {
       const effectiveYear = e.isBce ? -Math.abs(e.year) : e.year;
       const labelText = `${e.title}`;
+      const hasNote = Boolean(e.description && e.description.trim());
       const labelWidth =
-        measureTextWidth(labelText, '13px "Inter", sans-serif') + 24; // padding
+        measureTextWidth(labelText, '13px "Inter", sans-serif') + (hasNote ? 36 : 24); // padding + note icon
 
       return {
         eventId: e.id,

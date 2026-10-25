@@ -1041,38 +1041,36 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                         {item.title}
                       </text>
 
-                      {/* Chronicle Notes Mechanism on Center Label (Clean, Stable SVG, No Hover Flickering) */}
+                      {/* Chronicle Notes Mechanism on Center Label (Clean, Stable SVG, No Flickering Box) */}
                       {item.description && (
                         <g
-                          className="cursor-pointer"
+                          className="cursor-pointer group/note"
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedNoteEvent(item);
                           }}
                         >
                           <title>View Chronicle Notes</title>
+                          {/* Invisible hit-box rect for reliable clicking without any visual shape box or flickering */}
                           <rect
-                            x={centerX + labelW / 2 - 21}
-                            y={bracketY - 9}
-                            width="18"
-                            height="18"
-                            rx="4"
-                            fill={item.color}
-                            fillOpacity="0.2"
-                            className="hover:fill-opacity-45 transition-all"
+                            x={centerX + labelW / 2 - 22}
+                            y={bracketY - 11}
+                            width="20"
+                            height="22"
+                            fill="transparent"
                           />
                           <svg
                             x={centerX + labelW / 2 - 18}
                             y={bracketY - 6}
-                            width="12"
-                            height="12"
+                            width="13"
+                            height="13"
                             viewBox="0 0 24 24"
                             fill="none"
                             stroke={item.color}
                             strokeWidth="2.2"
                             strokeLinecap="round"
                             strokeLinejoin="round"
-                            className="pointer-events-none"
+                            className="pointer-events-none opacity-80 group-hover/note:opacity-100 transition-opacity"
                           >
                             <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
                             <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
@@ -1194,38 +1192,36 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                         {item.title}
                       </text>
 
-                      {/* Chronicle Notes Icon Button on Point Milestone (Clean, Stable SVG, No Hover Flickering) */}
+                      {/* Chronicle Notes Icon Button on Point Milestone (Clean, Stable SVG, No Flickering Box) */}
                       {item.description && (
                         <g
-                          className="cursor-pointer"
+                          className="cursor-pointer group/note"
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedNoteEvent(item);
                           }}
                         >
                           <title>View Chronicle Notes</title>
+                          {/* Invisible hit-box rect for reliable clicking without any visual shape box or flickering */}
                           <rect
-                            x={item.x + item.labelWidth / 2 - 21}
-                            y={spineY - TICK_HEIGHT / 2 - 23 - item.tier * TIER_SPACING}
-                            width="18"
-                            height="18"
-                            rx="4"
-                            fill={item.color}
-                            fillOpacity="0.2"
-                            className="hover:fill-opacity-45 transition-all"
+                            x={item.x + item.labelWidth / 2 - 22}
+                            y={spineY - TICK_HEIGHT / 2 - 25 - item.tier * TIER_SPACING}
+                            width="20"
+                            height="22"
+                            fill="transparent"
                           />
                           <svg
                             x={item.x + item.labelWidth / 2 - 18}
                             y={spineY - TICK_HEIGHT / 2 - 20 - item.tier * TIER_SPACING}
-                            width="12"
-                            height="12"
+                            width="13"
+                            height="13"
                             viewBox="0 0 24 24"
                             fill="none"
                             stroke={item.color}
                             strokeWidth="2.2"
                             strokeLinecap="round"
                             strokeLinejoin="round"
-                            className="pointer-events-none"
+                            className="pointer-events-none opacity-80 group-hover/note:opacity-100 transition-opacity"
                           >
                             <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
                             <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />

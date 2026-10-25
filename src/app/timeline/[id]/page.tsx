@@ -198,11 +198,8 @@ export default function TimelinePage() {
       if (savedActive) {
         try {
           const parsed = JSON.parse(savedActive);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            // Merge in all layers present in fetchedEvents so events are never hidden accidentally
-            const activeSet = new Set<string>(parsed);
-            distinctEventLayers.forEach((name) => activeSet.add(name));
-            setActiveLayerNames(Array.from(activeSet));
+          if (Array.isArray(parsed)) {
+            setActiveLayerNames(parsed);
           } else {
             setActiveLayerNames(fetchedLayers.map((l) => l.name));
           }

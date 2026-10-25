@@ -190,21 +190,19 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
   // Filter visible events based on active layers selection & assign layer colors
   const visibleEvents = useMemo(() => {
     if (events.length === 0) return [];
-    const activeSet = new Set(activeLayerNames);
+    const activeSet = new Set(activeLayerNames.map((n) => n.trim().toLowerCase()));
+
     const filtered = events.filter((e) => {
-      const lyr = e.layer || "General";
-      // If activeLayerNames is empty, show all; otherwise check set membership
-      return activeLayerNames.length === 0 || activeSet.has(lyr);
+      const lyr = ((e.layer && e.layer.trim()) || "General").toLowerCase();
+      return activeSet.has(lyr);
     });
 
-    // CRITICAL SAFETY GUARD:
-    // If events exist in this timeline, NEVER let the canvas render blank
-    // due to layer name mismatch, missing layer configuration, or desynced layer toggles!
-    const targetEvents = filtered.length > 0 ? filtered : events;
-
-    return targetEvents.map((e) => {
-      const lyr = e.layer || "General";
-      const customColor = layerColorMap.get(lyr) || e.color;
+    return filtered.map((e) => {
+      const rawLyr = (e.layer && e.layer.trim()) || "General";
+      const customColor =
+        layerColorMap.get(rawLyr) ||
+        layerColorMap.get(rawLyr.toLowerCase()) ||
+        e.color;
       return {
         ...e,
         color: customColor,
@@ -333,6 +331,113 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     () => layoutLabels(visibleEvents, yearToX),
     [visibleEvents, yearToX]
   );
+
+  // Unified Axis Date Markers (Deduplicated & Overlap-Suppressed)
+  const axisDateMarkers = useMemo(() => {
+    if (visibleEvents.length === 0) return [];
+
+    interface RawMarker {
+      key: string;
+      x: number;
+      year: number;
+      isBce: boolean;
+      month?: number | null;
+      day?: number | null;
+      color: string;
+      label: string;
+      isSpanAnchor: boolean;
+    }
+
+    const rawList: RawMarker[] = [];
+
+    // 1. Collect all anchors from point milestones & bracket span endpoints
+    layoutItems.forEach((item) => {
+      if (!item.isSpan) {
+        const effYear = item.isBce ? -Math.abs(item.year) : item.year;
+        const key = `${effYear}_${item.month || 0}_${item.day || 0}`;
+        rawList.push({
+          key,
+          x: item.x,
+          year: item.year,
+          isBce: item.isBce,
+          month: item.month,
+          day: item.day,
+          color: item.color,
+          label: formatDateLabel(item.year, item.isBce, item.month, item.day),
+          isSpanAnchor: false,
+        });
+      } else {
+        const rawX1 = item.startX !== undefined ? item.startX : yearToX(item.isBce ? -Math.abs(item.year) : item.year);
+        const rawX2 = item.endX !== undefined ? item.endX : yearToX(item.endIsBce ? -Math.abs(item.endYear || item.year) : (item.endYear || item.year));
+        const x1 = Math.min(rawX1, rawX2);
+        const x2 = Math.max(rawX1, rawX2);
+
+        const effStartYear = item.isBce ? -Math.abs(item.year) : item.year;
+        const startKey = `${effStartYear}_${item.month || 0}_${item.day || 0}`;
+        rawList.push({
+          key: startKey,
+          x: x1,
+          year: item.year,
+          isBce: item.isBce,
+          month: item.month,
+          day: item.day,
+          color: item.color,
+          label: formatDateLabel(item.year, item.isBce, item.month, item.day),
+          isSpanAnchor: true,
+        });
+
+        const endYearVal = item.endYear ?? item.year;
+        const endIsBceVal = item.endIsBce ?? item.isBce;
+        const effEndYear = endIsBceVal ? -Math.abs(endYearVal) : endYearVal;
+        const endKey = `${effEndYear}_${item.endMonth || 0}_${item.endDay || 0}`;
+        rawList.push({
+          key: endKey,
+          x: x2,
+          year: endYearVal,
+          isBce: endIsBceVal,
+          month: item.endMonth,
+          day: item.endDay,
+          color: item.color,
+          label: formatDateLabel(endYearVal, endIsBceVal, item.endMonth, item.endDay),
+          isSpanAnchor: true,
+        });
+      }
+    });
+
+    // 2. Deduplicate exact matching keys (same chronological coordinate)
+    // If a point milestone and a span anchor coincide, prefer point milestone's color
+    const map = new Map<string, RawMarker>();
+    rawList.forEach((m) => {
+      if (!map.has(m.key)) {
+        map.set(m.key, m);
+      } else {
+        const existing = map.get(m.key)!;
+        if (existing.isSpanAnchor && !m.isSpanAnchor) {
+          map.set(m.key, m);
+        }
+      }
+    });
+
+    // 3. Sort unique markers by X position
+    const sorted = Array.from(map.values()).sort((a, b) => a.x - b.x);
+
+    // 4. Overlap & collision suppression: if two year labels would overlap horizontally, only show one time!
+    // "if year is overlapped then only one time year should be shown."
+    const nonOverlapping: RawMarker[] = [];
+    let lastX = -Infinity;
+    const MIN_LABEL_GAP = 50; // minimum horizontal distance in px between labels
+
+    sorted.forEach((marker) => {
+      if (marker.x - lastX < MIN_LABEL_GAP) {
+        // Label would overlap with previous label: skip so year is only shown once!
+        return;
+      }
+      nonOverlapping.push(marker);
+      lastX = marker.x;
+    });
+
+    return nonOverlapping;
+  }, [visibleEvents, layoutItems, yearToX]);
 
   // Compute spine extents covering all anchors
   const hasEvents = visibleEvents.length > 0;
@@ -778,269 +883,210 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                 );
               })}
 
-            {/* Event ticks, connectors, and cards */}
-            {(() => {
-              const pointDateKeys = new Set(
-                layoutItems
-                  .filter((it) => !it.isSpan)
-                  .map((it) => `${it.isBce ? -Math.abs(it.year) : it.year}`)
-              );
-              const renderedSpanDateKeys = new Set<string>();
-
-              return layoutItems.map((item) => {
-                if (item.isSpan) {
-                  const rawX1 = item.startX !== undefined ? item.startX : yearToX(item.isBce ? -Math.abs(item.year) : item.year);
-                  const rawX2 = item.endX !== undefined ? item.endX : yearToX(item.endIsBce ? -Math.abs(item.endYear || item.year) : (item.endYear || item.year));
-                  const x1 = Math.min(rawX1, rawX2);
-                  const x2 = Math.max(rawX1, rawX2);
-                  const centerX = (x1 + x2) / 2;
-                  const bracketY = spineY - 75 - (item.bracketTier || 0) * 38;
-                  const labelW = Math.max(90, item.labelWidth);
-
-                  const startYearNum = item.isBce ? -Math.abs(item.year) : item.year;
-                  const endYearVal = item.endYear ?? item.year;
-                  const endIsBceVal = item.endIsBce ?? item.isBce;
-                  const endYearNum = endIsBceVal ? -Math.abs(endYearVal) : endYearVal;
-
-                  const startKey = `${startYearNum}`;
-                  const endKey = `${endYearNum}`;
-
-                  const renderStartAxis = !pointDateKeys.has(startKey) && !renderedSpanDateKeys.has(startKey);
-                  if (renderStartAxis) renderedSpanDateKeys.add(startKey);
-
-                  const renderEndAxis = !pointDateKeys.has(endKey) && !renderedSpanDateKeys.has(endKey);
-                  if (renderEndAxis) renderedSpanDateKeys.add(endKey);
-
-                  return (
-                    <g key={item.eventId} className="bracket-period-group">
-                      {/* Projection drop-lines down to the golden spine */}
-                      <line
-                        x1={x1}
-                        y1={bracketY + 12}
-                        x2={x1}
-                        y2={spineY}
-                        stroke={item.color}
-                        strokeWidth="1.2"
-                        strokeDasharray="3 3"
-                        opacity="0.45"
-                      />
-                      <line
-                        x1={x2}
-                        y1={bracketY + 12}
-                        x2={x2}
-                        y2={spineY}
-                        stroke={item.color}
-                        strokeWidth="1.2"
-                        strokeDasharray="3 3"
-                        opacity="0.45"
-                      />
-
-                      {/* Spine dots at start and end coordinates */}
-                      <circle cx={x1} cy={spineY} r="3.5" fill={item.color} stroke={bgColor} strokeWidth="1.5" />
-                      <circle cx={x2} cy={spineY} r="3.5" fill={item.color} stroke={bgColor} strokeWidth="1.5" />
-
-                      {/* Axis tick marks for span endpoints on the spine */}
-                      {renderStartAxis && (
-                        <line
-                          x1={x1}
-                          y1={spineY - TICK_HEIGHT / 2}
-                          x2={x1}
-                          y2={spineY + TICK_HEIGHT / 2}
-                          stroke={item.color}
-                          strokeWidth="2.5"
-                          opacity="0.95"
-                        />
-                      )}
-                      {renderEndAxis && (
-                        <line
-                          x1={x2}
-                          y1={spineY - TICK_HEIGHT / 2}
-                          x2={x2}
-                          y2={spineY + TICK_HEIGHT / 2}
-                          stroke={item.color}
-                          strokeWidth="2.5"
-                          opacity="0.95"
-                        />
-                      )}
-
-                      {/* Date labels beneath the timeline axis for span endpoints */}
-                      {renderStartAxis && (
-                        <text
-                          x={x1}
-                          y={spineY + TICK_HEIGHT / 2 + 16}
-                          textAnchor="middle"
-                          fill={item.color}
-                          fontSize="10"
-                          fontFamily="var(--font-mono)"
-                          fontWeight="500"
-                          opacity="0.9"
-                        >
-                          {formatDateLabel(item.year, item.isBce, item.month, item.day)}
-                        </text>
-                      )}
-                      {renderEndAxis && (
-                        <text
-                          x={x2}
-                          y={spineY + TICK_HEIGHT / 2 + 16}
-                          textAnchor="middle"
-                          fill={item.color}
-                          fontSize="10"
-                          fontFamily="var(--font-mono)"
-                          fontWeight="500"
-                          opacity="0.9"
-                        >
-                          {formatDateLabel(endYearVal, endIsBceVal, item.endMonth, item.endDay)}
-                        </text>
-                      )}
-
-                      {/* Horizontal Square Bracket Outline */}
-                      {/* Continuous horizontal top crossbar */}
-                      <line
-                        x1={x1}
-                        y1={bracketY}
-                        x2={x2}
-                        y2={bracketY}
-                        stroke={item.color}
-                        strokeWidth="2.5"
-                        opacity="0.95"
-                      />
-                      {/* Left vertical cap */}
-                      <line
-                        x1={x1}
-                        y1={bracketY}
-                        x2={x1}
-                        y2={bracketY + 12}
-                        stroke={item.color}
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        opacity="0.95"
-                      />
-                      {/* Right vertical cap */}
-                      <line
-                        x1={x2}
-                        y1={bracketY}
-                        x2={x2}
-                        y2={bracketY + 12}
-                        stroke={item.color}
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        opacity="0.95"
-                      />
-
-                      {/* Center Label Card */}
-                      <g
-                        style={{ cursor: "pointer" }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (!hasDragged.current) {
-                            onEventClick({
-                              id: item.eventId,
-                              year: item.year,
-                              isBce: item.isBce,
-                              month: item.month,
-                              day: item.day,
-                              endYear: item.endYear,
-                              endIsBce: item.endIsBce,
-                              endMonth: item.endMonth,
-                              endDay: item.endDay,
-                              title: item.title,
-                              description: item.description,
-                              color: item.color,
-                              layer: item.layer,
-                            });
-                          }
-                        }}
-                      >
-                        <rect
-                          x={centerX - labelW / 2}
-                          y={bracketY - 13}
-                          width={labelW}
-                          height="26"
-                          rx="6"
-                          fill={bgColor}
-                          stroke={item.color}
-                          strokeWidth="1.8"
-                          opacity="0.98"
-                        />
-                        <text
-                          x={item.description ? centerX - 8 : centerX}
-                          y={bracketY + 4}
-                          textAnchor="middle"
-                          fill={textColor}
-                          fontSize="12"
-                          fontFamily="var(--font-display)"
-                          fontWeight="600"
-                        >
-                          {item.title}
-                        </text>
-
-                        {/* Chronicle Notes Mechanism on Center Label (Clean, Stable SVG, No Hover Flickering) */}
-                        {item.description && (
-                          <g
-                            className="cursor-pointer"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedNoteEvent(item);
-                            }}
-                          >
-                            <title>View Chronicle Notes</title>
-                            <rect
-                              x={centerX + labelW / 2 - 21}
-                              y={bracketY - 9}
-                              width="18"
-                              height="18"
-                              rx="4"
-                              fill={item.color}
-                              fillOpacity="0.2"
-                              className="hover:fill-opacity-45 transition-all"
-                            />
-                            <svg
-                              x={centerX + labelW / 2 - 18}
-                              y={bracketY - 6}
-                              width="12"
-                              height="12"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke={item.color}
-                              strokeWidth="2.2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="pointer-events-none"
-                            >
-                              <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-                              <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-                            </svg>
-                          </g>
-                        )}
-                      </g>
-                    </g>
-                  );
-                }
-
-              // Standard Point Milestone
-              return (
-                <g key={item.eventId} className="event-group">
-                  {/* Vertical tick on axis with layer's unique color */}
+            {/* Unified Axis Ticks, Nodes & Date Labels (Deduplicated & Overlap-Free) */}
+            <g className="spine-ticks-and-labels">
+              {axisDateMarkers.map((marker) => (
+                <g key={`axis-${marker.key}`} className="axis-point-group">
+                  {/* Vertical tick on axis */}
                   <line
-                    x1={item.x}
+                    x1={marker.x}
                     y1={spineY - TICK_HEIGHT / 2}
-                    x2={item.x}
+                    x2={marker.x}
                     y2={spineY + TICK_HEIGHT / 2}
-                    stroke={item.color}
+                    stroke={marker.color}
                     strokeWidth="2.5"
                     opacity="0.95"
                   />
 
-                  {/* Spine dot node with layer's unique color */}
+                  {/* Spine dot node */}
                   <circle
-                    cx={item.x}
+                    cx={marker.x}
                     cy={spineY}
                     r="3.5"
-                    fill={item.color}
+                    fill={marker.color}
                     stroke={bgColor}
                     strokeWidth="1.5"
                   />
 
+                  {/* Single date label beneath the axis */}
+                  <text
+                    x={marker.x}
+                    y={spineY + TICK_HEIGHT / 2 + 16}
+                    textAnchor="middle"
+                    fill={marker.color}
+                    fontSize="10"
+                    fontFamily="var(--font-mono)"
+                    fontWeight="500"
+                    opacity="0.9"
+                  >
+                    {marker.label}
+                  </text>
+                </g>
+              ))}
+            </g>
+
+            {/* Event cards, brackets, and connectors */}
+            {layoutItems.map((item) => {
+              if (item.isSpan) {
+                const rawX1 = item.startX !== undefined ? item.startX : yearToX(item.isBce ? -Math.abs(item.year) : item.year);
+                const rawX2 = item.endX !== undefined ? item.endX : yearToX(item.endIsBce ? -Math.abs(item.endYear || item.year) : (item.endYear || item.year));
+                const x1 = Math.min(rawX1, rawX2);
+                const x2 = Math.max(rawX1, rawX2);
+                const centerX = (x1 + x2) / 2;
+                const bracketY = spineY - 75 - (item.bracketTier || 0) * 38;
+                const labelW = Math.max(90, item.labelWidth);
+
+                return (
+                  <g key={item.eventId} className="bracket-period-group">
+                    {/* Projection drop-lines down to the golden spine */}
+                    <line
+                      x1={x1}
+                      y1={bracketY + 12}
+                      x2={x1}
+                      y2={spineY}
+                      stroke={item.color}
+                      strokeWidth="1.2"
+                      strokeDasharray="3 3"
+                      opacity="0.45"
+                    />
+                    <line
+                      x1={x2}
+                      y1={bracketY + 12}
+                      x2={x2}
+                      y2={spineY}
+                      stroke={item.color}
+                      strokeWidth="1.2"
+                      strokeDasharray="3 3"
+                      opacity="0.45"
+                    />
+
+                    {/* Horizontal Square Bracket Outline */}
+                    {/* Continuous horizontal top crossbar */}
+                    <line
+                      x1={x1}
+                      y1={bracketY}
+                      x2={x2}
+                      y2={bracketY}
+                      stroke={item.color}
+                      strokeWidth="2.5"
+                      opacity="0.95"
+                    />
+                    {/* Left vertical cap */}
+                    <line
+                      x1={x1}
+                      y1={bracketY}
+                      x2={x1}
+                      y2={bracketY + 12}
+                      stroke={item.color}
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      opacity="0.95"
+                    />
+                    {/* Right vertical cap */}
+                    <line
+                      x1={x2}
+                      y1={bracketY}
+                      x2={x2}
+                      y2={bracketY + 12}
+                      stroke={item.color}
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      opacity="0.95"
+                    />
+
+                    {/* Center Label Card */}
+                    <g
+                      style={{ cursor: "pointer" }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!hasDragged.current) {
+                          onEventClick({
+                            id: item.eventId,
+                            year: item.year,
+                            isBce: item.isBce,
+                            month: item.month,
+                            day: item.day,
+                            endYear: item.endYear,
+                            endIsBce: item.endIsBce,
+                            endMonth: item.endMonth,
+                            endDay: item.endDay,
+                            title: item.title,
+                            description: item.description,
+                            color: item.color,
+                            layer: item.layer,
+                          });
+                        }
+                      }}
+                    >
+                      <rect
+                        x={centerX - labelW / 2}
+                        y={bracketY - 13}
+                        width={labelW}
+                        height="26"
+                        rx="6"
+                        fill={bgColor}
+                        stroke={item.color}
+                        strokeWidth="1.8"
+                        opacity="0.98"
+                      />
+                      <text
+                        x={item.description ? centerX - 8 : centerX}
+                        y={bracketY + 4}
+                        textAnchor="middle"
+                        fill={textColor}
+                        fontSize="12"
+                        fontFamily="var(--font-display)"
+                        fontWeight="600"
+                      >
+                        {item.title}
+                      </text>
+
+                      {/* Chronicle Notes Mechanism on Center Label (Clean, Stable SVG, No Hover Flickering) */}
+                      {item.description && (
+                        <g
+                          className="cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedNoteEvent(item);
+                          }}
+                        >
+                          <title>View Chronicle Notes</title>
+                          <rect
+                            x={centerX + labelW / 2 - 21}
+                            y={bracketY - 9}
+                            width="18"
+                            height="18"
+                            rx="4"
+                            fill={item.color}
+                            fillOpacity="0.2"
+                            className="hover:fill-opacity-45 transition-all"
+                          />
+                          <svg
+                            x={centerX + labelW / 2 - 18}
+                            y={bracketY - 6}
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke={item.color}
+                            strokeWidth="2.2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="pointer-events-none"
+                          >
+                            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                          </svg>
+                        </g>
+                      )}
+                    </g>
+                  </g>
+                );
+              }
+
+              // Standard Point Milestone
+              return (
+                <g key={item.eventId} className="event-group">
                   {item.collapsed ? (
                     // Collapsed dot with rich tooltip
                     <g
@@ -1186,26 +1232,11 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                           </svg>
                         </g>
                       )}
-
-                      {/* Date label beneath the axis */}
-                      <text
-                        x={item.x}
-                        y={spineY + TICK_HEIGHT / 2 + 16 + item.tier * 2}
-                        textAnchor="middle"
-                        fill={item.color}
-                        fontSize="10"
-                        fontFamily="var(--font-mono)"
-                        fontWeight="500"
-                        opacity="0.9"
-                      >
-                        {formatDateLabel(item.year, item.isBce, item.month, item.day)}
-                      </text>
                     </g>
                   )}
                 </g>
               );
-            });
-          })()}
+            })}
 
             {/* Interactive Hairline Mouse Cursor Guide */}
             {cursorX !== null && cursorYear !== null && !isDragging.current && (

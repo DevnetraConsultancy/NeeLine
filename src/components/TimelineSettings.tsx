@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, Palette, Sparkles, CheckSquare, Square } from "lucide-react";
 
 interface TimelineSettingsProps {
@@ -80,11 +81,16 @@ export default function TimelineSettings({
   onSave,
   onClose,
 }: TimelineSettingsProps) {
+  const [mounted, setMounted] = useState(false);
   const [bg, setBg] = useState(bgColor);
   const [spine, setSpine] = useState(spineColor);
   const [tick, setTick] = useState(tickColor);
   const [text, setText] = useState(textColor);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   async function handleSave() {
     setSaving(true);
@@ -105,12 +111,14 @@ export default function TimelineSettings({
     setText(preset.text);
   }
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
     >
       <div
-        className="w-full max-w-md rounded-2xl glass-panel shadow-[0_25px_60px_rgba(0,0,0,0.8)] border border-black/10 dark:border-white/[0.1] overflow-hidden flex flex-col max-h-[92vh]"
+        className="w-full max-w-md rounded-2xl glass-panel shadow-[0_25px_60px_rgba(0,0,0,0.8)] border border-black/10 dark:border-white/[0.1] overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header - Renamed to Canvas Settings */}
@@ -412,6 +420,7 @@ export default function TimelineSettings({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

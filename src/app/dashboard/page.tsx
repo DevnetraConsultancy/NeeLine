@@ -30,6 +30,11 @@ export default function DashboardPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{
+    type: "trash" | "delete";
+    timeline: Timeline;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const fetchTimelines = useCallback(async () => {
     try {
@@ -71,6 +76,31 @@ export default function DashboardPage() {
       setErrorMessage("Network error occurred while creating chronicle. Please try again.");
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleConfirmAction() {
+    if (!confirmAction) return;
+    setActionLoading(true);
+    try {
+      const url =
+        confirmAction.type === "delete"
+          ? `/api/timelines?id=${confirmAction.timeline.id}&permanent=true`
+          : `/api/timelines?id=${confirmAction.timeline.id}`;
+      const res = await fetch(url, { method: "DELETE" });
+      if (!res.ok) {
+        throw new Error("Failed to delete timeline");
+      }
+      setConfirmAction(null);
+      await fetchTimelines();
+    } catch {
+      setErrorMessage(
+        confirmAction.type === "delete"
+          ? "Failed to permanently delete timeline. Please try again."
+          : "Failed to move timeline to trash. Please try again."
+      );
+    } finally {
+      setActionLoading(false);
     }
   }
 
@@ -220,6 +250,8 @@ export default function DashboardPage() {
                 key={timeline.id}
                 timeline={timeline}
                 onUpdate={fetchTimelines}
+                onTrash={(t) => setConfirmAction({ type: "trash", timeline: t })}
+                onPermanentDelete={(t) => setConfirmAction({ type: "delete", timeline: t })}
               />
             ))}
           </div>
@@ -251,6 +283,29 @@ export default function DashboardPage() {
         isDestructive={false}
         onConfirm={() => setErrorMessage(null)}
         onClose={() => setErrorMessage(null)}
+      />
+
+      {/* Confirmation Modal for Moving to Trash or Permanent Erasure */}
+      <ConfirmModal
+        isOpen={confirmAction !== null}
+        title={
+          confirmAction?.type === "delete"
+            ? "Permanently Delete Timeline"
+            : "Move Timeline to Trash"
+        }
+        message={
+          confirmAction?.type === "delete"
+            ? `Are you sure you want to permanently delete "${confirmAction.timeline.name}"? This action cannot be reversed and all chronological events will be erased.`
+            : `Are you sure you want to move "${confirmAction?.timeline.name}" to the trash? You can restore it later from the Trash tab.`
+        }
+        confirmLabel={
+          confirmAction?.type === "delete" ? "Delete Permanently" : "Move to Trash"
+        }
+        cancelLabel="Keep Timeline"
+        isDestructive={true}
+        isLoading={actionLoading}
+        onConfirm={handleConfirmAction}
+        onClose={() => setConfirmAction(null)}
       />
     </div>
   );

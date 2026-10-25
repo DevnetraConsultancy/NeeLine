@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import {
   HelpCircle,
@@ -16,8 +16,13 @@ import {
 } from "lucide-react";
 
 export default function InfoButton() {
+  const [mounted, setMounted] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"shortcuts" | "features" | "about">("shortcuts");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <>
@@ -32,6 +37,7 @@ export default function InfoButton() {
       </button>
 
       {showModal &&
+        mounted &&
         createPortal(
           <div
             className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"

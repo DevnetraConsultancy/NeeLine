@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   Calendar,
   Trash2,
@@ -77,6 +78,7 @@ export default function EventForm({
   const [newLayerName, setNewLayerName] = useState("");
   const [newLayerColor, setNewLayerColor] = useState("#5a9bd5");
 
+  const [mounted, setMounted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -85,6 +87,7 @@ export default function EventForm({
   const isEditing = !!initialData?.id;
 
   useEffect(() => {
+    setMounted(true);
     setTimeout(() => titleRef.current?.focus(), 80);
   }, []);
 
@@ -145,13 +148,15 @@ export default function EventForm({
     return `${y} ${era}`;
   };
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
       // Backdrop click intentionally does NOT close the modal: ONLY 'X' closes it
     >
       <div
-        className="w-full max-w-lg rounded-2xl glass-panel shadow-[0_25px_60px_rgba(0,0,0,0.85)] border border-black/10 dark:border-white/[0.1] overflow-hidden flex flex-col max-h-[92vh]"
+        className="w-full max-w-lg rounded-2xl glass-panel shadow-[0_25px_60px_rgba(0,0,0,0.85)] border border-black/10 dark:border-white/[0.1] overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -504,6 +509,7 @@ export default function EventForm({
         onConfirm={handleExecuteDelete}
         onClose={() => setShowDeleteConfirm(false)}
       />
-    </div>
+    </div>,
+    document.body
   );
 }

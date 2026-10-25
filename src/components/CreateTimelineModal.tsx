@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Plus, X, Sparkles, FileText, Compass } from "lucide-react";
 
 interface CreateTimelineModalProps {
@@ -16,9 +17,14 @@ export default function CreateTimelineModal({
   onCreate,
   isLoading = false,
 }: CreateTimelineModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const nameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -28,7 +34,7 @@ export default function CreateTimelineModal({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,13 +43,12 @@ export default function CreateTimelineModal({
     await onCreate(trimmed, description.trim());
   }
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-150"
-      // Intentionally NOT closing on backdrop click: ONLY the X button or Discard closes it
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-150"
     >
       <div
-        className="w-full max-w-lg rounded-2xl glass-panel shadow-[0_25px_60px_rgba(0,0,0,0.85)] border border-black/10 dark:border-white/[0.1] overflow-hidden flex flex-col"
+        className="w-full max-w-lg rounded-2xl glass-panel shadow-[0_25px_60px_rgba(0,0,0,0.85)] border border-black/10 dark:border-white/[0.1] overflow-hidden flex flex-col animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header with X button */}
@@ -159,6 +164,7 @@ export default function CreateTimelineModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

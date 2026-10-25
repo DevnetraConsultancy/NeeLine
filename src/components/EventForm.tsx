@@ -10,6 +10,7 @@ import {
   Layers,
   Plus,
   BookOpen,
+  Check,
 } from "lucide-react";
 import ConfirmModal from "@/components/ConfirmModal";
 
@@ -746,31 +747,40 @@ export default function EventForm({
 
           {/* Color Palette Selection */}
           <div>
-            <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-2 font-medium">
+            <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-1.5 font-medium">
               Milestone & Bracket Line Color
             </label>
-            <div className="flex items-center gap-2 overflow-x-auto py-1">
-              {COLOR_PALETTE.map((c) => (
-                <button
-                  key={c.hex}
-                  type="button"
-                  onClick={() => setColor(c.hex)}
-                  title={c.label}
-                  className={`w-6 h-6 rounded-full transition-transform cursor-pointer shrink-0 ${
-                    color.toLowerCase() === c.hex.toLowerCase()
-                      ? "scale-125 ring-2 ring-white ring-offset-2 ring-offset-[#070c16]"
-                      : "hover:scale-110 opacity-80"
-                  }`}
-                  style={{ backgroundColor: c.hex }}
+            <div className="flex items-center gap-2 overflow-x-auto py-2.5 px-1 scrollbar-thin">
+              {COLOR_PALETTE.map((c) => {
+                const isSelected = color.toLowerCase() === c.hex.toLowerCase();
+                return (
+                  <button
+                    key={c.hex}
+                    type="button"
+                    onClick={() => setColor(c.hex)}
+                    title={c.label}
+                    className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center transition-all cursor-pointer ${
+                      isSelected
+                        ? "ring-2 ring-offset-2 ring-[#c9a84c] ring-offset-white dark:ring-offset-[#131c2e] shadow-sm"
+                        : "opacity-80 hover:opacity-100 hover:ring-1 hover:ring-black/20 dark:hover:ring-white/30"
+                    }`}
+                    style={{ backgroundColor: c.hex }}
+                  >
+                    {isSelected && (
+                      <Check className="w-3.5 h-3.5 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] stroke-[3]" />
+                    )}
+                  </button>
+                );
+              })}
+              <div className="relative shrink-0 flex items-center justify-center ml-0.5">
+                <input
+                  type="color"
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  className="w-6 h-6 rounded-full cursor-pointer p-0.5 bg-transparent border border-black/20 dark:border-white/20 transition-all hover:border-[#c9a84c]"
+                  title="Custom Color"
                 />
-              ))}
-              <input
-                type="color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                className="w-6 h-6 rounded-full cursor-pointer p-0.5 bg-transparent border border-black/20 dark:border-white/20 shrink-0 ml-1"
-                title="Custom Color"
-              />
+              </div>
             </div>
           </div>
 

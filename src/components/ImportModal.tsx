@@ -409,15 +409,15 @@ export default function ImportModal({
                         placeholder="New Layer Name (e.g. Classical Antiquity, World War I)"
                         className="w-full px-3 py-1.5 rounded-lg theme-input text-xs font-mono outline-none focus:ring-1 focus:ring-[#c9a84c]"
                       />
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 py-1.5 px-0.5">
                         <span className="text-[10px] theme-text-muted">Color:</span>
                         {PRESET_NEW_COLORS.map((c) => (
                           <button
                             key={c}
                             type="button"
                             onClick={() => setNewLayerColor(c)}
-                            className={`w-5 h-5 rounded-full transition-transform ${
-                              newLayerColor === c ? "scale-125 ring-2 ring-white" : ""
+                            className={`w-5 h-5 rounded-full transition-all shrink-0 ${
+                              newLayerColor === c ? "ring-2 ring-[#c9a84c] ring-offset-1 ring-offset-white dark:ring-offset-[#131c2e]" : "opacity-70 hover:opacity-100"
                             }`}
                             style={{ backgroundColor: c }}
                           />

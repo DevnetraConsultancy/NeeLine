@@ -72,8 +72,9 @@ export default function EventForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const yearNum = parseInt(year);
-    if (isNaN(yearNum) || !title.trim()) return;
+    const parsed = parseInt(year, 10);
+    if (isNaN(parsed) || !title.trim()) return;
+    const yearNum = Math.abs(parsed);
 
     setSaving(true);
     await onSave({
@@ -99,7 +100,8 @@ export default function EventForm({
 
   // Live formatted date label preview
   const previewDate = () => {
-    const y = year.trim() ? parseInt(year).toLocaleString() : "0";
+    const parsed = parseInt(year, 10);
+    const y = !isNaN(parsed) ? Math.abs(parsed).toLocaleString() : "0";
     const era = isBce ? "BCE" : "CE";
     if (month && day) return `${month}/${day}, ${y} ${era}`;
     if (month) return `M${month}, ${y} ${era}`;

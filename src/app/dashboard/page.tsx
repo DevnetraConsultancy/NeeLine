@@ -54,6 +54,8 @@ export default function DashboardPage() {
       if (res.ok) {
         const timeline = await res.json();
         router.push(`/timeline/${timeline.id}`);
+      } else {
+        alert("Failed to create timeline. Please verify your connection or session.");
       }
     } finally {
       setCreating(false);

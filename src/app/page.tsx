@@ -54,7 +54,7 @@ export default function LandingPage() {
 
   return (
     <div className="relative min-h-screen theme-bg flex flex-col overflow-x-hidden selection:bg-[#c9a84c]/30">
-      {/* Global Synchronized Navbar (Homepage & Dashboard buttons automatically hidden on home) */}
+      {/* Global Synchronized Navbar */}
       <Navbar />
 
       {/* Ambient background glows */}

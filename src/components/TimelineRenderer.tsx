@@ -133,8 +133,8 @@ export default function TimelineRenderer({
         return sorted[sorted.length - 1].x;
       for (let i = 0; i < sorted.length - 1; i++) {
         if (year >= sorted[i].ey && year <= sorted[i + 1].ey) {
-          const t =
-            (year - sorted[i].ey) / (sorted[i + 1].ey - sorted[i].ey);
+          const denom = sorted[i + 1].ey - sorted[i].ey;
+          const t = denom === 0 ? 0 : (year - sorted[i].ey) / denom;
           return sorted[i].x + t * (sorted[i + 1].x - sorted[i].x);
         }
       }
@@ -164,7 +164,8 @@ export default function TimelineRenderer({
         return sorted[sorted.length - 1].ey;
       for (let i = 0; i < sorted.length - 1; i++) {
         if (x >= sorted[i].x && x <= sorted[i + 1].x) {
-          const t = (x - sorted[i].x) / (sorted[i + 1].x - sorted[i].x);
+          const denom = sorted[i + 1].x - sorted[i].x;
+          const t = denom === 0 ? 0 : (x - sorted[i].x) / denom;
           return sorted[i].ey + t * (sorted[i + 1].ey - sorted[i].ey);
         }
       }
@@ -454,6 +455,7 @@ export default function TimelineRenderer({
     >
       {/* SVG Canvas */}
       <svg
+        id="timeline-canvas-svg"
         width={dimensions.width}
         height={dimensions.height}
         className="absolute inset-0"

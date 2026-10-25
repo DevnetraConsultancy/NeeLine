@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { usePathname } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -11,8 +10,6 @@ import {
   Sun,
   Moon,
   ChevronDown,
-  Home,
-  LayoutDashboard,
   LogIn,
 } from "lucide-react";
 import InfoButton from "@/components/InfoButton";
@@ -20,8 +17,6 @@ import { loginWithGoogle } from "@/app/actions/auth";
 
 export default function Navbar() {
   const { data: session } = useSession();
-  const pathname = usePathname();
-  const isHome = pathname === "/";
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -104,29 +99,6 @@ export default function Navbar() {
             </span>
           </div>
         </Link>
-
-        {/* Global Navigation: Homepage & Dashboard links (Shown ONLY on internal pages, removed from homepage) */}
-        {!isHome && (
-          <div className="flex items-center gap-1.5 pl-2 sm:pl-4 border-l border-black/10 dark:border-white/[0.1]">
-            <Link
-              href="/"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl theme-pill hover:border-[#c9a84c]/60 text-xs font-mono transition-all"
-              title="Go to Homepage"
-            >
-              <Home className="w-3.5 h-3.5 text-[#c9a84c]" />
-              <span className="hidden md:inline font-medium">Homepage</span>
-            </Link>
-
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl theme-pill hover:border-[#c9a84c]/60 text-xs font-mono transition-all"
-              title="Go to Workspace Dashboard"
-            >
-              <LayoutDashboard className="w-3.5 h-3.5 text-[#c9a84c]" />
-              <span className="hidden md:inline font-medium">Dashboard</span>
-            </Link>
-          </div>
-        )}
       </div>
 
       {/* Right controls */}

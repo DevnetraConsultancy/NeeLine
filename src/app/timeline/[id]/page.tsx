@@ -243,21 +243,24 @@ export default function TimelinePage() {
           (item): item is Record<string, unknown> =>
             typeof item === "object" && item !== null
         );
-        for (const item of items) {
-          await fetch("/api/events", {
+        if (items.length > 0) {
+          const res = await fetch("/api/events", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               timelineId,
-              year: typeof item.year === "number" ? item.year : 0,
-              isBce: typeof item.isBce === "boolean" ? item.isBce : false,
-              month: typeof item.month === "number" ? item.month : null,
-              day: typeof item.day === "number" ? item.day : null,
-              title: typeof item.title === "string" && item.title ? item.title : "Untitled",
-              description: typeof item.description === "string" ? item.description : null,
-              color: typeof item.color === "string" && item.color ? item.color : "#c9a84c",
+              events: items.map((item) => ({
+                year: typeof item.year === "number" ? Math.abs(item.year) : 0,
+                isBce: typeof item.isBce === "boolean" ? item.isBce : false,
+                month: typeof item.month === "number" ? item.month : null,
+                day: typeof item.day === "number" ? item.day : null,
+                title: typeof item.title === "string" && item.title.trim() ? item.title.trim() : "Untitled",
+                description: typeof item.description === "string" ? item.description.trim() : null,
+                color: typeof item.color === "string" && item.color.startsWith("#") ? item.color : "#c9a84c",
+              })),
             }),
           });
+          if (!res.ok) throw new Error("Batch import failed");
         }
         fetchData();
       } catch {
@@ -272,16 +275,18 @@ export default function TimelinePage() {
 
   // PNG export handler
   const handleExportPng = useCallback(() => {
-    let svg: SVGSVGElement | null = null;
-    let maxArea = 0;
-    document.querySelectorAll("svg").forEach((s) => {
-      const r = s.getBoundingClientRect();
-      const area = r.width * r.height;
-      if (area > maxArea) {
-        maxArea = area;
-        svg = s as SVGSVGElement;
-      }
-    });
+    let svg: SVGSVGElement | null = document.getElementById("timeline-canvas-svg") as SVGSVGElement | null;
+    if (!svg) {
+      let maxArea = 0;
+      document.querySelectorAll("svg").forEach((s) => {
+        const r = s.getBoundingClientRect();
+        const area = r.width * r.height;
+        if (area > maxArea) {
+          maxArea = area;
+          svg = s as SVGSVGElement;
+        }
+      });
+    }
     if (!svg) return;
     exportTimelineAsPng(
       svg,

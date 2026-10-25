@@ -1,18 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --color-bg: #0a1628;
-  --color-bg-light: #0f1f38;
+  --color-bg: #070c16;
+  --color-bg-light: #0d1527;
   --color-spine: #c9a84c;
   --color-tick: #c9a84c;
   --color-text: #f5f0e8;
-  --color-text-muted: #f5f0e880;
+  --color-text-muted: rgba(245, 240, 232, 0.6);
   --color-accent: #c9a84c;
-  --color-accent-dim: #c9a84c33;
-  --color-danger: #c94c4c;
+  --color-accent-hover: #dfbc5e;
+  --color-accent-dim: rgba(201, 168, 76, 0.18);
+  --color-danger: #e05252;
   --font-display: var(--font-display), "Georgia", serif;
-  --font-body: var(--font-body), "Helvetica Neue", sans-serif;
-  --font-mono: var(--font-mono), "Courier New", monospace;
+  --font-body: var(--font-body), "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: var(--font-mono), "JetBrains Mono", monospace;
 }
 
 * {
@@ -26,6 +27,75 @@ body {
   background-color: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-body);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Glassmorphism primitives */
+.glass-panel {
+  background: rgba(13, 21, 39, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(201, 168, 76, 0.16);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.glass-card {
+  background: linear-gradient(135deg, rgba(16, 26, 48, 0.8) 0%, rgba(10, 18, 34, 0.9) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(201, 168, 76, 0.14);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card:hover {
+  border-color: rgba(201, 168, 76, 0.35);
+  box-shadow: 0 16px 40px -10px rgba(201, 168, 76, 0.15), 0 0 20px -5px rgba(201, 168, 76, 0.1);
+  transform: translateY(-2px);
+}
+
+/* Button & interactive effects */
+.btn-gold {
+  background: linear-gradient(135deg, #dfbc5e 0%, #c9a84c 60%, #a88732 100%);
+  color: #070c16;
+  font-weight: 600;
+  box-shadow: 0 2px 14px rgba(201, 168, 76, 0.25);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-gold:hover {
+  background: linear-gradient(135deg, #ebcb72 0%, #d8b453 60%, #b89538 100%);
+  box-shadow: 0 4px 20px rgba(201, 168, 76, 0.4);
+  transform: translateY(-1px);
+}
+
+.btn-gold:active {
+  transform: translateY(0);
+}
+
+.btn-ghost-gold {
+  background: rgba(201, 168, 76, 0.08);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  color: #dfbc5e;
+  transition: all 0.2s ease;
+}
+
+.btn-ghost-gold:hover {
+  background: rgba(201, 168, 76, 0.18);
+  border-color: rgba(201, 168, 76, 0.45);
+  color: #f5f0e8;
+  box-shadow: 0 0 15px rgba(201, 168, 76, 0.15);
+}
+
+/* Ambient glow container */
+.ambient-glow {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(100px);
+  pointer-events: none;
+  opacity: 0.18;
 }
 
 /* Scrollbar styling */
@@ -37,44 +107,34 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-accent-dim);
-  border-radius: 3px;
+  background: rgba(201, 168, 76, 0.25);
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-spine);
+  background: rgba(201, 168, 76, 0.6);
 }
 
 /* Selection */
 ::selection {
-  background: var(--color-spine);
-  color: var(--color-bg);
+  background: rgba(201, 168, 76, 0.3);
+  color: #f5f0e8;
 }
 
-/* Input styling */
-input,
-select,
-textarea {
-  font-family: var(--font-body);
+/* Keyframes */
+@keyframes pulseSubtle {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.04); }
 }
 
-/* Tooltip styling */
-[data-tooltip] {
-  position: relative;
+.animate-pulse-subtle {
+  animation: pulseSubtle 6s ease-in-out infinite;
 }
-[data-tooltip]:hover::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 4px 8px;
-  background: #1a2a44;
-  color: var(--color-text);
-  font-size: 12px;
-  font-family: var(--font-mono);
-  white-space: nowrap;
-  border-radius: 4px;
-  border: 1px solid var(--color-accent-dim);
-  pointer-events: none;
-  z-index: 100;
+
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+.animate-float {
+  animation: floatSlow 5s ease-in-out infinite;
 }

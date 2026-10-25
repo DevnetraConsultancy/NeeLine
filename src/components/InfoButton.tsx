@@ -2,210 +2,297 @@
 
 import { useState } from "react";
 import { createPortal } from "react-dom";
+import {
+  HelpCircle,
+  X,
+  Keyboard,
+  MousePointer,
+  Sparkles,
+  Mail,
+  Layers,
+  Download,
+  Palette,
+} from "lucide-react";
 
 export default function InfoButton() {
   const [showModal, setShowModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<"shortcuts" | "features" | "about">("shortcuts");
 
   return (
     <>
       <button
         onClick={() => setShowModal(true)}
-        className="w-8 h-8 rounded-lg border border-[#c9a84c]/20 text-[#c9a84c]/50 hover:text-[#c9a84c] hover:bg-[#c9a84c]/10 transition-colors flex items-center justify-center"
-        title="Help & About"
+        className="h-8 px-2.5 rounded-lg border border-white/[0.08] bg-white/[0.03] text-[#f5f0e8]/60 hover:text-[#c9a84c] hover:border-[#c9a84c]/30 hover:bg-[#c9a84c]/10 transition-all flex items-center gap-1.5 cursor-pointer font-mono text-xs"
+        title="Help, Shortcuts & About"
       >
-        <svg viewBox="0 0 20 20" className="w-4 h-4" fill="currentColor">
-          <path
-            fillRule="evenodd"
-            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-            clipRule="evenodd"
-          />
-        </svg>
+        <HelpCircle className="w-3.5 h-3.5 text-[#c9a84c]" />
+        <span className="hidden sm:inline">Guide</span>
       </button>
 
-      {showModal && createPortal(
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60"
-          onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}
-        >
+      {showModal &&
+        createPortal(
           <div
-            className="bg-[#0a1628] border border-[#c9a84c]/30 rounded-xl p-5 max-w-md w-full mx-4 shadow-2xl max-h-[85vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowModal(false);
+            }}
           >
-            {/* Header */}
-            <div className="text-center mb-4">
-              <h1
-                className="text-xl font-bold tracking-wide"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                <span className="text-[#f5f0e8]">Nee</span>
-                <span className="text-[#c9a84c]">Line</span>
-              </h1>
-              <p
-                className="text-sm text-[#f5f0e8]/40 mt-1"
-                style={{ fontFamily: "var(--font-body)" }}
-              >
-                Visualize History on a Number Line
-              </p>
-            </div>
+            <div
+              className="glass-panel rounded-2xl p-6 max-w-lg w-full shadow-[0_25px_60px_rgba(0,0,0,0.85)] border border-white/[0.12] max-h-[88vh] overflow-y-auto flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#c9a84c] to-[#ecd58e] p-[1.5px] shadow-[0_0_15px_rgba(201,168,76,0.25)]">
+                    <div className="w-full h-full rounded-full bg-[#070c16] flex items-center justify-center">
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="w-4 h-4 text-[#c9a84c]"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <circle cx="12" cy="12" r="3" />
+                        <line x1="2" y1="12" x2="22" y2="12" />
+                        <line x1="12" y1="2" x2="12" y2="5" />
+                        <line x1="12" y1="19" x2="12" y2="22" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div>
+                    <h1
+                      className="text-base font-bold text-[#f5f0e8] leading-tight"
+                      style={{ fontFamily: "var(--font-display)" }}
+                    >
+                      Nee<span className="text-[#c9a84c]">Line</span> Guide & Studio Manual
+                    </h1>
+                    <p className="text-[11px] font-mono text-[#f5f0e8]/45 mt-0.5">
+                      Visualize History on a Number Line
+                    </p>
+                  </div>
+                </div>
 
-            {/* Keyboard Shortcuts */}
-            <div className="mb-6">
-              <h2
-                className="text-[#c9a84c] font-semibold text-sm mb-2 uppercase tracking-wider"
-                style={{ fontFamily: "var(--font-mono)" }}
-              >
-                Keyboard Shortcuts
-              </h2>
-              <div className="space-y-1">
-                <div className="flex justify-between items-center text-sm text-[#f5f0e8]/70">
-                  <kbd className="px-2 py-0.5 rounded bg-[#f5f0e8]/10 text-[#f5f0e8]/80 font-mono text-xs min-w-[40px] text-center">
-                    0
-                  </kbd>
-                  <span>Fit all events</span>
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-xl text-[#f5f0e8]/40 hover:text-[#f5f0e8] hover:bg-white/[0.06] transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Segmented Tab Navigation */}
+              <div className="flex items-center p-1 rounded-xl bg-white/[0.04] border border-white/[0.08] mb-5 font-mono text-xs">
+                <button
+                  onClick={() => setActiveTab("shortcuts")}
+                  className={`flex-1 py-1.5 rounded-lg transition-all cursor-pointer text-center ${
+                    activeTab === "shortcuts"
+                      ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/30 font-semibold"
+                      : "text-[#f5f0e8]/50 hover:text-[#f5f0e8]"
+                  }`}
+                >
+                  Shortcuts
+                </button>
+                <button
+                  onClick={() => setActiveTab("features")}
+                  className={`flex-1 py-1.5 rounded-lg transition-all cursor-pointer text-center ${
+                    activeTab === "features"
+                      ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/30 font-semibold"
+                      : "text-[#f5f0e8]/50 hover:text-[#f5f0e8]"
+                  }`}
+                >
+                  Capabilities
+                </button>
+                <button
+                  onClick={() => setActiveTab("about")}
+                  className={`flex-1 py-1.5 rounded-lg transition-all cursor-pointer text-center ${
+                    activeTab === "about"
+                      ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/30 font-semibold"
+                      : "text-[#f5f0e8]/50 hover:text-[#f5f0e8]"
+                  }`}
+                >
+                  About
+                </button>
+              </div>
+
+              {/* Tab 1: Shortcuts & Controls */}
+              {activeTab === "shortcuts" && (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-xs font-mono uppercase tracking-wider text-[#c9a84c] mb-2.5 flex items-center gap-1.5">
+                      <Keyboard className="w-3.5 h-3.5" />
+                      <span>Desktop Controls</span>
+                    </h3>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] text-xs">
+                        <span className="text-[#f5f0e8]/70">Fit all events into frame</span>
+                        <kbd className="px-2.5 py-1 rounded-md bg-[#070c16] text-[#c9a84c] font-mono text-xs border border-white/[0.1] shadow-sm">
+                          0
+                        </kbd>
+                      </div>
+                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] text-xs">
+                        <span className="text-[#f5f0e8]/70">Add milestone at position</span>
+                        <kbd className="px-2.5 py-1 rounded-md bg-[#070c16] text-[#c9a84c] font-mono text-xs border border-white/[0.1] shadow-sm">
+                          Click Axis
+                        </kbd>
+                      </div>
+                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] text-xs">
+                        <span className="text-[#f5f0e8]/70">Pan along the number line</span>
+                        <kbd className="px-2.5 py-1 rounded-md bg-[#070c16] text-[#c9a84c] font-mono text-xs border border-white/[0.1] shadow-sm">
+                          Drag Canvas
+                        </kbd>
+                      </div>
+                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] text-xs">
+                        <span className="text-[#f5f0e8]/70">Infinite temporal zoom</span>
+                        <kbd className="px-2.5 py-1 rounded-md bg-[#070c16] text-[#c9a84c] font-mono text-xs border border-white/[0.1] shadow-sm">
+                          Scroll Wheel / + -
+                        </kbd>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xs font-mono uppercase tracking-wider text-[#c9a84c] mb-2.5 flex items-center gap-1.5">
+                      <MousePointer className="w-3.5 h-3.5" />
+                      <span>Touchscreen Gestures</span>
+                    </h3>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] text-xs">
+                        <span className="text-[#f5f0e8]/70">1-Finger Drag</span>
+                        <span className="font-mono text-[#c9a84c] text-xs">Smooth Pan</span>
+                      </div>
+                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] text-xs">
+                        <span className="text-[#f5f0e8]/70">2-Finger Pinch</span>
+                        <span className="font-mono text-[#c9a84c] text-xs">Continuous Zoom</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center text-sm text-[#f5f0e8]/70">
-                  <kbd className="px-2 py-0.5 rounded bg-[#f5f0e8]/10 text-[#f5f0e8]/80 font-mono text-xs min-w-[40px] text-center">
-                    Click
-                  </kbd>
-                  <span>Add event at position</span>
+              )}
+
+              {/* Tab 2: Capabilities & Features */}
+              {activeTab === "features" && (
+                <div className="space-y-3">
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-start gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-[#c9a84c]/15 text-[#c9a84c] flex items-center justify-center shrink-0 mt-0.5">
+                      <Layers className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-semibold text-[#f5f0e8]">
+                        Even vs. Proportional Spacing
+                      </h4>
+                      <p className="text-[11px] text-[#f5f0e8]/50 mt-0.5 font-light leading-relaxed">
+                        Toggle instantly between mathematical physical time and balanced card density.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-start gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-[#5a9bd5]/15 text-[#5a9bd5] flex items-center justify-center shrink-0 mt-0.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-semibold text-[#f5f0e8]">
+                        Multi-Tier Collision Avoidance
+                      </h4>
+                      <p className="text-[11px] text-[#f5f0e8]/50 mt-0.5 font-light leading-relaxed">
+                        Labels automatically distribute into staggered tiers and collapse into glowing nodes during heavy density.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-start gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-[#7ab8a0]/15 text-[#7ab8a0] flex items-center justify-center shrink-0 mt-0.5">
+                      <Download className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-semibold text-[#f5f0e8]">
+                        Retina PNG & Tabular TXT Export
+                      </h4>
+                      <p className="text-[11px] text-[#f5f0e8]/50 mt-0.5 font-light leading-relaxed">
+                        Generate publication-ready 2x resolution canvas graphics or export raw chronological tab-separated datasets.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-start gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-[#b07cc6]/15 text-[#b07cc6] flex items-center justify-center shrink-0 mt-0.5">
+                      <Palette className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-semibold text-[#f5f0e8]">
+                        Custom Chromatic Themes
+                      </h4>
+                      <p className="text-[11px] text-[#f5f0e8]/50 mt-0.5 font-light leading-relaxed">
+                        Tailor background, spine line, ticks, and text to match historical parchment, modern dark mode, or classic paper.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center text-sm text-[#f5f0e8]/70">
-                  <kbd className="px-2 py-0.5 rounded bg-[#f5f0e8]/10 text-[#f5f0e8]/80 font-mono text-xs min-w-[40px] text-center">
-                    Drag
-                  </kbd>
-                  <span>Pan the timeline</span>
+              )}
+
+              {/* Tab 3: About & Devnetra */}
+              {activeTab === "about" && (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="w-2 h-2 rounded-full bg-[#c9a84c]" />
+                      <h3
+                        className="text-sm font-bold text-[#f5f0e8]"
+                        style={{ fontFamily: "var(--font-display)" }}
+                      >
+                        Devnetra Consultancy
+                      </h3>
+                    </div>
+                    <p className="text-xs text-[#f5f0e8]/60 leading-relaxed font-light mb-4">
+                      NeeLine is built with architectural precision to bridge historical pedagogy, research chronicles, and human temporal curiosity on an interactive coordinate axis.
+                    </p>
+
+                    <div className="space-y-2 pt-2 border-t border-white/[0.06] text-xs font-mono">
+                      <a
+                        href="mailto:devnetraconsultancy@gmail.com"
+                        className="flex items-center gap-2.5 text-[#f5f0e8]/60 hover:text-[#c9a84c] transition-colors p-1.5 rounded-lg hover:bg-white/[0.04]"
+                      >
+                        <Mail className="w-4 h-4 text-[#c9a84c]" />
+                        <span>devnetraconsultancy@gmail.com</span>
+                      </a>
+                      <a
+                        href="https://www.instagram.com/scien_nee/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2.5 text-[#f5f0e8]/60 hover:text-[#c9a84c] transition-colors p-1.5 rounded-lg hover:bg-white/[0.04]"
+                      >
+                        <svg
+                          className="w-4 h-4 text-[#c9a84c] shrink-0"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+                          <path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z" />
+                          <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+                        </svg>
+                        <span>@scien_nee on Instagram</span>
+                      </a>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center text-sm text-[#f5f0e8]/70">
-                  <kbd className="px-2 py-0.5 rounded bg-[#f5f0e8]/10 text-[#f5f0e8]/80 font-mono text-xs min-w-[40px] text-center">
-                    Scroll
-                  </kbd>
-                  <span>Zoom in / out</span>
-                </div>
+              )}
+
+              {/* Close Button */}
+              <div className="mt-5 pt-4 border-t border-white/[0.08] flex justify-end">
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="btn-gold px-5 py-2 rounded-xl text-xs font-mono font-semibold cursor-pointer"
+                >
+                  Got It
+                </button>
               </div>
             </div>
-
-            {/* Touch Controls */}
-            <div className="mb-6">
-              <h2
-                className="text-[#c9a84c] font-semibold text-sm mb-3 uppercase tracking-wider"
-                style={{ fontFamily: "var(--font-mono)" }}
-              >
-                Touch Controls
-              </h2>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center text-sm text-[#f5f0e8]/70">
-                  <span>1 finger drag</span>
-                  <span>Pan</span>
-                </div>
-                <div className="flex justify-between items-center text-sm text-[#f5f0e8]/70">
-                  <span>Pinch</span>
-                  <span>Zoom</span>
-                </div>
-              </div>
-            </div>
-
-            {/* What You Can Do */}
-            <div className="mb-6">
-              <h2
-                className="text-[#c9a84c] font-semibold text-sm mb-3 uppercase tracking-wider"
-                style={{ fontFamily: "var(--font-mono)" }}
-              >
-                Features
-              </h2>
-              <ul className="space-y-1.5 text-sm text-[#f5f0e8]/70">
-                <li className="flex items-start gap-2">
-                  <span className="text-[#c9a84c]/60 mt-0.5">•</span>
-                  <span>Create and edit timeline events with dates and descriptions</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-[#c9a84c]/60 mt-0.5">•</span>
-                  <span>Switch between evenly-spaced and time-proportional layouts</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-[#c9a84c]/60 mt-0.5">•</span>
-                  <span>Toggle time-gap indicators between events</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-[#c9a84c]/60 mt-0.5">•</span>
-                  <span>Import events from a JSON file</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-[#c9a84c]/60 mt-0.5">•</span>
-                  <span>Export your timeline as a PNG image</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-[#c9a84c]/60 mt-0.5">•</span>
-                  <span>Customize colors via Timeline Settings</span>
-                </li>
-              </ul>
-            </div>
-
-            {/* Divider */}
-            <div className="border-t border-[#c9a84c]/10 pt-5">
-              <h2
-                className="text-[#c9a84c] font-semibold text-sm mb-3"
-                style={{ fontFamily: "var(--font-mono)" }}
-              >
-                Contact Us
-              </h2>
-              <p className="text-sm text-[#f5f0e8]/60 mb-3">
-                Made by <span className="text-[#f5f0e8]/80 font-medium">Devnetra Consultancy</span>
-              </p>
-              <div className="space-y-2 text-sm text-[#f5f0e8]/50">
-                <div className="flex items-center gap-2">
-                  <svg
-                    className="w-4 h-4 text-[#c9a84c]/50 shrink-0"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                    <polyline points="22,6 12,13 2,6" />
-                  </svg>
-                  <a
-                    href="mailto:devnetraconsultancy@gmail.com"
-                    className="hover:text-[#c9a84c] transition-colors"
-                  >
-                    devnetraconsultancy@gmail.com
-                  </a>
-                </div>
-                <div className="flex items-center gap-2">
-                  <svg
-                    className="w-4 h-4 text-[#c9a84c]/50 shrink-0"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
-                    <path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z" />
-                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
-                  </svg>
-                  <a
-                    href="https://www.instagram.com/scien_nee/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-[#c9a84c] transition-colors"
-                  >
-                    @scien_nee on Instagram
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            {/* Close button */}
-            <div className="mt-4 text-center">
-              <button
-                onClick={() => setShowModal(false)}
-                className="px-6 py-2 rounded-lg bg-[#c9a84c]/10 border border-[#c9a84c]/30 text-[#c9a84c] text-sm font-medium hover:bg-[#c9a84c]/20 transition-colors"
-              >
-                Got it
-              </button>
-            </div>
-          </div>
-        </div>
-      , document.body)}
+          </div>,
+          document.body
+        )}
     </>
   );
 }

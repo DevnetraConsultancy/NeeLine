@@ -26,9 +26,14 @@ export interface LayoutItem {
   collapsed: boolean;
 }
 
-export const TIER_SPACING = 28; // vertical spacing between label tiers
-const LABEL_GAP = 6; // horizontal gap between labels
+export const TIER_SPACING = 32; // vertical spacing between label tiers
+const LABEL_GAP = 8; // horizontal gap between labels
 const MAX_TIERS = 4;
+
+const MONTH_NAMES = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+];
 
 export function layoutLabels(
   events: Array<{
@@ -51,7 +56,7 @@ export function layoutLabels(
       const effectiveYear = e.isBce ? -Math.abs(e.year) : e.year;
       const labelText = `${e.title}`;
       const labelWidth =
-        measureTextWidth(labelText, '13px "Inter", sans-serif') + 16; // padding
+        measureTextWidth(labelText, '13px "Inter", sans-serif') + 20; // padding
 
       return {
         eventId: e.id,
@@ -109,11 +114,11 @@ export function formatDateLabel(
 ): string {
   const era = isBce ? "BCE" : "CE";
   const formattedYear = year.toLocaleString();
-  if (month && day) {
-    return `${formattedYear} ${era}`;
+  if (month && day && month >= 1 && month <= 12) {
+    return `${MONTH_NAMES[month - 1]} ${day}, ${formattedYear} ${era}`;
   }
-  if (month) {
-    return `${formattedYear} ${era}`;
+  if (month && month >= 1 && month <= 12) {
+    return `${MONTH_NAMES[month - 1]} ${formattedYear} ${era}`;
   }
   return `${formattedYear} ${era}`;
 }

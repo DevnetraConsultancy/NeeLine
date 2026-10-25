@@ -2,6 +2,12 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { layoutLabels, formatDateLabel, TIER_SPACING } from "@/lib/timeline-layout";
+import {
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  Layers,
+} from "lucide-react";
 
 interface EventData {
   id: string;
@@ -28,8 +34,8 @@ const BASE_PIXELS_PER_YEAR = 0.05;
 const MIN_ZOOM = 0.001;
 const MAX_ZOOM = 50;
 
-const TICK_HEIGHT = 12;
-const DOT_RADIUS = 4;
+const TICK_HEIGHT = 14;
+const DOT_RADIUS = 5;
 
 export default function TimelineRenderer({
   events,
@@ -48,6 +54,8 @@ export default function TimelineRenderer({
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   const [layoutMode, setLayoutMode] = useState<"even" | "proportional">("even");
   const [showGaps, setShowGaps] = useState(true);
+  const [cursorYear, setCursorYear] = useState<number | null>(null);
+  const [cursorX, setCursorX] = useState<number | null>(null);
 
   // Drag state
   const isDragging = useRef(false);
@@ -74,7 +82,6 @@ export default function TimelineRenderer({
   }, []);
 
   // Year-to-x coordinate mapping
-  // Evenly-spaced event positions (base, centered at 0)
   const baseEventPositions = useMemo(() => {
     const map = new Map<string, number>();
     if (events.length === 0) return map;
@@ -83,7 +90,7 @@ export default function TimelineRenderer({
       const yb = b.isBce ? -Math.abs(b.year) : b.year;
       return ya - yb;
     });
-    const SPACING = 180;
+    const SPACING = 200;
     const totalSpan = (sorted.length - 1) * SPACING;
     const start = -totalSpan / 2;
     sorted.forEach((e, i) => {
@@ -164,7 +171,7 @@ export default function TimelineRenderer({
     [events, baseEventPositions, layoutMode, zoom, panX, dimensions.width]
   );
 
-  // Check if any event is at year 0 (to avoid origin marker overlap)
+  // Check if any event is at year 0
   const hasYearZero = useMemo(
     () => events.some((e) => e.year === 0 && !e.isBce),
     [events]
@@ -185,7 +192,7 @@ export default function TimelineRenderer({
     [events, yearToX]
   );
 
-  // Compute spine extents — only if events exist
+  // Compute spine extents
   const hasEvents = events.length > 0;
   const spineLeft = useMemo(() => {
     if (!hasEvents) return 0;
@@ -193,12 +200,12 @@ export default function TimelineRenderer({
       const years = events.map((e) => (e.isBce ? -Math.abs(e.year) : e.year));
       years.push(0);
       const minYear = Math.min(...years);
-      return yearToX(minYear);
+      return yearToX(minYear) - 80;
     }
     const positions = Array.from(baseEventPositions.values()).map(
       (bx) => dimensions.width / 2 + bx * zoom + panX
     );
-    return Math.min(...positions) - 60;
+    return Math.min(...positions) - 100;
   }, [hasEvents, baseEventPositions, layoutMode, events, zoom, panX, dimensions.width, yearToX]);
 
   const spineRight = useMemo(() => {
@@ -207,12 +214,12 @@ export default function TimelineRenderer({
       const years = events.map((e) => (e.isBce ? -Math.abs(e.year) : e.year));
       years.push(0);
       const maxYear = Math.max(...years);
-      return yearToX(maxYear);
+      return yearToX(maxYear) + 80;
     }
     const positions = Array.from(baseEventPositions.values()).map(
       (bx) => dimensions.width / 2 + bx * zoom + panX
     );
-    return Math.max(...positions) + 60;
+    return Math.max(...positions) + 100;
   }, [hasEvents, baseEventPositions, layoutMode, events, zoom, panX, dimensions.width, yearToX]);
 
   const spineY = dimensions.height / 2;
@@ -227,8 +234,12 @@ export default function TimelineRenderer({
       const minYear = Math.min(...years);
       const maxYear = Math.max(...years);
       const range = maxYear - minYear;
-      if (range === 0) { setZoom(1); setPanX(0); return; }
-      const padding = 80;
+      if (range === 0) {
+        setZoom(1);
+        setPanX(0);
+        return;
+      }
+      const padding = 100;
       const availableWidth = dimensions.width - padding * 2;
       const newZoom = availableWidth / (range * BASE_PIXELS_PER_YEAR);
       const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
@@ -237,12 +248,11 @@ export default function TimelineRenderer({
       setPanX(-centerX * BASE_PIXELS_PER_YEAR * clampedZoom);
       return;
     }
-    const SPACING = 180;
+    const SPACING = 200;
     const totalSpan = (events.length - 1) * SPACING;
-    const padding = 120;
+    const padding = 140;
     const availableWidth = dimensions.width - padding * 2;
-    const newZoom =
-      events.length > 1 ? availableWidth / totalSpan : 1;
+    const newZoom = events.length > 1 ? availableWidth / totalSpan : 1;
     setZoom(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom)));
     setPanX(0);
   }, [events, layoutMode, dimensions.width]);
@@ -253,7 +263,6 @@ export default function TimelineRenderer({
     if (events.length !== prevEventCount.current || prevEventCount.current === 0) {
       prevEventCount.current = events.length;
       if (events.length > 0) {
-        // Double RAF to let dimensions settle
         requestAnimationFrame(() => {
           requestAnimationFrame(() => fitAllRef.current());
         });
@@ -261,21 +270,20 @@ export default function TimelineRenderer({
     }
   }, [events.length, fitAll]);
 
-  // Auto-fit when layout mode changes so events stay centered
+  // Auto-fit when layout mode changes
   const fitAllRef = useRef(fitAll);
   fitAllRef.current = fitAll;
   const prevLayoutMode = useRef(layoutMode);
   useEffect(() => {
     if (prevLayoutMode.current !== layoutMode) {
       prevLayoutMode.current = layoutMode;
-      // Double RAF ensures React has committed the new state
       requestAnimationFrame(() => {
         requestAnimationFrame(() => fitAllRef.current());
       });
     }
   }, [layoutMode, fitAll]);
 
-  // Mouse wheel zoom — use native non-passive listener to preventDefault()
+  // Mouse wheel zoom
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -283,7 +291,7 @@ export default function TimelineRenderer({
       e.preventDefault();
       const rect = el.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
-      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
       const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * factor));
       const baseX = (mouseX - dimensions.width / 2 - panX) / zoom;
       const newPanX = mouseX - dimensions.width / 2 - baseX * newZoom;
@@ -295,19 +303,24 @@ export default function TimelineRenderer({
   }, [zoom, panX, dimensions.width]);
 
   // Mouse drag pan
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      if (e.button !== 0) return;
-      isDragging.current = true;
-      hasDragged.current = false;
-      lastMouse.current = { x: e.clientX, y: e.clientY };
-      e.preventDefault();
-    },
-    []
-  );
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    isDragging.current = true;
+    hasDragged.current = false;
+    lastMouse.current = { x: e.clientX, y: e.clientY };
+    e.preventDefault();
+  }, []);
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        const mouseX = e.clientX - rect.left;
+        setCursorX(mouseX);
+        const y = Math.round(xToYear(mouseX));
+        setCursorYear(y);
+      }
+
       if (!isDragging.current) return;
 
       const dx = e.clientX - lastMouse.current.x;
@@ -319,11 +332,17 @@ export default function TimelineRenderer({
 
       setPanX((prev) => prev + dx);
     },
-    []
+    [xToYear]
   );
 
   const handleMouseUp = useCallback(() => {
     isDragging.current = false;
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    isDragging.current = false;
+    setCursorX(null);
+    setCursorYear(null);
   }, []);
 
   // Touch handlers for mobile
@@ -371,7 +390,7 @@ export default function TimelineRenderer({
     pinchDist.current = null;
   }, []);
 
-  // Click on background to add event at that year
+  // Click on background to add event at that coordinate
   const handleSvgClick = useCallback(
     (e: React.MouseEvent) => {
       if (hasDragged.current) return;
@@ -388,108 +407,218 @@ export default function TimelineRenderer({
     [xToYear, onBgClick]
   );
 
+  // Manual Zoom In / Zoom Out functions
+  const zoomIn = useCallback(() => {
+    setZoom((z) => Math.min(MAX_ZOOM, z * 1.25));
+  }, []);
+
+  const zoomOut = useCallback(() => {
+    setZoom((z) => Math.max(MIN_ZOOM, z / 1.25));
+  }, []);
+
   // Keyboard shortcuts
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
       if (e.key === "0") {
         fitAll();
+      } else if (e.key === "+" || e.key === "=") {
+        zoomIn();
+      } else if (e.key === "-") {
+        zoomOut();
       }
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [fitAll]);
+  }, [fitAll, zoomIn, zoomOut]);
 
   return (
     <div
       ref={containerRef}
-      className="w-full h-full overflow-hidden relative select-none"
-      style={{ cursor: isDragging.current ? "grabbing" : "grab", backgroundColor: bgColor }}
-
+      className="w-full h-full overflow-hidden relative select-none transition-colors duration-300"
+      style={{
+        cursor: isDragging.current ? "grabbing" : "grab",
+        backgroundColor: bgColor,
+      }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
+      onMouseLeave={handleMouseLeave}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {/* SVG */}
+      {/* SVG Canvas */}
       <svg
         width={dimensions.width}
         height={dimensions.height}
         className="absolute inset-0"
         onClick={handleSvgClick}
       >
+        <defs>
+          {/* Spine glow filter */}
+          <filter id="spine-glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+        </defs>
+
         {hasEvents && (
           <>
-            {/* Spine line */}
+            {/* The Golden Spine Axis line */}
             <line
               x1={spineLeft}
               y1={spineY}
               x2={spineRight}
               y2={spineY}
               stroke={spineColor}
-              strokeWidth="2"
-              opacity="0.6"
+              strokeWidth="2.5"
+              opacity="0.8"
+            />
+            {/* Soft halo for spine line */}
+            <line
+              x1={spineLeft}
+              y1={spineY}
+              x2={spineRight}
+              y2={spineY}
+              stroke={spineColor}
+              strokeWidth="6"
+              opacity="0.15"
             />
 
-            {/* Origin "0" marker — hidden when a Year Zero event exists */}
+            {/* Origin "0 CE" Beacon */}
             {!hasYearZero && (
-            <g>
-              {/* Tick */}
-              <line
-                x1={originX}
-                y1={spineY - TICK_HEIGHT}
-                x2={originX}
-                y2={spineY + TICK_HEIGHT}
-                stroke={tickColor}
-                strokeWidth="2"
-                opacity="0.8"
-              />
-              {/* Origin circle */}
-              <circle
-                cx={originX}
-                cy={spineY}
-                r="5"
-                fill="none"
-                stroke={tickColor}
-                strokeWidth="1.5"
-                opacity="0.6"
-              />
-              {/* Origin label */}
-              <text
-                x={originX}
-                y={spineY + TICK_HEIGHT + 18}
-                textAnchor="middle"
-                fill={textColor}
-                fontSize="12"
-                fontFamily="var(--font-mono)"
-                opacity="0.5"
-              >
-                0
-              </text>
-            </g>
+              <g className="origin-marker">
+                {/* Vertical tick through axis */}
+                <line
+                  x1={originX}
+                  y1={spineY - TICK_HEIGHT - 2}
+                  x2={originX}
+                  y2={spineY + TICK_HEIGHT + 2}
+                  stroke={tickColor}
+                  strokeWidth="2"
+                  opacity="0.85"
+                />
+                {/* Celestial orbital ring */}
+                <circle
+                  cx={originX}
+                  cy={spineY}
+                  r="6.5"
+                  fill="none"
+                  stroke={tickColor}
+                  strokeWidth="1.5"
+                  opacity="0.75"
+                />
+                {/* Center pip */}
+                <circle cx={originX} cy={spineY} r="2" fill={tickColor} opacity="0.9" />
+                {/* Origin label */}
+                <text
+                  x={originX}
+                  y={spineY + TICK_HEIGHT + 20}
+                  textAnchor="middle"
+                  fill={textColor}
+                  fontSize="11"
+                  fontWeight="600"
+                  fontFamily="var(--font-mono)"
+                  opacity="0.7"
+                >
+                  0 CE
+                </text>
+              </g>
             )}
 
-            {/* Event ticks and labels */}
+            {/* Time gap indicators between consecutive events */}
+            {showGaps &&
+              sortedEvents.length > 1 &&
+              sortedEvents.map((ev, i) => {
+                if (i === 0) return null;
+                const prev = sortedEvents[i - 1];
+                const prevYear = prev.isBce ? -Math.abs(prev.year) : prev.year;
+                const curYear = ev.isBce ? -Math.abs(ev.year) : ev.year;
+                const gap = Math.abs(curYear - prevYear);
+                if (gap === 0) return null;
+                const prevX = yearToX(prevYear);
+                const curX = yearToX(curYear);
+                const midX = (prevX + curX) / 2;
+                const gapText =
+                  gap >= 1000000
+                    ? `${(gap / 1000000).toFixed(gap % 1000000 === 0 ? 0 : 1)}M yrs`
+                    : gap >= 1000
+                    ? `${(gap / 1000).toFixed(gap % 1000 === 0 ? 0 : 1)}k yrs`
+                    : `${gap.toLocaleString()} yrs`;
+
+                // If gap spans sufficient visual width, render
+                if (Math.abs(curX - prevX) < 50) return null;
+
+                return (
+                  <g key={`gap-${i}`} className="transition-opacity duration-200">
+                    {/* Dashed connector line on spine */}
+                    <line
+                      x1={prevX + 12}
+                      y1={spineY}
+                      x2={curX - 12}
+                      y2={spineY}
+                      stroke={spineColor}
+                      strokeWidth="1.5"
+                      strokeDasharray="4 4"
+                      opacity="0.35"
+                    />
+                    {/* Gap badge background */}
+                    <rect
+                      x={midX - (gapText.length * 6) / 2 - 8}
+                      y={spineY + TICK_HEIGHT + 8}
+                      width={gapText.length * 6 + 16}
+                      height="16"
+                      rx="8"
+                      fill={bgColor}
+                      stroke={spineColor}
+                      strokeWidth="1"
+                      opacity="0.45"
+                    />
+                    {/* Gap label */}
+                    <text
+                      x={midX}
+                      y={spineY + TICK_HEIGHT + 20}
+                      textAnchor="middle"
+                      fill={textColor}
+                      fontSize="9"
+                      fontFamily="var(--font-mono)"
+                      opacity="0.65"
+                    >
+                      {gapText}
+                    </text>
+                  </g>
+                );
+              })}
+
+            {/* Event ticks, connectors, and cards */}
             {layoutItems.map((item) => (
-              <g key={item.eventId}>
-                {/* Tick mark */}
+              <g key={item.eventId} className="event-group">
+                {/* Vertical tick on axis */}
                 <line
                   x1={item.x}
                   y1={spineY - TICK_HEIGHT / 2}
                   x2={item.x}
                   y2={spineY + TICK_HEIGHT / 2}
                   stroke={item.color}
-                  strokeWidth="2"
-                  opacity="0.9"
+                  strokeWidth="2.5"
+                  opacity="0.95"
                 />
 
-                {/* Small dot on spine */}
-                <circle cx={item.x} cy={spineY} r="2.5" fill={item.color} opacity="0.8" />
+                {/* Spine dot node */}
+                <circle
+                  cx={item.x}
+                  cy={spineY}
+                  r="3.5"
+                  fill={item.color}
+                  stroke={bgColor}
+                  strokeWidth="1.5"
+                />
 
                 {item.collapsed ? (
-                  // Collapsed dot with hover
+                  // Collapsed dot with rich tooltip
                   <g
                     onMouseEnter={() => {
                       setHoveredEvent(item.eventId);
@@ -513,16 +642,30 @@ export default function TimelineRenderer({
                       }
                     }}
                   >
+                    {/* Vertical guideline */}
+                    <line
+                      x1={item.x}
+                      y1={spineY - TICK_HEIGHT / 2}
+                      x2={item.x}
+                      y2={spineY - TICK_HEIGHT / 2 - 8 - item.tier * TIER_SPACING}
+                      stroke={item.color}
+                      strokeWidth="1"
+                      strokeDasharray="2 2"
+                      opacity="0.5"
+                    />
+                    {/* Collapsed glowing node */}
                     <circle
                       cx={item.x}
-                      cy={spineY - TICK_HEIGHT / 2 - DOT_RADIUS - 4 - item.tier * TIER_SPACING}
+                      cy={spineY - TICK_HEIGHT / 2 - DOT_RADIUS - 6 - item.tier * TIER_SPACING}
                       r={DOT_RADIUS}
                       fill={item.color}
-                      opacity="0.8"
+                      stroke={bgColor}
+                      strokeWidth="1.5"
+                      opacity="0.95"
                     />
                   </g>
                 ) : (
-                  // Full label
+                  // Full Label Card
                   <g
                     style={{ cursor: "pointer" }}
                     onClick={(e) => {
@@ -541,52 +684,54 @@ export default function TimelineRenderer({
                       }
                     }}
                   >
-                    {/* Connector line from tick to label */}
+                    {/* Connector line from spine tick to label */}
                     <line
                       x1={item.x}
                       y1={spineY - TICK_HEIGHT / 2}
                       x2={item.x}
-                      y2={spineY - TICK_HEIGHT / 2 - 6 - item.tier * TIER_SPACING}
+                      y2={spineY - TICK_HEIGHT / 2 - 8 - item.tier * TIER_SPACING}
                       stroke={item.color}
-                      strokeWidth="1"
-                      opacity="0.4"
+                      strokeWidth="1.2"
+                      opacity="0.65"
                     />
 
-                    {/* Label background */}
+                    {/* Card background */}
                     <rect
                       x={item.x - item.labelWidth / 2}
-                      y={spineY - TICK_HEIGHT / 2 - 22 - item.tier * TIER_SPACING}
+                      y={spineY - TICK_HEIGHT / 2 - 26 - item.tier * TIER_SPACING}
                       width={item.labelWidth}
-                      height="20"
-                      rx="3"
+                      height="24"
+                      rx="6"
                       fill={bgColor}
                       stroke={item.color}
-                      strokeWidth="1"
-                      opacity="0.9"
+                      strokeWidth="1.5"
+                      opacity="0.95"
                     />
 
-                    {/* Label text */}
+                    {/* Event Title */}
                     <text
                       x={item.x}
-                      y={spineY - TICK_HEIGHT / 2 - 8 - item.tier * TIER_SPACING}
+                      y={spineY - TICK_HEIGHT / 2 - 10 - item.tier * TIER_SPACING}
                       textAnchor="middle"
                       fill={textColor}
-                      fontSize="12"
+                      fontSize="12.5"
                       fontFamily="var(--font-display)"
-                      fontWeight="500"
+                      fontWeight="600"
+                      letterSpacing="0.01em"
                     >
                       {item.title}
                     </text>
 
-                    {/* Year label below the tick */}
+                    {/* Date label beneath the axis */}
                     <text
                       x={item.x}
-                      y={spineY + TICK_HEIGHT / 2 + 14 + item.tier * 2}
+                      y={spineY + TICK_HEIGHT / 2 + 16 + item.tier * 2}
                       textAnchor="middle"
                       fill={item.color}
                       fontSize="10"
                       fontFamily="var(--font-mono)"
-                      opacity="0.7"
+                      fontWeight="500"
+                      opacity="0.9"
                     >
                       {formatDateLabel(item.year, item.isBce, item.month, item.day)}
                     </text>
@@ -595,125 +740,193 @@ export default function TimelineRenderer({
               </g>
             ))}
 
-            {/* Time gap indicators between consecutive events */}
-            {showGaps && sortedEvents.length > 1 && sortedEvents.map((ev, i) => {
-              if (i === 0) return null;
-              const prev = sortedEvents[i - 1];
-              const prevYear = prev.isBce ? -Math.abs(prev.year) : prev.year;
-              const curYear = ev.isBce ? -Math.abs(ev.year) : ev.year;
-              const gap = Math.abs(curYear - prevYear);
-              if (gap === 0) return null;
-              const prevX = yearToX(prevYear);
-              const curX = yearToX(curYear);
-              const midX = (prevX + curX) / 2;
-              const gapText = gap >= 1000000 ? `${(gap / 1000000).toFixed(gap % 1000000 === 0 ? 0 : 1)}M years` : gap >= 1000 ? `${(gap / 1000).toFixed(gap % 1000 === 0 ? 0 : 1)}k years` : `${gap.toLocaleString()} years`;
-              return (
-                <g key={`gap-${i}`}>
-                  {/* Dashed connector line on spine */}
-                  <line
-                    x1={prevX + 8}
-                    y1={spineY}
-                    x2={curX - 8}
-                    y2={spineY}
-                    stroke={spineColor}
-                    strokeWidth="1"
-                    strokeDasharray="4 4"
-                    opacity="0.3"
-                  />
-                  {/* Gap label */}
-                  <text
-                    x={midX}
-                    y={spineY + TICK_HEIGHT + 16}
-                    textAnchor="middle"
-                    fill={textColor}
-                    fontSize="9"
-                    fontFamily="var(--font-mono)"
-                    opacity="0.35"
-                  >
-                    {gapText}
-                  </text>
-                </g>
-              );
-            })}
+            {/* Interactive Hairline Mouse Cursor Guide */}
+            {cursorX !== null && cursorYear !== null && !isDragging.current && (
+              <g className="cursor-guide pointer-events-none">
+                <line
+                  x1={cursorX}
+                  y1={spineY - 30}
+                  x2={cursorX}
+                  y2={spineY + 30}
+                  stroke="#c9a84c"
+                  strokeWidth="1"
+                  strokeDasharray="3 3"
+                  opacity="0.5"
+                />
+                <circle cx={cursorX} cy={spineY} r="3" fill="#c9a84c" opacity="0.8" />
+              </g>
+            )}
           </>
         )}
 
-        {/* Empty state */}
+        {/* Empty Canvas Welcome State */}
         {!hasEvents && (
-          <text
-            x={dimensions.width / 2}
-            y={dimensions.height / 2}
-            textAnchor="middle"
-            fill={textColor}
-            fontSize="14"
-            fontFamily="var(--font-body)"
-            opacity="0.2"
-          >
-            Add your first event to begin
-          </text>
+          <g>
+            {/* Axis preview line */}
+            <line
+              x1={dimensions.width / 2 - 200}
+              y1={dimensions.height / 2}
+              x2={dimensions.width / 2 + 200}
+              y2={dimensions.height / 2}
+              stroke={spineColor}
+              strokeWidth="2"
+              strokeDasharray="6 6"
+              opacity="0.3"
+            />
+            <circle
+              cx={dimensions.width / 2}
+              cy={dimensions.height / 2}
+              r="6"
+              fill={spineColor}
+              opacity="0.4"
+            />
+            <text
+              x={dimensions.width / 2}
+              y={dimensions.height / 2 - 30}
+              textAnchor="middle"
+              fill={textColor}
+              fontSize="16"
+              fontFamily="var(--font-display)"
+              fontWeight="600"
+              opacity="0.85"
+            >
+              Empty Chronicle Axis
+            </text>
+            <text
+              x={dimensions.width / 2}
+              y={dimensions.height / 2 + 35}
+              textAnchor="middle"
+              fill={textColor}
+              fontSize="12"
+              fontFamily="var(--font-mono)"
+              opacity="0.4"
+            >
+              Click anywhere on this axis or press + Add Event to begin
+            </text>
+          </g>
         )}
       </svg>
 
-      {/* Tooltip for collapsed labels */}
+      {/* Rich Floating Tooltip for collapsed events */}
       {hoveredEvent && tooltipPos && (() => {
         const item = layoutItems.find((i) => i.eventId === hoveredEvent);
         if (!item) return null;
         return (
           <div
-            className="absolute pointer-events-none z-40 px-3 py-2 rounded-lg border shadow-lg max-w-xs"
+            className="absolute pointer-events-none z-50 px-4 py-3 rounded-xl border glass-panel shadow-2xl max-w-sm"
             style={{
-              left: Math.min(tooltipPos.x, dimensions.width - 200),
-              top: tooltipPos.y - 60,
-              backgroundColor: bgColor,
+              left: Math.min(tooltipPos.x, dimensions.width - 240),
+              top: tooltipPos.y - 75,
               borderColor: item.color,
-              color: textColor,
             }}
           >
-            <div className="text-sm font-semibold" style={{ fontFamily: "var(--font-display)" }}>
+            <div
+              className="text-sm font-semibold text-[#f5f0e8]"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
               {item.title}
             </div>
-            <div className="text-xs mt-0.5 opacity-60" style={{ fontFamily: "var(--font-mono)" }}>
+            <div
+              className="text-xs mt-1 font-mono font-medium"
+              style={{ color: item.color }}
+            >
               {formatDateLabel(item.year, item.isBce, item.month, item.day)}
             </div>
             {item.description && (
-              <div className="text-xs mt-1 opacity-50">{item.description}</div>
+              <div className="text-xs mt-1.5 text-[#f5f0e8]/70 leading-relaxed font-light">
+                {item.description}
+              </div>
             )}
           </div>
         );
       })()}
 
-      {/* Layout mode + gap toggle controls */}
+      {/* Floating HUD: Top-Right Canvas Controls */}
       <div className="absolute top-4 right-4 flex items-center gap-2 z-30">
-        <button
-          onClick={() => setLayoutMode((m) => m === "even" ? "proportional" : "even")}
-          className="px-3 h-7 rounded-lg bg-[#0f1f38]/80 border border-[#c9a84c]/20 text-[#c9a84c] text-[10px] hover:bg-[#0f1f38] transition-colors"
-          style={{ fontFamily: "var(--font-mono)" }}
-          title="Toggle spacing mode"
-        >
-          {layoutMode === "even" ? "⬌ Even" : "⬌ Proportional"}
-        </button>
+        {/* Layout Mode Segmented Toggle */}
+        <div className="flex items-center p-1 rounded-xl glass-panel text-[11px] font-mono shadow-lg border border-white/[0.08]">
+          <button
+            onClick={() => setLayoutMode("even")}
+            className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+              layoutMode === "even"
+                ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/30 font-semibold"
+                : "text-[#f5f0e8]/50 hover:text-[#f5f0e8]"
+            }`}
+            title="Even spacing for maximum readability"
+          >
+            Even Space
+          </button>
+          <button
+            onClick={() => setLayoutMode("proportional")}
+            className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+              layoutMode === "proportional"
+                ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/30 font-semibold"
+                : "text-[#f5f0e8]/50 hover:text-[#f5f0e8]"
+            }`}
+            title="Proportional physical time scale"
+          >
+            Proportional
+          </button>
+        </div>
+
+        {/* Gaps Toggle Button */}
         <button
           onClick={() => setShowGaps((g) => !g)}
-          className={`px-3 h-7 rounded-lg bg-[#0f1f38]/80 border text-[10px] hover:bg-[#0f1f38] transition-colors ${
-            showGaps ? "border-[#c9a84c]/40 text-[#c9a84c]" : "border-[#c9a84c]/10 text-[#c9a84c]/40"
+          className={`h-8 px-3 rounded-xl glass-panel text-[11px] font-mono flex items-center gap-1.5 transition-all cursor-pointer border ${
+            showGaps
+              ? "border-[#c9a84c]/40 text-[#c9a84c] bg-[#c9a84c]/10"
+              : "border-white/[0.08] text-[#f5f0e8]/40 hover:text-[#f5f0e8]/70"
           }`}
-          style={{ fontFamily: "var(--font-mono)" }}
-          title="Show time gaps between events"
+          title="Toggle time span gap badges between consecutive events"
         >
-          {showGaps ? "↕ Gaps" : "↕ Gaps"}
+          <Layers className="w-3.5 h-3.5" />
+          <span>Gaps</span>
         </button>
       </div>
 
-      {/* Fit button only */}
-      <div className="absolute bottom-4 right-4 flex items-center gap-2 z-30">
+      {/* Floating HUD: Bottom-Right Zoom & Fit Dock */}
+      <div className="absolute bottom-4 right-4 flex items-center gap-1.5 p-1 rounded-xl glass-panel border border-white/[0.08] shadow-2xl z-30 font-mono text-xs">
+        <button
+          onClick={zoomOut}
+          className="w-8 h-8 rounded-lg flex items-center justify-center text-[#f5f0e8]/60 hover:text-[#c9a84c] hover:bg-white/[0.06] transition-colors cursor-pointer"
+          title="Zoom out (-)"
+        >
+          <ZoomOut className="w-4 h-4" />
+        </button>
+        <button
+          onClick={zoomIn}
+          className="w-8 h-8 rounded-lg flex items-center justify-center text-[#f5f0e8]/60 hover:text-[#c9a84c] hover:bg-white/[0.06] transition-colors cursor-pointer"
+          title="Zoom in (+)"
+        >
+          <ZoomIn className="w-4 h-4" />
+        </button>
+        <div className="w-px h-4 bg-white/[0.1] mx-0.5" />
         <button
           onClick={fitAll}
-          className="px-3 h-8 rounded-lg bg-[#0f1f38]/80 border border-[#c9a84c]/20 text-[#c9a84c] text-xs hover:bg-[#0f1f38] transition-colors"
-          style={{ fontFamily: "var(--font-mono)" }}
-          title="Fit all events (press 0)"
+          className="px-2.5 h-8 rounded-lg flex items-center gap-1.5 text-[#c9a84c] hover:bg-[#c9a84c]/10 transition-colors cursor-pointer font-medium"
+          title="Fit all milestones to canvas (Key: 0)"
         >
-          Fit
+          <Maximize2 className="w-3.5 h-3.5" />
+          <span>Fit</span>
         </button>
+      </div>
+
+      {/* Floating HUD: Bottom-Left Dynamic Coordinate Tracker */}
+      <div className="absolute bottom-4 left-4 flex items-center gap-2 z-30 font-mono text-[11px] pointer-events-none">
+        <div className="px-3 py-1.5 rounded-xl glass-panel border border-white/[0.08] shadow-lg flex items-center gap-2.5 text-[#f5f0e8]/60">
+          <span className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#c9a84c]" />
+            <span>Zoom: {Math.round(zoom * 100)}%</span>
+          </span>
+          {cursorYear !== null && (
+            <>
+              <span className="text-white/20">|</span>
+              <span className="text-[#c9a84c]">
+                Cursor: {Math.abs(cursorYear).toLocaleString()} {cursorYear < 0 ? "BCE" : "CE"}
+              </span>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

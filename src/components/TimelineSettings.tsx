@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { X, Palette, Sparkles } from "lucide-react";
 
 interface TimelineSettingsProps {
   bgColor: string;
@@ -16,17 +17,55 @@ interface TimelineSettingsProps {
   onClose: () => void;
 }
 
+const PRESET_THEMES = [
+  {
+    name: "Obsidian Gold",
+    bg: "#070c16",
+    spine: "#c9a84c",
+    tick: "#c9a84c",
+    text: "#f5f0e8",
+  },
+  {
+    name: "Parchment",
+    bg: "#f5f0e8",
+    spine: "#2c2c2c",
+    tick: "#2c2c2c",
+    text: "#1a1a1a",
+  },
+  {
+    name: "Midnight Navy",
+    bg: "#0a1628",
+    spine: "#5a9bd5",
+    tick: "#5a9bd5",
+    text: "#e8f0fe",
+  },
+  {
+    name: "Ancient Forest",
+    bg: "#0a1a14",
+    spine: "#7ab8a0",
+    tick: "#7ab8a0",
+    text: "#f0f8f4",
+  },
+  {
+    name: "Pure Monochrome",
+    bg: "#0c0c0c",
+    spine: "#e0e0e0",
+    tick: "#e0e0e0",
+    text: "#ffffff",
+  },
+];
+
 const BG_COLORS = [
-  "#0a1628", "#0f1f38", "#1a0a28", "#0a2818",
-  "#1a1a1a", "#28201a", "#0a0a0a", "#f5f0e8",
-  "#1e293b", "#0f172a",
+  "#070c16", "#0a1628", "#0f1f38", "#1a0a28",
+  "#0a2818", "#1a1a1a", "#28201a", "#0a0a0a",
+  "#1e293b", "#f5f0e8",
 ];
 
 const ACCENT_COLORS = [
   "#c9a84c", "#e8d5a3", "#7ab8a0", "#5a9bd5",
   "#d4786c", "#b07cc6", "#e8a87c", "#7cc6d4",
   "#d4a5c9", "#a8b87a", "#f5f0e8", "#ffffff",
-  "#8b8b8b", "#4a4a4a",
+  "#8b8b8b", "#333333",
 ];
 
 export default function TimelineSettings({
@@ -55,166 +94,264 @@ export default function TimelineSettings({
     onClose();
   }
 
+  function applyPreset(preset: typeof PRESET_THEMES[0]) {
+    setBg(preset.bg);
+    setSpine(preset.spine);
+    setTick(preset.tick);
+    setText(preset.text);
+  }
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-sm mx-4 rounded-xl bg-[#0f1f38] border border-[#c9a84c]/20 shadow-2xl shadow-black/50 overflow-hidden">
+      <div className="w-full max-w-md rounded-2xl glass-panel shadow-[0_25px_60px_rgba(0,0,0,0.8)] border border-white/[0.1] overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#c9a84c]/10">
-          <h2
-            className="text-lg font-semibold text-[#f5f0e8]"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            Timeline Colors
-          </h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] bg-white/[0.02]">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-[#c9a84c]/15 text-[#c9a84c] border border-[#c9a84c]/20 flex items-center justify-center">
+              <Palette className="w-4 h-4" />
+            </div>
+            <div>
+              <h2
+                className="text-base font-bold text-[#f5f0e8] leading-tight"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                Studio Palette & Theme
+              </h2>
+              <p className="text-[11px] font-mono text-[#f5f0e8]/40">
+                Customize canvas atmospheric chromatic values
+              </p>
+            </div>
+          </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-[#f5f0e8]/30 hover:text-[#f5f0e8]/60 hover:bg-[#c9a84c]/10 transition-colors"
+            className="w-8 h-8 flex items-center justify-center rounded-xl text-[#f5f0e8]/40 hover:text-[#f5f0e8] hover:bg-white/[0.06] transition-colors cursor-pointer"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="p-5 space-y-5">
-          {/* Theme Presets */}
+        <div className="p-6 space-y-5 overflow-y-auto flex-1">
+          {/* Real-time Live Mini-Canvas Preview */}
           <div>
-            <label className="block text-xs text-[#f5f0e8]/40 mb-2 uppercase tracking-wider">
-              Theme Presets
+            <label className="block text-[11px] font-mono text-[#f5f0e8]/40 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Sparkles className="w-3 h-3 text-[#c9a84c]" />
+              <span>Live Theme Visualizer</span>
             </label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  setBg("#0a1628");
-                  setSpine("#c9a84c");
-                  setTick("#c9a84c");
-                  setText("#f5f0e8");
-                }}
-                className="flex-1 px-3 py-2 rounded-lg border border-[#c9a84c]/20 text-[#c9a84c] text-xs font-medium hover:bg-[#c9a84c]/10 transition-colors text-center"
-                style={{ fontFamily: "var(--font-mono)" }}
-              >
-                Dark
-              </button>
-              <button
-                onClick={() => {
-                  setBg("#f5f0e8");
-                  setSpine("#2c2c2c");
-                  setTick("#2c2c2c");
-                  setText("#1a1a1a");
-                }}
-                className="flex-1 px-3 py-2 rounded-lg border border-[#c9a84c]/20 text-[#c9a84c] text-xs font-medium hover:bg-[#c9a84c]/10 transition-colors text-center"
-                style={{ fontFamily: "var(--font-mono)" }}
-              >
-                Light
-              </button>
+            <div
+              className="rounded-xl p-4 border border-white/[0.1] relative overflow-hidden transition-colors duration-300 shadow-inner"
+              style={{ backgroundColor: bg }}
+            >
+              <div className="relative py-4 flex items-center justify-between px-6">
+                {/* Simulated spine line */}
+                <div
+                  className="absolute left-4 right-4 h-[2px] transition-colors"
+                  style={{ backgroundColor: spine }}
+                />
+
+                {/* Left Tick */}
+                <div className="relative z-10 flex flex-col items-center">
+                  <div
+                    className="w-1.5 h-6 rounded-full transition-colors"
+                    style={{ backgroundColor: tick }}
+                  />
+                  <span
+                    className="text-[10px] font-mono mt-2"
+                    style={{ color: text }}
+                  >
+                    44 BCE
+                  </span>
+                </div>
+
+                {/* Center Node */}
+                <div className="relative z-10 flex flex-col items-center">
+                  <div
+                    className="px-2 py-0.5 rounded text-[10px] font-semibold border mb-1.5 shadow-sm"
+                    style={{
+                      borderColor: tick,
+                      backgroundColor: bg,
+                      color: text,
+                      fontFamily: "var(--font-display)",
+                    }}
+                  >
+                    Example Event
+                  </div>
+                  <div
+                    className="w-2.5 h-2.5 rounded-full border transition-colors shadow-sm"
+                    style={{ backgroundColor: tick, borderColor: bg }}
+                  />
+                  <span
+                    className="text-[10px] font-mono mt-1"
+                    style={{ color: tick }}
+                  >
+                    0 CE
+                  </span>
+                </div>
+
+                {/* Right Tick */}
+                <div className="relative z-10 flex flex-col items-center">
+                  <div
+                    className="w-1.5 h-6 rounded-full transition-colors"
+                    style={{ backgroundColor: tick }}
+                  />
+                  <span
+                    className="text-[10px] font-mono mt-2"
+                    style={{ color: text }}
+                  >
+                    2026 CE
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Background Color */}
+          {/* Curated Theme Presets */}
           <div>
-            <label className="block text-xs text-[#f5f0e8]/40 mb-2 uppercase tracking-wider">
-              Background
+            <label className="block text-[11px] font-mono text-[#f5f0e8]/40 uppercase tracking-wider mb-2">
+              Curated Theme Presets
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {PRESET_THEMES.map((preset) => {
+                const isActive =
+                  bg === preset.bg &&
+                  spine === preset.spine &&
+                  tick === preset.tick &&
+                  text === preset.text;
+                return (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    onClick={() => applyPreset(preset)}
+                    className={`px-3 py-2 rounded-xl border text-xs font-mono transition-all text-left flex items-center justify-between cursor-pointer ${
+                      isActive
+                        ? "bg-[#c9a84c]/20 border-[#c9a84c] text-[#f5f0e8] shadow-sm"
+                        : "bg-white/[0.03] border-white/[0.08] text-[#f5f0e8]/60 hover:border-white/20 hover:text-[#f5f0e8]"
+                    }`}
+                  >
+                    <span className="truncate">{preset.name}</span>
+                    <div
+                      className="w-2.5 h-2.5 rounded-full shrink-0 ml-1.5 border border-white/20"
+                      style={{ backgroundColor: preset.spine }}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Background Palette */}
+          <div>
+            <label className="block text-[11px] font-mono text-[#f5f0e8]/40 uppercase tracking-wider mb-2">
+              Canvas Background
             </label>
             <div className="flex gap-2 flex-wrap">
               {BG_COLORS.map((c) => (
                 <button
                   key={`bg-${c}`}
+                  type="button"
                   onClick={() => setBg(c)}
-                  className={`w-7 h-7 rounded-full border-2 transition-all ${
-                    bg === c ? "border-white scale-110" : "border-white/20 hover:border-white/40"
+                  className={`w-7 h-7 rounded-full border-2 transition-all cursor-pointer ${
+                    bg === c
+                      ? "border-white scale-110 shadow-md ring-2 ring-white/20"
+                      : "border-transparent opacity-80 hover:opacity-100 hover:scale-105"
                   }`}
                   style={{ backgroundColor: c }}
+                  title={c}
                 />
               ))}
             </div>
           </div>
 
-          {/* Spine Color */}
+          {/* Central Axis Spine Line */}
           <div>
-            <label className="block text-xs text-[#f5f0e8]/40 mb-2 uppercase tracking-wider">
-              Spine Line
+            <label className="block text-[11px] font-mono text-[#f5f0e8]/40 uppercase tracking-wider mb-2">
+              Central Axis Line
             </label>
             <div className="flex gap-2 flex-wrap">
               {ACCENT_COLORS.map((c) => (
                 <button
                   key={`spine-${c}`}
+                  type="button"
                   onClick={() => setSpine(c)}
-                  className={`w-7 h-7 rounded-full border-2 transition-all ${
-                    spine === c ? "border-white scale-110" : "border-white/20 hover:border-white/40"
+                  className={`w-7 h-7 rounded-full border-2 transition-all cursor-pointer ${
+                    spine === c
+                      ? "border-white scale-110 shadow-md ring-2 ring-white/20"
+                      : "border-transparent opacity-80 hover:opacity-100 hover:scale-105"
                   }`}
                   style={{ backgroundColor: c }}
+                  title={c}
                 />
               ))}
             </div>
           </div>
 
-          {/* Tick Color */}
+          {/* Tick Marks & Origin */}
           <div>
-            <label className="block text-xs text-[#f5f0e8]/40 mb-2 uppercase tracking-wider">
-              Tick Marks
+            <label className="block text-[11px] font-mono text-[#f5f0e8]/40 uppercase tracking-wider mb-2">
+              Tick Marks & Origin
             </label>
             <div className="flex gap-2 flex-wrap">
               {ACCENT_COLORS.map((c) => (
                 <button
                   key={`tick-${c}`}
+                  type="button"
                   onClick={() => setTick(c)}
-                  className={`w-7 h-7 rounded-full border-2 transition-all ${
-                    tick === c ? "border-white scale-110" : "border-white/20 hover:border-white/40"
+                  className={`w-7 h-7 rounded-full border-2 transition-all cursor-pointer ${
+                    tick === c
+                      ? "border-white scale-110 shadow-md ring-2 ring-white/20"
+                      : "border-transparent opacity-80 hover:opacity-100 hover:scale-105"
                   }`}
                   style={{ backgroundColor: c }}
+                  title={c}
                 />
               ))}
             </div>
           </div>
 
-          {/* Text Color */}
+          {/* Typography Color */}
           <div>
-            <label className="block text-xs text-[#f5f0e8]/40 mb-2 uppercase tracking-wider">
-              Text
+            <label className="block text-[11px] font-mono text-[#f5f0e8]/40 uppercase tracking-wider mb-2">
+              Canvas Typography
             </label>
             <div className="flex gap-2 flex-wrap">
               {ACCENT_COLORS.map((c) => (
                 <button
                   key={`text-${c}`}
+                  type="button"
                   onClick={() => setText(c)}
-                  className={`w-7 h-7 rounded-full border-2 transition-all ${
-                    text === c ? "border-white scale-110" : "border-white/20 hover:border-white/40"
+                  className={`w-7 h-7 rounded-full border-2 transition-all cursor-pointer ${
+                    text === c
+                      ? "border-white scale-110 shadow-md ring-2 ring-white/20"
+                      : "border-transparent opacity-80 hover:opacity-100 hover:scale-105"
                   }`}
                   style={{ backgroundColor: c }}
+                  title={c}
                 />
               ))}
             </div>
           </div>
 
-          {/* Preview */}
-          <div
-            className="rounded-lg p-4 border border-[#c9a84c]/10"
-            style={{ backgroundColor: bg }}
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tick }} />
-              <div className="flex-1 h-0.5" style={{ backgroundColor: spine }} />
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tick }} />
-            </div>
-            <p
-              className="text-xs mt-2 text-center"
-              style={{ color: text, fontFamily: "var(--font-display)" }}
+          {/* Submit */}
+          <div className="pt-2">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="w-full btn-gold py-2.5 rounded-xl text-xs font-mono font-semibold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
             >
-              Preview text
-            </p>
+              {saving ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-[#070c16]/40 border-t-[#070c16] rounded-full animate-spin" />
+                  <span>Applying Colors...</span>
+                </>
+              ) : (
+                <span>Apply Colors to Canvas</span>
+              )}
+            </button>
           </div>
-
-          {/* Actions */}
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full px-4 py-2.5 rounded-lg bg-[#c9a84c] text-[#0a1628] font-semibold text-sm hover:bg-[#d4b65a] transition-colors disabled:opacity-40"
-          >
-            {saving ? "Saving..." : "Apply Colors"}
-          </button>
         </div>
       </div>
     </div>

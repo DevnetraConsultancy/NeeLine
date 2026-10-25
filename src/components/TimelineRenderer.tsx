@@ -20,7 +20,6 @@ import {
   Trash2,
   CheckSquare,
   Square,
-  BookOpen,
   X,
   Sparkles,
 } from "lucide-react";
@@ -61,8 +60,6 @@ interface TimelineRendererProps {
   showGapBorder?: boolean;
   layers?: LayerItem[];
   activeLayerNames?: string[];
-  chronicleNotes?: string | null;
-  onOpenChronicleNotes?: () => void;
   onToggleLayer?: (name: string) => void;
   onToggleAllLayers?: (all: boolean) => void;
   onCreateLayer?: (name: string, color: string) => Promise<LayerItem>;
@@ -100,8 +97,6 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       showGapBorder = true,
       layers = [],
       activeLayerNames = [],
-      chronicleNotes,
-      onOpenChronicleNotes,
       onToggleLayer,
       onToggleAllLayers,
       onCreateLayer,
@@ -129,8 +124,6 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
   const [showAddPeriodInput, setShowAddPeriodInput] = useState(false);
   const [creatingLayer, setCreatingLayer] = useState(false);
   const layersMenuRef = useRef<HTMLDivElement>(null);
-  const [hudNotesHovered, setHudNotesHovered] = useState(false);
-  const hudNotesTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Drag state
   const isDragging = useRef(false);
@@ -219,64 +212,73 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     });
   }, [events, activeLayerNames, layerColorMap]);
 
-  // Year-to-x coordinate mapping based on visible events
-  const baseEventPositions = useMemo(() => {
-    const map = new Map<string, number>();
-    if (visibleEvents.length === 0) return map;
-    const sorted = [...visibleEvents].sort((a, b) => {
-      const ya = a.isBce ? -Math.abs(a.year) : a.year;
-      const yb = b.isBce ? -Math.abs(b.year) : b.year;
-      return ya - yb;
+  // Unique chronological anchors across all visible point milestones and bracket span endpoints
+  const chronologicalAnchors = useMemo(() => {
+    const yearSet = new Set<number>();
+    visibleEvents.forEach((e) => {
+      yearSet.add(e.isBce ? -Math.abs(e.year) : e.year);
+      if (e.endYear !== undefined && e.endYear !== null) {
+        yearSet.add(e.endIsBce ? -Math.abs(e.endYear) : e.endYear);
+      }
     });
-    const SPACING = 200;
-    const totalSpan = (sorted.length - 1) * SPACING;
-    const start = -totalSpan / 2;
-    sorted.forEach((e, i) => {
-      map.set(e.id, start + i * SPACING);
-    });
-    return map;
+    return Array.from(yearSet).sort((a, b) => a - b);
   }, [visibleEvents]);
 
-  // Year-to-x mapping (supports both modes)
+  // Even-space base positions for all chronological anchors
+  const anchorBasePositions = useMemo(() => {
+    const map = new Map<number, number>();
+    if (chronologicalAnchors.length === 0) return map;
+    const SPACING = 220;
+    const totalSpan = (chronologicalAnchors.length - 1) * SPACING;
+    const start = -totalSpan / 2;
+    chronologicalAnchors.forEach((y, i) => {
+      map.set(y, start + i * SPACING);
+    });
+    return map;
+  }, [chronologicalAnchors]);
+
+  // Year-to-x mapping (supports both modes and all span anchors)
   const yearToX = useCallback(
     (year: number): number => {
       if (layoutMode === "proportional") {
         return dimensions.width / 2 + year * BASE_PIXELS_PER_YEAR * zoom + panX;
       }
-      // Even mode: find event or interpolate
-      const match = visibleEvents.find(
-        (e) => (e.isBce ? -Math.abs(e.year) : e.year) === year
-      );
-      if (match) {
-        const baseX = baseEventPositions.get(match.id);
-        if (baseX !== undefined) {
-          return dimensions.width / 2 + baseX * zoom + panX;
-        }
+      if (chronologicalAnchors.length === 0) return dimensions.width / 2;
+
+      // Exact match check
+      const exactBase = anchorBasePositions.get(year);
+      if (exactBase !== undefined) {
+        return dimensions.width / 2 + exactBase * zoom + panX;
       }
-      // Interpolate between nearest events
-      const sorted = visibleEvents
-        .map((e) => ({
-          ey: e.isBce ? -Math.abs(e.year) : e.year,
-          x:
-            dimensions.width / 2 +
-            (baseEventPositions.get(e.id) ?? 0) * zoom +
-            panX,
-        }))
-        .sort((a, b) => a.ey - b.ey);
-      if (sorted.length === 0) return dimensions.width / 2;
-      if (year <= sorted[0].ey) return sorted[0].x;
-      if (year >= sorted[sorted.length - 1].ey)
-        return sorted[sorted.length - 1].x;
-      for (let i = 0; i < sorted.length - 1; i++) {
-        if (year >= sorted[i].ey && year <= sorted[i + 1].ey) {
-          const denom = sorted[i + 1].ey - sorted[i].ey;
-          const t = denom === 0 ? 0 : (year - sorted[i].ey) / denom;
-          return sorted[i].x + t * (sorted[i + 1].x - sorted[i].x);
+
+      // If before first anchor or after last anchor
+      const firstYear = chronologicalAnchors[0];
+      const lastYear = chronologicalAnchors[chronologicalAnchors.length - 1];
+      const firstX = dimensions.width / 2 + (anchorBasePositions.get(firstYear) ?? 0) * zoom + panX;
+      const lastX = dimensions.width / 2 + (anchorBasePositions.get(lastYear) ?? 0) * zoom + panX;
+
+      if (year <= firstYear) {
+        return firstX + (year - firstYear) * BASE_PIXELS_PER_YEAR * zoom;
+      }
+      if (year >= lastYear) {
+        return lastX + (year - lastYear) * BASE_PIXELS_PER_YEAR * zoom;
+      }
+
+      // Interpolate between surrounding anchors
+      for (let i = 0; i < chronologicalAnchors.length - 1; i++) {
+        const y0 = chronologicalAnchors[i];
+        const y1 = chronologicalAnchors[i + 1];
+        if (year >= y0 && year <= y1) {
+          const x0 = dimensions.width / 2 + (anchorBasePositions.get(y0) ?? 0) * zoom + panX;
+          const x1 = dimensions.width / 2 + (anchorBasePositions.get(y1) ?? 0) * zoom + panX;
+          const denom = y1 - y0;
+          const t = denom === 0 ? 0 : (year - y0) / denom;
+          return x0 + t * (x1 - x0);
         }
       }
       return dimensions.width / 2;
     },
-    [visibleEvents, baseEventPositions, layoutMode, zoom, panX, dimensions.width]
+    [chronologicalAnchors, anchorBasePositions, layoutMode, zoom, panX, dimensions.width]
   );
 
   // X-to-year: inverse of yearToX
@@ -285,29 +287,30 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       if (layoutMode === "proportional") {
         return (x - dimensions.width / 2 - panX) / (BASE_PIXELS_PER_YEAR * zoom);
       }
-      const sorted = visibleEvents
-        .map((e) => ({
-          ey: e.isBce ? -Math.abs(e.year) : e.year,
-          x:
-            dimensions.width / 2 +
-            (baseEventPositions.get(e.id) ?? 0) * zoom +
-            panX,
-        }))
-        .sort((a, b) => a.x - b.x);
-      if (sorted.length === 0) return 0;
-      if (x <= sorted[0].x) return sorted[0].ey;
-      if (x >= sorted[sorted.length - 1].x)
-        return sorted[sorted.length - 1].ey;
-      for (let i = 0; i < sorted.length - 1; i++) {
-        if (x >= sorted[i].x && x <= sorted[i + 1].x) {
-          const denom = sorted[i + 1].x - sorted[i].x;
-          const t = denom === 0 ? 0 : (x - sorted[i].x) / denom;
-          return sorted[i].ey + t * (sorted[i + 1].ey - sorted[i].ey);
+      if (chronologicalAnchors.length === 0) return 0;
+
+      const anchorPoints = chronologicalAnchors.map((y) => ({
+        year: y,
+        x: dimensions.width / 2 + (anchorBasePositions.get(y) ?? 0) * zoom + panX,
+      }));
+
+      if (x <= anchorPoints[0].x) return anchorPoints[0].year;
+      if (x >= anchorPoints[anchorPoints.length - 1].x) {
+        return anchorPoints[anchorPoints.length - 1].year;
+      }
+
+      for (let i = 0; i < anchorPoints.length - 1; i++) {
+        const p0 = anchorPoints[i];
+        const p1 = anchorPoints[i + 1];
+        if (x >= p0.x && x <= p1.x) {
+          const denom = p1.x - p0.x;
+          const t = denom === 0 ? 0 : (x - p0.x) / denom;
+          return p0.year + t * (p1.year - p0.year);
         }
       }
       return 0;
     },
-    [visibleEvents, baseEventPositions, layoutMode, zoom, panX, dimensions.width]
+    [chronologicalAnchors, anchorBasePositions, layoutMode, zoom, panX, dimensions.width]
   );
 
   // Check if any visible event is at year 0
@@ -331,35 +334,47 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     [visibleEvents, yearToX]
   );
 
-  // Compute spine extents
+  // Compute spine extents covering all anchors
   const hasEvents = visibleEvents.length > 0;
   const spineLeft = useMemo(() => {
     if (!hasEvents) return dimensions.width * 0.1;
     if (layoutMode === "proportional") {
       const years = visibleEvents.map((e) => (e.isBce ? -Math.abs(e.year) : e.year));
+      visibleEvents.forEach((e) => {
+        if (e.endYear !== undefined && e.endYear !== null) {
+          years.push(e.endIsBce ? -Math.abs(e.endYear) : e.endYear);
+        }
+      });
       years.push(0);
       const minYear = Math.min(...years);
       return yearToX(minYear) - 80;
     }
-    const positions = Array.from(baseEventPositions.values()).map(
+    const positions = Array.from(anchorBasePositions.values()).map(
       (bx) => dimensions.width / 2 + bx * zoom + panX
     );
+    if (positions.length === 0) return dimensions.width * 0.1;
     return Math.min(...positions) - 100;
-  }, [hasEvents, baseEventPositions, layoutMode, visibleEvents, zoom, panX, dimensions.width, yearToX]);
+  }, [hasEvents, anchorBasePositions, layoutMode, visibleEvents, zoom, panX, dimensions.width, yearToX]);
 
   const spineRight = useMemo(() => {
     if (!hasEvents) return dimensions.width * 0.9;
     if (layoutMode === "proportional") {
       const years = visibleEvents.map((e) => (e.isBce ? -Math.abs(e.year) : e.year));
+      visibleEvents.forEach((e) => {
+        if (e.endYear !== undefined && e.endYear !== null) {
+          years.push(e.endIsBce ? -Math.abs(e.endYear) : e.endYear);
+        }
+      });
       years.push(0);
       const maxYear = Math.max(...years);
       return yearToX(maxYear) + 80;
     }
-    const positions = Array.from(baseEventPositions.values()).map(
+    const positions = Array.from(anchorBasePositions.values()).map(
       (bx) => dimensions.width / 2 + bx * zoom + panX
     );
+    if (positions.length === 0) return dimensions.width * 0.9;
     return Math.max(...positions) + 100;
-  }, [hasEvents, baseEventPositions, layoutMode, visibleEvents, zoom, panX, dimensions.width, yearToX]);
+  }, [hasEvents, anchorBasePositions, layoutMode, visibleEvents, zoom, panX, dimensions.width, yearToX]);
 
   const spineY = dimensions.height / 2;
   const originX = yearToX(0);
@@ -392,14 +407,14 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       setPanX(-centerX * BASE_PIXELS_PER_YEAR * clampedZoom);
       return;
     }
-    const SPACING = 200;
-    const totalSpan = (visibleEvents.length - 1) * SPACING;
+    const SPACING = 220;
+    const totalSpan = Math.max(1, chronologicalAnchors.length - 1) * SPACING;
     const padding = 140;
     const availableWidth = dimensions.width - padding * 2;
-    const newZoom = visibleEvents.length > 1 ? availableWidth / totalSpan : 1;
+    const newZoom = chronologicalAnchors.length > 1 ? availableWidth / totalSpan : 1;
     setZoom(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom)));
     setPanX(0);
-  }, [visibleEvents, layoutMode, dimensions.width]);
+  }, [visibleEvents, layoutMode, chronologicalAnchors, dimensions.width]);
 
   // Export full timeline fitted as 2x Retina PNG
   const exportPng = useCallback(
@@ -766,10 +781,13 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
             {/* Event ticks, connectors, and cards */}
             {layoutItems.map((item) => {
               if (item.isSpan) {
-                const x1 = item.x1 ?? item.x;
-                const x2 = item.x2 ?? item.x;
+                const rawX1 = item.startX !== undefined ? item.startX : yearToX(item.isBce ? -Math.abs(item.year) : item.year);
+                const rawX2 = item.endX !== undefined ? item.endX : yearToX(item.endIsBce ? -Math.abs(item.endYear || item.year) : (item.endYear || item.year));
+                const x1 = Math.min(rawX1, rawX2);
+                const x2 = Math.max(rawX1, rawX2);
+                const centerX = (x1 + x2) / 2;
                 const bracketY = spineY - 75 - (item.bracketTier || 0) * 38;
-                const labelW = Math.max(80, item.labelWidth);
+                const labelW = Math.max(90, item.labelWidth);
 
                 return (
                   <g key={item.eventId} className="bracket-period-group">
@@ -780,9 +798,9 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                       x2={x1}
                       y2={spineY}
                       stroke={item.color}
-                      strokeWidth="1"
-                      strokeDasharray="2 3"
-                      opacity="0.35"
+                      strokeWidth="1.2"
+                      strokeDasharray="3 3"
+                      opacity="0.45"
                     />
                     <line
                       x1={x2}
@@ -790,78 +808,70 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                       x2={x2}
                       y2={spineY}
                       stroke={item.color}
-                      strokeWidth="1"
-                      strokeDasharray="2 3"
-                      opacity="0.35"
+                      strokeWidth="1.2"
+                      strokeDasharray="3 3"
+                      opacity="0.45"
                     />
 
                     {/* Spine dots at start and end coordinates */}
-                    <circle cx={x1} cy={spineY} r="3" fill={item.color} stroke={bgColor} strokeWidth="1.5" />
-                    <circle cx={x2} cy={spineY} r="3" fill={item.color} stroke={bgColor} strokeWidth="1.5" />
+                    <circle cx={x1} cy={spineY} r="3.5" fill={item.color} stroke={bgColor} strokeWidth="1.5" />
+                    <circle cx={x2} cy={spineY} r="3.5" fill={item.color} stroke={bgColor} strokeWidth="1.5" />
 
                     {/* Horizontal Square Bracket Outline */}
-                    {/* Left vertical cap */}
+                    {/* Continuous horizontal top crossbar */}
                     <line
                       x1={x1}
-                      y1={bracketY + 12}
-                      x2={x1}
-                      y2={bracketY}
-                      stroke={item.color}
-                      strokeWidth="2"
-                      opacity="0.9"
-                    />
-                    {/* Left horizontal crossbar arm */}
-                    <line
-                      x1={x1}
-                      y1={bracketY}
-                      x2={Math.min(x2, item.x - labelW / 2 - 4)}
-                      y2={bracketY}
-                      stroke={item.color}
-                      strokeWidth="2"
-                      opacity="0.9"
-                    />
-                    {/* Right horizontal crossbar arm */}
-                    <line
-                      x1={Math.max(x1, item.x + labelW / 2 + 4)}
                       y1={bracketY}
                       x2={x2}
                       y2={bracketY}
                       stroke={item.color}
-                      strokeWidth="2"
-                      opacity="0.9"
+                      strokeWidth="2.5"
+                      opacity="0.95"
+                    />
+                    {/* Left vertical cap */}
+                    <line
+                      x1={x1}
+                      y1={bracketY}
+                      x2={x1}
+                      y2={bracketY + 12}
+                      stroke={item.color}
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      opacity="0.95"
                     />
                     {/* Right vertical cap */}
                     <line
                       x1={x2}
-                      y1={bracketY + 12}
+                      y1={bracketY}
                       x2={x2}
-                      y2={bracketY}
+                      y2={bracketY + 12}
                       stroke={item.color}
-                      strokeWidth="2"
-                      opacity="0.9"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      opacity="0.95"
                     />
 
                     {/* Extremity Date labels */}
                     <text
                       x={x1}
-                      y={bracketY - 6}
+                      y={bracketY - 7}
                       textAnchor="middle"
                       fill={item.color}
                       fontSize="9.5"
                       fontFamily="var(--font-mono)"
-                      fontWeight="500"
+                      fontWeight="600"
                       opacity="0.9"
                     >
                       {formatDateLabel(item.year, item.isBce)}
                     </text>
                     <text
                       x={x2}
-                      y={bracketY - 6}
+                      y={bracketY - 7}
                       textAnchor="middle"
                       fill={item.color}
                       fontSize="9.5"
                       fontFamily="var(--font-mono)"
-                      fontWeight="500"
+                      fontWeight="600"
                       opacity="0.9"
                     >
                       {formatDateLabel(item.endYear || item.year, item.endIsBce || false)}
@@ -892,18 +902,18 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                       }}
                     >
                       <rect
-                        x={item.x - labelW / 2}
-                        y={bracketY - 12}
+                        x={centerX - labelW / 2}
+                        y={bracketY - 13}
                         width={labelW}
-                        height="24"
+                        height="26"
                         rx="6"
                         fill={bgColor}
                         stroke={item.color}
                         strokeWidth="1.8"
-                        opacity="0.96"
+                        opacity="0.98"
                       />
                       <text
-                        x={item.x - 8}
+                        x={item.description ? centerX - 8 : centerX}
                         y={bracketY + 4}
                         textAnchor="middle"
                         fill={textColor}
@@ -914,34 +924,44 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                         {item.title}
                       </text>
 
-                      {/* Chronicle Notes Mechanism on Center Label */}
-                      <g
-                        className="hover:scale-125 transition-transform"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedNoteEvent(item);
-                        }}
-                      >
-                        <title>View Chronicle Notes</title>
-                        <rect
-                          x={item.x + labelW / 2 - 20}
-                          y={bracketY - 9}
-                          width="16"
-                          height="18"
-                          rx="4"
-                          fill={item.color}
-                          opacity="0.25"
-                        />
-                        <text
-                          x={item.x + labelW / 2 - 12}
-                          y={bracketY + 4}
-                          textAnchor="middle"
-                          fill={item.color}
-                          fontSize="10"
+                      {/* Chronicle Notes Mechanism on Center Label (Clean, Stable SVG, No Hover Flickering) */}
+                      {item.description && (
+                        <g
+                          className="cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedNoteEvent(item);
+                          }}
                         >
-                          📖
-                        </text>
-                      </g>
+                          <title>View Chronicle Notes</title>
+                          <rect
+                            x={centerX + labelW / 2 - 21}
+                            y={bracketY - 9}
+                            width="18"
+                            height="18"
+                            rx="4"
+                            fill={item.color}
+                            fillOpacity="0.2"
+                            className="hover:fill-opacity-45 transition-all"
+                          />
+                          <svg
+                            x={centerX + labelW / 2 - 18}
+                            y={bracketY - 6}
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke={item.color}
+                            strokeWidth="2.2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="pointer-events-none"
+                          >
+                            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                          </svg>
+                        </g>
+                      )}
                     </g>
                   </g>
                 );
@@ -1078,10 +1098,10 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                         {item.title}
                       </text>
 
-                      {/* Chronicle Notes Icon Button on Point Milestone */}
+                      {/* Chronicle Notes Icon Button on Point Milestone (Clean, Stable SVG, No Hover Flickering) */}
                       {item.description && (
                         <g
-                          className="hover:scale-125 transition-transform"
+                          className="cursor-pointer"
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedNoteEvent(item);
@@ -1089,23 +1109,31 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                         >
                           <title>View Chronicle Notes</title>
                           <rect
-                            x={item.x + item.labelWidth / 2 - 18}
+                            x={item.x + item.labelWidth / 2 - 21}
                             y={spineY - TICK_HEIGHT / 2 - 23 - item.tier * TIER_SPACING}
-                            width="15"
+                            width="18"
                             height="18"
                             rx="4"
                             fill={item.color}
-                            opacity="0.22"
+                            fillOpacity="0.2"
+                            className="hover:fill-opacity-45 transition-all"
                           />
-                          <text
-                            x={item.x + item.labelWidth / 2 - 10.5}
-                            y={spineY - TICK_HEIGHT / 2 - 10 - item.tier * TIER_SPACING}
-                            textAnchor="middle"
-                            fill={item.color}
-                            fontSize="10"
+                          <svg
+                            x={item.x + item.labelWidth / 2 - 18}
+                            y={spineY - TICK_HEIGHT / 2 - 20 - item.tier * TIER_SPACING}
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke={item.color}
+                            strokeWidth="2.2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="pointer-events-none"
                           >
-                            📖
-                          </text>
+                            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                          </svg>
                         </g>
                       )}
 
@@ -1555,75 +1583,6 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                     <span>New Period / Layer</span>
                   </button>
                 )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Chronicle Notes Canvas HUD Button (Beside Layers button) */}
-        <div className="relative">
-          <button
-            onClick={() => onOpenChronicleNotes?.()}
-            onMouseEnter={() => {
-              if (hudNotesTimeout.current) clearTimeout(hudNotesTimeout.current);
-              setHudNotesHovered(true);
-            }}
-            onMouseLeave={() => {
-              hudNotesTimeout.current = setTimeout(() => setHudNotesHovered(false), 250);
-            }}
-            className="h-8 px-3 rounded-xl theme-hud text-[11px] font-mono flex items-center gap-1.5 transition-all cursor-pointer theme-hud-btn hover:border-[#c9a84c]/50 text-[#c9a84c]"
-            title="View & Edit Chronicle Scope & Archival Notes"
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>Notes</span>
-            {chronicleNotes ? (
-              <span className="w-1.5 h-1.5 rounded-full bg-[#c9a84c] shadow-[0_0_6px_rgba(201,168,76,0.8)]" />
-            ) : null}
-          </button>
-
-          {/* Canvas HUD Notes Hover Popover */}
-          {hudNotesHovered && (
-            <div
-              className="absolute left-0 top-full mt-2 w-80 sm:w-96 rounded-2xl glass-panel p-4 shadow-[0_20px_50px_rgba(0,0,0,0.85)] border border-black/10 dark:border-white/[0.12] z-50 animate-in fade-in zoom-in-95 duration-150 text-left pointer-events-auto"
-              onMouseEnter={() => {
-                if (hudNotesTimeout.current) clearTimeout(hudNotesTimeout.current);
-                setHudNotesHovered(true);
-              }}
-              onMouseLeave={() => {
-                hudNotesTimeout.current = setTimeout(() => setHudNotesHovered(false), 250);
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenChronicleNotes?.();
-              }}
-            >
-              <div className="flex items-center justify-between pb-2 mb-2 border-b border-black/[0.08] dark:border-white/[0.08]">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg bg-[#c9a84c]/15 text-[#c9a84c] border border-[#c9a84c]/30 flex items-center justify-center">
-                    <BookOpen className="w-3.5 h-3.5" />
-                  </div>
-                  <span className="text-xs font-bold font-mono text-[#c9a84c]">
-                    Chronicle Scope & Notes
-                  </span>
-                </div>
-                <span className="text-[10px] font-mono theme-text-muted px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/5">
-                  Click to Open
-                </span>
-              </div>
-
-              <div className="max-h-44 overflow-y-auto pr-1 text-xs theme-card-title font-sans font-light leading-relaxed whitespace-pre-wrap selection:bg-[#c9a84c]/30">
-                {chronicleNotes ? (
-                  chronicleNotes
-                ) : (
-                  <p className="text-xs font-mono theme-text-muted italic py-1">
-                    No chronicle overview notes added yet. Click to record overarching historical context, primary sources, or thematic notes.
-                  </p>
-                )}
-              </div>
-
-              <div className="mt-3 pt-2 border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between text-[10px] font-mono theme-text-muted">
-                <span>{visibleEvents.length} active events</span>
-                <span className="text-[#c9a84c] font-semibold hover:underline cursor-pointer">Open Full Notes →</span>
               </div>
             </div>
           )}

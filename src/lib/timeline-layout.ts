@@ -204,17 +204,18 @@ export function formatSpanLabel(
   endYear: number,
   endBce: boolean
 ): string {
-  const startEra = startBce ? "BCE" : "CE";
-  const endEra = endBce ? "BCE" : "CE";
-  const sy = startYear.toLocaleString();
-  const ey = endYear.toLocaleString();
+  const sNum = startBce ? -Math.abs(startYear) : startYear;
+  const eNum = endBce ? -Math.abs(endYear) : endYear;
+  const earlyNum = Math.min(sNum, eNum);
+  const lateNum = Math.max(sNum, eNum);
 
-  // Calculate year difference
-  const startNum = startBce ? -Math.abs(startYear) : startYear;
-  const endNum = endBce ? -Math.abs(endYear) : endYear;
-  let diff = Math.abs(endNum - startNum);
-  // Account for no year 0 if crossing BCE/CE
-  if ((startBce && !endBce) || (!startBce && endBce)) {
+  const sy = Math.abs(earlyNum).toLocaleString();
+  const ey = Math.abs(lateNum).toLocaleString();
+  const startEra = earlyNum < 0 ? "BCE" : "CE";
+  const endEra = lateNum < 0 ? "BCE" : "CE";
+
+  let diff = Math.abs(lateNum - earlyNum);
+  if ((earlyNum < 0 && lateNum > 0) || (earlyNum > 0 && lateNum < 0)) {
     diff = Math.max(1, diff - 1);
   }
   const spanYears = diff === 1 ? "1 yr" : `${diff.toLocaleString()} yrs`;

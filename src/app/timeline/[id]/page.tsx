@@ -23,7 +23,6 @@ import {
   Calendar,
   CheckCircle2,
   Edit2,
-  BookOpen,
   Code,
 } from "lucide-react";
 
@@ -81,21 +80,8 @@ export default function TimelinePage() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showGapBorder, setShowGapBorder] = useState(true);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
-  const [notesHovered, setNotesHovered] = useState(false);
 
   const exportMenuRef = useRef<HTMLDivElement>(null);
-  const notesTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const handleNotesMouseEnter = useCallback(() => {
-    if (notesTimeoutRef.current) clearTimeout(notesTimeoutRef.current);
-    setNotesHovered(true);
-  }, []);
-
-  const handleNotesMouseLeave = useCallback(() => {
-    notesTimeoutRef.current = setTimeout(() => {
-      setNotesHovered(false);
-    }, 250);
-  }, []);
 
   // Load gap border preference from localStorage
   useEffect(() => {
@@ -349,7 +335,10 @@ export default function TimelinePage() {
         description: data.description || null,
         color: data.color,
         layer: data.layer || "General",
-        endYear: data.isSpan && data.endYear ? data.endYear : null,
+        endYear:
+          data.isSpan && data.endYear !== undefined && data.endYear !== null && data.endYear !== ""
+            ? data.endYear
+            : null,
         endIsBce: data.isSpan ? Boolean(data.endIsBce) : null,
         endMonth: data.isSpan && data.endMonth ? data.endMonth : null,
         endDay: data.isSpan && data.endDay ? data.endDay : null,
@@ -596,67 +585,6 @@ export default function TimelinePage() {
               {events.length} {events.length === 1 ? "event" : "events"}
             </span>
           </span>
-
-          {/* Premium Chronicle Notes Mechanism Button */}
-          <div className="relative">
-            <button
-              onClick={() => setShowChronicleNotes(true)}
-              onMouseEnter={handleNotesMouseEnter}
-              onMouseLeave={handleNotesMouseLeave}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl theme-pill hover:border-[#c9a84c]/60 text-xs font-mono transition-all cursor-pointer text-[#c9a84c] group shrink-0"
-              title="View & Edit Chronicle Notes (Scope, Overview & Context)"
-              aria-label="Chronicle Notes"
-            >
-              <BookOpen className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
-              <span className="font-medium hidden md:inline">Chronicle Notes</span>
-              <span className="font-medium md:hidden">Notes</span>
-              {timeline.description ? (
-                <span className="w-1.5 h-1.5 rounded-full bg-[#c9a84c] shadow-[0_0_6px_rgba(201,168,76,0.8)]" />
-              ) : null}
-            </button>
-
-            {/* Premium Hover Preview Popover */}
-            {notesHovered && (
-              <div
-                className="absolute left-0 top-full mt-2 w-80 sm:w-96 rounded-2xl glass-panel p-4 shadow-[0_20px_50px_rgba(0,0,0,0.85)] border border-black/10 dark:border-white/[0.12] z-50 animate-in fade-in zoom-in-95 duration-150 text-left pointer-events-auto"
-                onMouseEnter={handleNotesMouseEnter}
-                onMouseLeave={handleNotesMouseLeave}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowChronicleNotes(true);
-                }}
-              >
-                <div className="flex items-center justify-between pb-2 mb-2 border-b border-black/[0.08] dark:border-white/[0.08]">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg bg-[#c9a84c]/15 text-[#c9a84c] border border-[#c9a84c]/30 flex items-center justify-center">
-                      <BookOpen className="w-3.5 h-3.5" />
-                    </div>
-                    <span className="text-xs font-bold font-mono text-[#c9a84c]">
-                      Chronicle Scope & Notes
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-mono theme-text-muted px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/5">
-                    Click to Edit
-                  </span>
-                </div>
-
-                <div className="max-h-48 overflow-y-auto pr-1 text-xs theme-card-title font-sans font-light leading-relaxed whitespace-pre-wrap selection:bg-[#c9a84c]/30">
-                  {timeline.description ? (
-                    timeline.description
-                  ) : (
-                    <p className="text-xs font-mono theme-text-muted italic py-1">
-                      No chronicle notes added yet. Click to record overarching historical context, primary sources, or thematic notes.
-                    </p>
-                  )}
-                </div>
-
-                <div className="mt-3 pt-2 border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between text-[10px] font-mono theme-text-muted">
-                  <span>{events.length} milestones • {spanCount} periods</span>
-                  <span className="text-[#c9a84c] font-semibold hover:underline cursor-pointer">Open Full Notes →</span>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Right Studio Action Icons: Import/Export -> Canvas Settings -> Add Event */}
@@ -778,8 +706,6 @@ export default function TimelinePage() {
           showGapBorder={showGapBorder}
           layers={layers}
           activeLayerNames={activeLayerNames}
-          chronicleNotes={timeline.description}
-          onOpenChronicleNotes={() => setShowChronicleNotes(true)}
           onToggleLayer={handleToggleLayer}
           onToggleAllLayers={handleToggleAllLayers}
           onCreateLayer={handleCreateLayer}

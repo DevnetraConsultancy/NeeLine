@@ -141,15 +141,24 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
   const touchStart = useRef({ x: 0, y: 0 });
   const pinchDist = useRef<number | null>(null);
 
-  // Resize observer
+  // Resize observer with immediate measurement fallback and zero-collapse guard
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
+    // Immediately measure client rect to establish dimensions synchronously
+    const rect = el.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      setDimensions({ width: rect.width, height: rect.height });
+    }
+
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
-        setDimensions({ width, height });
+        // Never allow zero or negative measurements to collapse the canvas
+        if (width > 0 && height > 0) {
+          setDimensions({ width, height });
+        }
       }
     });
     ro.observe(el);
@@ -187,21 +196,27 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
 
   // Filter visible events based on active layers selection & assign layer colors
   const visibleEvents = useMemo(() => {
+    if (events.length === 0) return [];
     const activeSet = new Set(activeLayerNames);
-    return events
-      .filter((e) => {
-        const lyr = e.layer || "General";
-        // If activeLayerNames is empty, show all; otherwise check set membership
-        return activeLayerNames.length === 0 || activeSet.has(lyr);
-      })
-      .map((e) => {
-        const lyr = e.layer || "General";
-        const customColor = layerColorMap.get(lyr) || e.color;
-        return {
-          ...e,
-          color: customColor,
-        };
-      });
+    const filtered = events.filter((e) => {
+      const lyr = e.layer || "General";
+      // If activeLayerNames is empty, show all; otherwise check set membership
+      return activeLayerNames.length === 0 || activeSet.has(lyr);
+    });
+
+    // CRITICAL SAFETY GUARD:
+    // If events exist in this timeline, NEVER let the canvas render blank
+    // due to layer name mismatch, missing layer configuration, or desynced layer toggles!
+    const targetEvents = filtered.length > 0 ? filtered : events;
+
+    return targetEvents.map((e) => {
+      const lyr = e.layer || "General";
+      const customColor = layerColorMap.get(lyr) || e.color;
+      return {
+        ...e,
+        color: customColor,
+      };
+    });
   }, [events, activeLayerNames, layerColorMap]);
 
   // Year-to-x coordinate mapping based on visible events
@@ -319,7 +334,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
   // Compute spine extents
   const hasEvents = visibleEvents.length > 0;
   const spineLeft = useMemo(() => {
-    if (!hasEvents) return 0;
+    if (!hasEvents) return dimensions.width * 0.1;
     if (layoutMode === "proportional") {
       const years = visibleEvents.map((e) => (e.isBce ? -Math.abs(e.year) : e.year));
       years.push(0);
@@ -333,7 +348,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
   }, [hasEvents, baseEventPositions, layoutMode, visibleEvents, zoom, panX, dimensions.width, yearToX]);
 
   const spineRight = useMemo(() => {
-    if (!hasEvents) return 0;
+    if (!hasEvents) return dimensions.width * 0.9;
     if (layoutMode === "proportional") {
       const years = visibleEvents.map((e) => (e.isBce ? -Math.abs(e.year) : e.year));
       years.push(0);
@@ -620,70 +635,70 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
           </filter>
         </defs>
 
+        {/* The Golden Spine Axis line (always visible) */}
+        <line
+          x1={spineLeft}
+          y1={spineY}
+          x2={spineRight}
+          y2={spineY}
+          stroke={spineColor}
+          strokeWidth="2.5"
+          opacity="0.8"
+        />
+        {/* Soft halo for spine line */}
+        <line
+          x1={spineLeft}
+          y1={spineY}
+          x2={spineRight}
+          y2={spineY}
+          stroke={spineColor}
+          strokeWidth="6"
+          opacity="0.15"
+        />
+
+        {/* Origin "0 CE" Beacon */}
+        {!hasYearZero && (
+          <g className="origin-marker">
+            {/* Vertical tick through axis */}
+            <line
+              x1={originX}
+              y1={spineY - TICK_HEIGHT - 2}
+              x2={originX}
+              y2={spineY + TICK_HEIGHT + 2}
+              stroke={tickColor}
+              strokeWidth="2"
+              opacity="0.85"
+            />
+            {/* Celestial orbital ring */}
+            <circle
+              cx={originX}
+              cy={spineY}
+              r="6.5"
+              fill="none"
+              stroke={tickColor}
+              strokeWidth="1.5"
+              opacity="0.75"
+            />
+            {/* Center pip */}
+            <circle cx={originX} cy={spineY} r="2" fill={tickColor} opacity="0.9" />
+            {/* Origin label */}
+            <text
+              x={originX}
+              y={spineY + TICK_HEIGHT + 20}
+              textAnchor="middle"
+              fill={textColor}
+              fontSize="11"
+              fontWeight="600"
+              fontFamily="var(--font-mono)"
+              opacity="0.7"
+            >
+              0 CE
+            </text>
+          </g>
+        )}
+
         {hasEvents && (
           <>
-            {/* The Golden Spine Axis line */}
-            <line
-              x1={spineLeft}
-              y1={spineY}
-              x2={spineRight}
-              y2={spineY}
-              stroke={spineColor}
-              strokeWidth="2.5"
-              opacity="0.8"
-            />
-            {/* Soft halo for spine line */}
-            <line
-              x1={spineLeft}
-              y1={spineY}
-              x2={spineRight}
-              y2={spineY}
-              stroke={spineColor}
-              strokeWidth="6"
-              opacity="0.15"
-            />
-
-            {/* Origin "0 CE" Beacon */}
-            {!hasYearZero && (
-              <g className="origin-marker">
-                {/* Vertical tick through axis */}
-                <line
-                  x1={originX}
-                  y1={spineY - TICK_HEIGHT - 2}
-                  x2={originX}
-                  y2={spineY + TICK_HEIGHT + 2}
-                  stroke={tickColor}
-                  strokeWidth="2"
-                  opacity="0.85"
-                />
-                {/* Celestial orbital ring */}
-                <circle
-                  cx={originX}
-                  cy={spineY}
-                  r="6.5"
-                  fill="none"
-                  stroke={tickColor}
-                  strokeWidth="1.5"
-                  opacity="0.75"
-                />
-                {/* Center pip */}
-                <circle cx={originX} cy={spineY} r="2" fill={tickColor} opacity="0.9" />
-                {/* Origin label */}
-                <text
-                  x={originX}
-                  y={spineY + TICK_HEIGHT + 20}
-                  textAnchor="middle"
-                  fill={textColor}
-                  fontSize="11"
-                  fontWeight="600"
-                  fontFamily="var(--font-mono)"
-                  opacity="0.7"
-                >
-                  0 CE
-                </text>
-              </g>
-            )}
-
             {/* Time gap indicators between consecutive events */}
             {showGaps &&
               sortedEvents.length > 1 &&

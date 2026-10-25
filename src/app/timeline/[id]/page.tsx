@@ -186,6 +186,24 @@ export default function TimelinePage() {
         fetchedLayers.unshift({ id: "layer-general", name: "General", color: "#c9a84c" });
       }
 
+      // Dynamically discover all distinct layers present across fetchedEvents
+      const distinctEventLayers = new Set<string>();
+      fetchedEvents.forEach((ev) => {
+        const lyr = (ev.layer && ev.layer.trim()) || "General";
+        distinctEventLayers.add(lyr);
+      });
+
+      // Register any event layers in fetchedLayers if not already present
+      distinctEventLayers.forEach((layerName) => {
+        if (!fetchedLayers.some((l) => l.name.toLowerCase() === layerName.toLowerCase())) {
+          fetchedLayers.push({
+            id: `layer-${layerName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
+            name: layerName,
+            color: "#c9a84c",
+          });
+        }
+      });
+
       setLayers(fetchedLayers);
 
       // Restore active layers preference
@@ -195,7 +213,10 @@ export default function TimelinePage() {
         try {
           const parsed = JSON.parse(savedActive);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setActiveLayerNames(parsed);
+            // Merge in all layers present in fetchedEvents so events are never hidden accidentally
+            const activeSet = new Set<string>(parsed);
+            distinctEventLayers.forEach((name) => activeSet.add(name));
+            setActiveLayerNames(Array.from(activeSet));
           } else {
             setActiveLayerNames(fetchedLayers.map((l) => l.name));
           }
@@ -519,7 +540,7 @@ export default function TimelinePage() {
   }
 
   return (
-    <div className="min-h-screen theme-bg flex flex-col overflow-hidden select-none">
+    <div className="h-screen w-screen theme-bg overflow-hidden select-none relative flex flex-col">
       <Navbar />
 
       {/* Studio Header Bar */}
@@ -745,8 +766,8 @@ export default function TimelinePage() {
         </div>
       </div>
 
-      {/* Main Interactive Canvas Area */}
-      <div className="flex-1 mt-[112px] mb-[36px] relative">
+      {/* Main Interactive Canvas Area: Fixed between top studio header and bottom footer */}
+      <div className="absolute inset-x-0 top-[112px] bottom-[36px] overflow-hidden">
         <TimelineRenderer
           ref={rendererRef}
           events={events}

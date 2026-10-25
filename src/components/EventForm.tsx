@@ -5,7 +5,6 @@ import {
   Calendar,
   Trash2,
   X,
-  Check,
   Sparkles,
 } from "lucide-react";
 
@@ -114,48 +113,48 @@ export default function EventForm({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-lg rounded-2xl glass-panel shadow-[0_25px_60px_rgba(0,0,0,0.8)] border border-white/[0.1] overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="w-full max-w-lg rounded-2xl glass-panel shadow-[0_25px_60px_rgba(0,0,0,0.8)] border border-black/10 dark:border-white/[0.1] overflow-hidden flex flex-col max-h-[92vh]">
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] bg-white/[0.02]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-black/[0.08] dark:border-white/[0.08] bg-black/[0.02] dark:bg-white/[0.02]">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-[#c9a84c]/15 text-[#c9a84c] border border-[#c9a84c]/20 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-[#c9a84c]/15 text-[#c9a84c] border border-[#c9a84c]/30 flex items-center justify-center">
               <Calendar className="w-4 h-4" />
             </div>
             <div>
               <h2
-                className="text-base font-bold text-[#f5f0e8] leading-tight"
+                className="text-base font-bold theme-card-title leading-tight"
                 style={{ fontFamily: "var(--font-display)" }}
               >
                 {isEditing ? "Edit Milestone" : "Add Chronicle Milestone"}
               </h2>
-              <p className="text-[11px] font-mono text-[#f5f0e8]/40">
+              <p className="text-[11px] font-mono theme-text-muted">
                 Temporal coordinate on the number line
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-xl text-[#f5f0e8]/40 hover:text-[#f5f0e8] hover:bg-white/[0.06] transition-colors cursor-pointer"
+            className="w-8 h-8 flex items-center justify-center rounded-xl theme-text-muted hover:opacity-100 hover:bg-black/[0.05] dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Live Interactive Card Preview */}
-        <div className="px-6 pt-5 pb-3 bg-gradient-to-b from-white/[0.02] to-transparent">
-          <div className="text-[10px] font-mono uppercase tracking-wider text-[#f5f0e8]/30 mb-2 flex items-center gap-1.5">
+        <div className="px-6 pt-5 pb-3 bg-gradient-to-b from-black/[0.02] dark:from-white/[0.02] to-transparent">
+          <div className="text-[10px] font-mono uppercase tracking-wider theme-text-muted mb-2 flex items-center gap-1.5">
             <Sparkles className="w-3 h-3 text-[#c9a84c]" />
             <span>Canvas Representation Preview</span>
           </div>
-          <div className="p-3.5 rounded-xl bg-[#070c16]/80 border border-white/[0.08] flex items-center justify-between gap-3">
+          <div className="p-3.5 rounded-xl bg-black/[0.04] dark:bg-[#070c16]/80 border border-black/10 dark:border-white/[0.08] flex items-center justify-between gap-3 shadow-inner">
             <div className="flex items-center gap-3 min-w-0">
               <div
-                className="w-3 h-8 rounded-md shrink-0 shadow-sm"
+                className="w-3.5 h-8 rounded-md shrink-0 shadow-sm"
                 style={{ backgroundColor: color }}
               />
               <div className="min-w-0">
                 <div
-                  className="text-sm font-semibold text-[#f5f0e8] truncate"
+                  className="text-sm font-semibold theme-card-title truncate"
                   style={{ fontFamily: "var(--font-display)" }}
                 >
                   {title.trim() || "Milestone Title"}
@@ -169,10 +168,10 @@ export default function EventForm({
               </div>
             </div>
             <div
-              className="px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider border shrink-0"
+              className="px-2.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider border shrink-0"
               style={{
-                borderColor: `${color}40`,
-                backgroundColor: `${color}15`,
+                borderColor: `${color}60`,
+                backgroundColor: `${color}18`,
                 color,
               }}
             >
@@ -187,17 +186,17 @@ export default function EventForm({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Era Toggle */}
             <div>
-              <label className="block text-[11px] font-mono text-[#f5f0e8]/50 uppercase tracking-wider mb-1.5">
+              <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-1.5 font-medium">
                 Era
               </label>
-              <div className="flex rounded-xl bg-white/[0.04] p-1 border border-white/[0.08]">
+              <div className="flex rounded-xl bg-black/[0.04] dark:bg-white/[0.04] p-1 border border-black/10 dark:border-white/[0.08]">
                 <button
                   type="button"
                   onClick={() => setIsBce(true)}
                   className={`flex-1 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer ${
                     isBce
-                      ? "bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm"
-                      : "text-[#f5f0e8]/40 hover:text-[#f5f0e8]"
+                      ? "bg-rose-500/20 text-rose-500 border border-rose-500/40 shadow-sm"
+                      : "theme-text-muted hover:opacity-100"
                   }`}
                 >
                   BCE
@@ -208,7 +207,7 @@ export default function EventForm({
                   className={`flex-1 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer ${
                     !isBce
                       ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/40 shadow-sm"
-                      : "text-[#f5f0e8]/40 hover:text-[#f5f0e8]"
+                      : "theme-text-muted hover:opacity-100"
                   }`}
                 >
                   CE
@@ -218,8 +217,8 @@ export default function EventForm({
 
             {/* Year Input */}
             <div className="sm:col-span-2">
-              <label className="block text-[11px] font-mono text-[#f5f0e8]/50 uppercase tracking-wider mb-1.5">
-                Year <span className="text-rose-400">*</span>
+              <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-1.5 font-medium">
+                Year <span className="text-rose-500">*</span>
               </label>
               <input
                 type="number"
@@ -227,7 +226,7 @@ export default function EventForm({
                 onChange={(e) => setYear(e.target.value)}
                 placeholder="e.g. 1776, 44, 2500"
                 required
-                className="w-full px-3.5 py-2 rounded-xl bg-white/[0.03] border border-white/[0.1] text-[#f5f0e8] text-xs font-mono outline-none focus:border-[#c9a84c]/70 focus:ring-1 focus:ring-[#c9a84c]/30 placeholder:text-[#f5f0e8]/20 transition-all"
+                className="w-full px-3.5 py-2 rounded-xl theme-input text-xs font-mono outline-none focus:border-[#c9a84c] focus:ring-1 focus:ring-[#c9a84c]/40 transition-all"
               />
             </div>
           </div>
@@ -235,8 +234,8 @@ export default function EventForm({
           {/* Month & Day (Optional) */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] font-mono text-[#f5f0e8]/50 uppercase tracking-wider mb-1.5">
-                Month <span className="text-[#f5f0e8]/25">(optional)</span>
+              <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-1.5 font-medium">
+                Month <span className="opacity-60">(optional)</span>
               </label>
               <input
                 type="number"
@@ -245,12 +244,12 @@ export default function EventForm({
                 value={month}
                 onChange={(e) => setMonth(e.target.value)}
                 placeholder="1 – 12"
-                className="w-full px-3.5 py-2 rounded-xl bg-white/[0.03] border border-white/[0.1] text-[#f5f0e8] text-xs font-mono outline-none focus:border-[#c9a84c]/70 focus:ring-1 focus:ring-[#c9a84c]/30 placeholder:text-[#f5f0e8]/20 transition-all"
+                className="w-full px-3.5 py-2 rounded-xl theme-input text-xs font-mono outline-none focus:border-[#c9a84c] focus:ring-1 focus:ring-[#c9a84c]/40 transition-all"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-mono text-[#f5f0e8]/50 uppercase tracking-wider mb-1.5">
-                Day <span className="text-[#f5f0e8]/25">(optional)</span>
+              <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-1.5 font-medium">
+                Day <span className="opacity-60">(optional)</span>
               </label>
               <input
                 type="number"
@@ -259,15 +258,15 @@ export default function EventForm({
                 value={day}
                 onChange={(e) => setDay(e.target.value)}
                 placeholder="1 – 31"
-                className="w-full px-3.5 py-2 rounded-xl bg-white/[0.03] border border-white/[0.1] text-[#f5f0e8] text-xs font-mono outline-none focus:border-[#c9a84c]/70 focus:ring-1 focus:ring-[#c9a84c]/30 placeholder:text-[#f5f0e8]/20 transition-all"
+                className="w-full px-3.5 py-2 rounded-xl theme-input text-xs font-mono outline-none focus:border-[#c9a84c] focus:ring-1 focus:ring-[#c9a84c]/40 transition-all"
               />
             </div>
           </div>
 
           {/* Title */}
           <div>
-            <label className="block text-[11px] font-mono text-[#f5f0e8]/50 uppercase tracking-wider mb-1.5">
-              Title <span className="text-rose-400">*</span>
+            <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-1.5 font-medium">
+              Title <span className="text-rose-500">*</span>
             </label>
             <input
               ref={titleRef}
@@ -276,78 +275,92 @@ export default function EventForm({
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Declaration of Independence"
               required
-              className="w-full px-3.5 py-2 rounded-xl bg-white/[0.03] border border-white/[0.1] text-[#f5f0e8] text-sm outline-none focus:border-[#c9a84c]/70 focus:ring-1 focus:ring-[#c9a84c]/30 placeholder:text-[#f5f0e8]/20 transition-all"
+              className="w-full px-3.5 py-2 rounded-xl theme-input text-sm outline-none focus:border-[#c9a84c] focus:ring-1 focus:ring-[#c9a84c]/40 transition-all"
               style={{ fontFamily: "var(--font-display)" }}
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-[11px] font-mono text-[#f5f0e8]/50 uppercase tracking-wider mb-1.5">
-              Chronicle Notes <span className="text-[#f5f0e8]/25">(optional)</span>
+            <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-1.5 font-medium">
+              Chronicle Notes <span className="opacity-60">(optional)</span>
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Historical context, participants, or significant outcomes..."
               rows={3}
-              className="w-full px-3.5 py-2 rounded-xl bg-white/[0.03] border border-white/[0.1] text-[#f5f0e8] text-xs outline-none focus:border-[#c9a84c]/70 focus:ring-1 focus:ring-[#c9a84c]/30 placeholder:text-[#f5f0e8]/20 resize-none transition-all leading-relaxed font-light"
+              className="w-full px-3.5 py-2 rounded-xl theme-input text-xs outline-none focus:border-[#c9a84c] focus:ring-1 focus:ring-[#c9a84c]/40 resize-none transition-all leading-relaxed font-light"
             />
           </div>
 
           {/* Color Palette */}
           <div>
-            <label className="block text-[11px] font-mono text-[#f5f0e8]/50 uppercase tracking-wider mb-2">
-              Color Coordinate
+            <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-2 font-medium">
+              Milestone Chromatic Accent
             </label>
-            <div className="flex gap-2 flex-wrap">
-              {COLOR_PALETTE.map((c) => (
-                <button
-                  key={c.hex}
-                  type="button"
-                  onClick={() => setColor(c.hex)}
-                  className={`w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-                    color === c.hex
-                      ? "ring-2 ring-white ring-offset-2 ring-offset-[#070c16] scale-110 shadow-md"
-                      : "hover:scale-105 opacity-80 hover:opacity-100"
-                  }`}
-                  style={{ backgroundColor: c.hex }}
-                  title={c.label}
-                >
-                  {color === c.hex && <Check className="w-3 h-3 text-[#070c16] stroke-[3]" />}
-                </button>
-              ))}
+            <div className="flex flex-wrap gap-2.5">
+              {COLOR_PALETTE.map((c) => {
+                const isSelected = color === c.hex;
+                return (
+                  <button
+                    key={c.hex}
+                    type="button"
+                    onClick={() => setColor(c.hex)}
+                    className={`w-7 h-7 rounded-xl transition-all relative flex items-center justify-center cursor-pointer ${
+                      isSelected
+                        ? "scale-110 ring-2 ring-offset-2 ring-[#c9a84c] ring-offset-white dark:ring-offset-[#0d1527] shadow-md"
+                        : "hover:scale-105 opacity-80 hover:opacity-100"
+                    }`}
+                    style={{ backgroundColor: c.hex }}
+                    title={c.label}
+                  >
+                    {isSelected && (
+                      <div className="w-2 h-2 rounded-full bg-white shadow-sm" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Modal Actions */}
-          <div className="flex items-center gap-3 pt-3 border-t border-white/[0.08]">
-            {isEditing && onDelete && (
+          {/* Action Footer */}
+          <div className="pt-4 border-t border-black/[0.08] dark:border-white/[0.08] flex items-center justify-between gap-3">
+            {isEditing && onDelete ? (
               <button
                 type="button"
                 onClick={handleDelete}
                 disabled={saving}
-                className="px-4 py-2.5 rounded-xl border border-rose-500/30 text-rose-300 text-xs font-mono hover:bg-rose-500/10 transition-colors disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
+                className="px-3.5 py-2 rounded-xl text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 text-xs font-mono flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Delete</span>
               </button>
+            ) : (
+              <div />
             )}
 
-            <button
-              type="submit"
-              disabled={saving || !title.trim() || !year}
-              className="flex-1 btn-gold py-2.5 px-4 rounded-xl text-xs font-mono font-semibold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
-            >
-              {saving ? (
-                <>
-                  <div className="w-3.5 h-3.5 border-2 border-[#070c16]/40 border-t-[#070c16] rounded-full animate-spin" />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-xl theme-pill text-xs font-mono hover:opacity-100 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                disabled={saving || !title.trim() || !year.trim()}
+                className="btn-gold px-5 py-2 rounded-xl text-xs font-mono font-semibold flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-md"
+              >
+                {saving ? (
                   <span>Saving...</span>
-                </>
-              ) : (
-                <span>{isEditing ? "Update Milestone" : "Add to Number Line"}</span>
-              )}
-            </button>
+                ) : (
+                  <span>{isEditing ? "Update Milestone" : "Add to Number Line"}</span>
+                )}
+              </button>
+            </div>
           </div>
         </form>
       </div>

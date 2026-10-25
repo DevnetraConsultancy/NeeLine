@@ -3,6 +3,7 @@
 import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import Navbar from "@/components/Navbar";
 import {
   Sparkles,
   Layers,
@@ -51,15 +52,18 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="relative min-h-screen bg-[#070c16] text-[#f5f0e8] overflow-x-hidden selection:bg-[#c9a84c]/30 selection:text-[#f5f0e8]">
+    <div className="relative min-h-screen theme-bg flex flex-col overflow-x-hidden selection:bg-[#c9a84c]/30">
+      {/* Global Synchronized Navbar */}
+      <Navbar />
+
       {/* Ambient background glows */}
       <div className="ambient-glow w-[600px] h-[600px] bg-[#c9a84c] top-[-100px] left-1/2 -translate-x-1/2 opacity-15" />
-      <div className="ambient-glow w-[500px] h-[500px] bg-[#2a4d80] top-[350px] -left-[100px] opacity-10" />
-      <div className="ambient-glow w-[450px] h-[450px] bg-[#8a4baf] bottom-[100px] -right-[50px] opacity-10" />
+      <div className="ambient-glow w-[500px] h-[500px] bg-[#2a4d80] top-[350px] -left-[100px] opacity-15" />
+      <div className="ambient-glow w-[450px] h-[450px] bg-[#8a4baf] bottom-[100px] -right-[50px] opacity-15" />
 
       {/* Subtle coordinate grid lines overlay */}
       <div
-        className="absolute inset-0 pointer-events-none opacity-[0.035]"
+        className="absolute inset-0 pointer-events-none opacity-[0.04]"
         style={{
           backgroundImage:
             "linear-gradient(to right, #c9a84c 1px, transparent 1px), linear-gradient(to bottom, #c9a84c 1px, transparent 1px)",
@@ -67,76 +71,48 @@ export default function LandingPage() {
         }}
       />
 
-      {/* Top micro bar */}
-      <header className="relative z-20 flex items-center justify-between px-6 py-4 max-w-7xl mx-auto border-b border-white/[0.06]">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#c9a84c] via-[#ecd58e] to-[#a4812d] flex items-center justify-center p-[1px] shadow-[0_0_15px_rgba(201,168,76,0.25)]">
-            <div className="w-full h-full rounded-full bg-[#070c16] flex items-center justify-center">
-              <svg
-                viewBox="0 0 24 24"
-                className="w-5 h-5 text-[#c9a84c]"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <circle cx="12" cy="12" r="3" />
-                <line x1="2" y1="12" x2="22" y2="12" />
-                <line x1="12" y1="2" x2="12" y2="5" />
-                <line x1="12" y1="19" x2="12" y2="22" />
-              </svg>
-            </div>
-          </div>
-          <span
-            className="text-xl font-bold tracking-tight text-[#f5f0e8]"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            Nee<span className="text-[#c9a84c]">Line</span>
-          </span>
-        </div>
-      </header>
-
       {/* Main hero section */}
-      <main className="relative z-10 max-w-6xl mx-auto px-6 pt-12 pb-24 flex flex-col items-center">
+      <main className="relative z-10 max-w-6xl mx-auto px-6 pt-24 pb-20 flex flex-col items-center flex-1">
         {/* Release Pill Badge */}
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#c9a84c]/10 border border-[#c9a84c]/25 text-[#c9a84c] text-xs font-mono mb-8 backdrop-blur-md shadow-[0_0_20px_rgba(201,168,76,0.12)]">
-          <Sparkles className="w-3.5 h-3.5 text-[#ecd58e]" />
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#c9a84c]/15 border border-[#c9a84c]/30 text-[#c9a84c] text-xs font-mono mb-8 backdrop-blur-md shadow-[0_0_20px_rgba(201,168,76,0.15)]">
+          <Sparkles className="w-3.5 h-3.5" />
           <span>The Next Generation Historical Canvas</span>
           <ChevronRight className="w-3 h-3 opacity-60" />
         </div>
 
         {/* Hero Title */}
         <h1
-          className="text-4xl sm:text-6xl md:text-7xl font-bold text-center tracking-tight max-w-4xl leading-[1.08] mb-6"
+          className="text-4xl sm:text-6xl md:text-7xl font-bold text-center tracking-tight max-w-4xl leading-[1.08] mb-6 theme-card-title"
           style={{ fontFamily: "var(--font-display)" }}
         >
           Visualize History on a{" "}
-          <span className="bg-gradient-to-r from-[#f5f0e8] via-[#e8d5a3] to-[#c9a84c] bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-[#dfbc5e] via-[#c9a84c] to-[#926907] bg-clip-text text-transparent">
             Number Line.
           </span>
         </h1>
 
         {/* Subtitle */}
         <p
-          className="text-base sm:text-lg md:text-xl text-[#f5f0e8]/60 text-center max-w-2xl leading-relaxed mb-10 font-light"
+          className="text-base sm:text-lg md:text-xl theme-text-muted text-center max-w-2xl leading-relaxed mb-10 font-light"
           style={{ fontFamily: "var(--font-body)" }}
         >
           An algorithmic, horizontal time canvas designed for scholars, researchers, and curious minds. Map deep time from ancient antiquity to the modern era with mathematical precision.
         </p>
 
         {/* Auth CTA Card */}
-        <div className="w-full max-w-md p-6 sm:p-8 rounded-2xl glass-card relative mb-16 border border-[#c9a84c]/20 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
+        <div className="w-full max-w-md p-6 sm:p-8 rounded-2xl glass-panel relative mb-16 border border-black/10 dark:border-[#c9a84c]/20 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
           {status === "loading" ? (
             <div className="py-8 flex flex-col items-center gap-3">
               <div className="w-6 h-6 border-2 border-[#c9a84c]/30 border-t-[#c9a84c] rounded-full animate-spin" />
-              <span className="text-xs text-[#c9a84c]/70 font-mono">Authenticating session...</span>
+              <span className="text-xs text-[#c9a84c] font-mono">Authenticating session...</span>
             </div>
           ) : (
             <div className="flex flex-col gap-4">
               <div className="text-center mb-1">
-                <span className="text-xs font-mono uppercase tracking-widest text-[#c9a84c]/80">
+                <span className="text-xs font-mono uppercase tracking-widest text-[#c9a84c] font-semibold">
                   Access Your Workspace
                 </span>
-                <p className="text-sm text-[#f5f0e8]/60 mt-1">
+                <p className="text-sm theme-text-muted mt-1">
                   Start mapping your historical chronology in seconds.
                 </p>
               </div>
@@ -144,7 +120,7 @@ export default function LandingPage() {
               {/* Google Sign In */}
               <button
                 onClick={() => signIn("google")}
-                className="w-full h-12 rounded-xl bg-white text-[#0a1628] font-semibold text-sm flex items-center justify-center gap-3 hover:bg-[#f5f0e8] transition-all shadow-[0_4px_18px_rgba(255,255,255,0.12)] hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                className="w-full h-12 rounded-xl bg-white text-[#0a1628] font-semibold text-sm flex items-center justify-center gap-3 hover:bg-[#fafaf9] border border-black/10 transition-all shadow-[0_4px_18px_rgba(0,0,0,0.08)] hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24">
                   <path
@@ -169,25 +145,25 @@ export default function LandingPage() {
 
               {/* Divider */}
               <div className="flex items-center gap-3 my-1">
-                <div className="flex-1 h-px bg-white/[0.08]" />
-                <span className="text-[11px] font-mono text-[#f5f0e8]/30 uppercase">
+                <div className="flex-1 h-px bg-black/[0.08] dark:bg-white/[0.08]" />
+                <span className="text-[11px] font-mono theme-text-subtle uppercase">
                   or instant sandbox
                 </span>
-                <div className="flex-1 h-px bg-white/[0.08]" />
+                <div className="flex-1 h-px bg-black/[0.08] dark:bg-white/[0.08]" />
               </div>
 
               {/* Guest Login */}
               <button
                 onClick={handleGuestLogin}
                 disabled={guestLoading}
-                className="w-full h-11 rounded-xl btn-ghost-gold font-medium text-xs flex items-center justify-center gap-2.5 transition-all disabled:opacity-50 cursor-pointer"
+                className="w-full h-11 rounded-xl btn-ghost-gold font-medium text-xs flex items-center justify-center gap-2.5 transition-all disabled:opacity-50 cursor-pointer shadow-sm"
               >
                 <User className="w-4 h-4 text-[#c9a84c]" />
                 <span>{guestLoading ? "Opening Guest Sandbox..." : "Continue as Guest"}</span>
-                <ArrowRight className="w-3.5 h-3.5 opacity-60" />
+                <ArrowRight className="w-3.5 h-3.5 opacity-70" />
               </button>
 
-              <p className="text-[11px] text-[#f5f0e8]/35 text-center mt-1 font-mono">
+              <p className="text-[11px] theme-text-subtle text-center mt-1 font-mono">
                 No credit card or registration required · Private instant session
               </p>
             </div>
@@ -195,41 +171,41 @@ export default function LandingPage() {
         </div>
 
         {/* Interactive Sample Timeline Showcase */}
-        <section className="w-full max-w-5xl rounded-2xl glass-card p-6 sm:p-8 mb-20 border border-[#c9a84c]/20 relative overflow-hidden">
+        <section className="w-full max-w-5xl rounded-2xl glass-panel p-6 sm:p-8 mb-20 border border-black/10 dark:border-[#c9a84c]/20 relative overflow-hidden shadow-xl">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div>
               <div className="flex items-center gap-2">
                 <span className="inline-block w-2 h-2 rounded-full bg-[#c9a84c] shadow-[0_0_8px_#c9a84c]" />
                 <h3
-                  className="text-lg font-bold text-[#f5f0e8]"
+                  className="text-lg font-bold theme-card-title"
                   style={{ fontFamily: "var(--font-display)" }}
                 >
                   Interactive Deep-Time Preview
                 </h3>
               </div>
-              <p className="text-xs text-[#f5f0e8]/50 mt-1">
+              <p className="text-xs theme-text-muted mt-1">
                 Click any milestone below to simulate real-time temporal focusing.
               </p>
             </div>
-            <div className="flex items-center gap-2 text-xs font-mono text-[#c9a84c]/80 bg-[#c9a84c]/10 px-3 py-1.5 rounded-lg border border-[#c9a84c]/20 self-start sm:self-auto">
+            <div className="flex items-center gap-2 text-xs font-mono text-[#c9a84c] bg-[#c9a84c]/15 px-3 py-1.5 rounded-lg border border-[#c9a84c]/30 self-start sm:self-auto font-medium">
               <Clock className="w-3.5 h-3.5" />
               <span>Span: 5,226 Years Illustrated</span>
             </div>
           </div>
 
           {/* Simulated Number Line Spine */}
-          <div className="relative py-12 px-4 sm:px-8 bg-[#091122]/60 rounded-xl border border-white/[0.05] overflow-x-auto">
+          <div className="relative py-12 px-4 sm:px-8 bg-black/[0.04] dark:bg-[#091122]/70 rounded-xl border border-black/10 dark:border-white/[0.06] overflow-x-auto shadow-inner">
             {/* The Golden Spine */}
             <div className="relative w-full min-w-[700px] h-20 flex items-center">
               <div className="absolute left-0 right-0 h-[2px] bg-gradient-to-r from-[#c9a84c]/20 via-[#c9a84c] to-[#c9a84c]/20" />
 
               {/* Zero Marker */}
               <div className="absolute left-[54%] -translate-x-1/2 flex flex-col items-center">
-                <div className="w-[2px] h-8 bg-white/40 mb-1" />
-                <div className="w-3 h-3 rounded-full border border-white/60 bg-[#070c16] flex items-center justify-center">
-                  <div className="w-1 h-1 rounded-full bg-white" />
+                <div className="w-[2px] h-8 bg-black/40 dark:bg-white/40 mb-1" />
+                <div className="w-3 h-3 rounded-full border border-black/60 dark:border-white/60 bg-white dark:bg-[#070c16] flex items-center justify-center">
+                  <div className="w-1 h-1 rounded-full bg-[#c9a84c]" />
                 </div>
-                <span className="text-[10px] font-mono text-white/50 mt-1">0 CE</span>
+                <span className="text-[10px] font-mono opacity-60 mt-1 font-semibold">0 CE</span>
               </div>
 
               {/* Milestones along the number line */}
@@ -246,8 +222,8 @@ export default function LandingPage() {
                       <div
                         className={`px-2.5 py-1 rounded-md text-[11px] font-medium mb-3 transition-all whitespace-nowrap shadow-md ${
                           isActive
-                            ? "bg-[#0d1629] text-[#f5f0e8] border border-amber-400/60 scale-105 shadow-[0_0_12px_rgba(201,168,76,0.3)]"
-                            : "bg-[#0a1220]/80 text-[#f5f0e8]/70 border border-white/[0.08] hover:border-white/30"
+                            ? "bg-white dark:bg-[#0d1629] theme-card-title border border-[#c9a84c] scale-105 shadow-[0_0_12px_rgba(201,168,76,0.35)]"
+                            : "bg-white/90 dark:bg-[#0a1220]/80 theme-text-muted border border-black/10 dark:border-white/[0.08] hover:border-[#c9a84c]/40"
                         }`}
                         style={{ fontFamily: "var(--font-display)" }}
                       >
@@ -271,12 +247,12 @@ export default function LandingPage() {
                       {/* Bottom Year & Era */}
                       <div className="mt-3 text-center">
                         <div
-                          className="text-[11px] font-mono font-semibold"
+                          className="text-[11px] font-mono font-bold"
                           style={{ color: event.color }}
                         >
                           {event.year}
                         </div>
-                        <div className="text-[9px] text-[#f5f0e8]/40 font-mono tracking-tight">
+                        <div className="text-[9px] theme-text-subtle font-mono tracking-tight">
                           {event.era}
                         </div>
                       </div>
@@ -288,71 +264,71 @@ export default function LandingPage() {
           </div>
 
           {/* Active Event Detail Spotlight */}
-          <div className="mt-6 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between">
+          <div className="mt-6 p-4 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/[0.06] flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div
-                className="w-3 h-10 rounded-full"
+                className="w-3.5 h-10 rounded-full shadow-sm"
                 style={{ backgroundColor: SAMPLE_EVENTS[activeSampleIndex].color }}
               />
               <div>
-                <div className="text-sm font-semibold text-[#f5f0e8]">
+                <div className="text-sm font-semibold theme-card-title">
                   {SAMPLE_EVENTS[activeSampleIndex].title}
                 </div>
-                <div className="text-xs text-[#f5f0e8]/50 font-mono">
+                <div className="text-xs theme-text-muted font-mono">
                   Era: {SAMPLE_EVENTS[activeSampleIndex].era} · Chronological Coordinate:{" "}
                   {SAMPLE_EVENTS[activeSampleIndex].year}
                 </div>
               </div>
             </div>
-            <span className="text-[11px] font-mono text-[#c9a84c]/80 bg-[#c9a84c]/10 px-2.5 py-1 rounded">
+            <span className="text-[11px] font-mono text-[#c9a84c] bg-[#c9a84c]/15 px-2.5 py-1 rounded border border-[#c9a84c]/30 font-semibold">
               Active Focus
             </span>
           </div>
         </section>
 
         {/* Feature Highlights Grid */}
-        <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mb-24">
-          <div className="p-6 rounded-2xl glass-card border border-white/[0.06]">
-            <div className="w-10 h-10 rounded-xl bg-[#c9a84c]/15 text-[#c9a84c] flex items-center justify-center mb-4 border border-[#c9a84c]/20">
+        <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mb-12">
+          <div className="p-6 rounded-2xl theme-card border border-black/10 dark:border-white/[0.08]">
+            <div className="w-10 h-10 rounded-xl bg-[#c9a84c]/15 text-[#c9a84c] flex items-center justify-center mb-4 border border-[#c9a84c]/30 shadow-sm">
               <ZoomIn className="w-5 h-5" />
             </div>
             <h4
-              className="text-lg font-bold mb-2 text-[#f5f0e8]"
+              className="text-lg font-bold mb-2 theme-card-title"
               style={{ fontFamily: "var(--font-display)" }}
             >
               Infinite Deep-Time Zoom
             </h4>
-            <p className="text-sm text-[#f5f0e8]/60 leading-relaxed font-light">
+            <p className="text-sm theme-text-muted leading-relaxed font-light">
               Glide from geological epochs spanning millions of years down to exact calendar days with continuous fluid mousewheel and pinch zoom.
             </p>
           </div>
 
-          <div className="p-6 rounded-2xl glass-card border border-white/[0.06]">
-            <div className="w-10 h-10 rounded-xl bg-[#5a9bd5]/15 text-[#5a9bd5] flex items-center justify-center mb-4 border border-[#5a9bd5]/20">
+          <div className="p-6 rounded-2xl theme-card border border-black/10 dark:border-white/[0.08]">
+            <div className="w-10 h-10 rounded-xl bg-[#5a9bd5]/15 text-[#5a9bd5] flex items-center justify-center mb-4 border border-[#5a9bd5]/30 shadow-sm">
               <Layers className="w-5 h-5" />
             </div>
             <h4
-              className="text-lg font-bold mb-2 text-[#f5f0e8]"
+              className="text-lg font-bold mb-2 theme-card-title"
               style={{ fontFamily: "var(--font-display)" }}
             >
               Multi-Tier Layout Engine
             </h4>
-            <p className="text-sm text-[#f5f0e8]/60 leading-relaxed font-light">
+            <p className="text-sm theme-text-muted leading-relaxed font-light">
               Events automatically stack across non-overlapping tiers. When events pack tightly, they collapse into interactive glowing nodes.
             </p>
           </div>
 
-          <div className="p-6 rounded-2xl glass-card border border-white/[0.06]">
-            <div className="w-10 h-10 rounded-xl bg-[#7ab8a0]/15 text-[#7ab8a0] flex items-center justify-center mb-4 border border-[#7ab8a0]/20">
+          <div className="p-6 rounded-2xl theme-card border border-black/10 dark:border-white/[0.08]">
+            <div className="w-10 h-10 rounded-xl bg-[#7ab8a0]/15 text-[#7ab8a0] flex items-center justify-center mb-4 border border-[#7ab8a0]/30 shadow-sm">
               <Download className="w-5 h-5" />
             </div>
             <h4
-              className="text-lg font-bold mb-2 text-[#f5f0e8]"
+              className="text-lg font-bold mb-2 theme-card-title"
               style={{ fontFamily: "var(--font-display)" }}
             >
               Publication-Grade Export
             </h4>
-            <p className="text-sm text-[#f5f0e8]/60 leading-relaxed font-light">
+            <p className="text-sm theme-text-muted leading-relaxed font-light">
               Export ultra-crisp 2x retina PNG graphics for academic presentations, papers, and essays, or download clean tabular TXT and JSON data.
             </p>
           </div>
@@ -360,12 +336,12 @@ export default function LandingPage() {
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-white/[0.06] py-8 px-6 bg-[#050810]/80 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-[#f5f0e8]/40">
+      <footer className="relative z-10 py-8 px-6 theme-footer">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono theme-text-muted">
           <div className="flex items-center gap-2">
             <span>© {new Date().getFullYear()} NeeLine</span>
             <span>·</span>
-            <span className="text-[#f5f0e8]/60">Developed in Collaboration with Academia | Devnetra Consultancy</span>
+            <span className="font-medium">Developed in Collaboration with Academia | Devnetra Consultancy</span>
           </div>
 
           <div className="flex items-center gap-6">
@@ -383,7 +359,7 @@ export default function LandingPage() {
             >
               @scien_nee
             </a>
-            <span className="text-[10px] px-2 py-0.5 rounded bg-white/[0.04] text-[#c9a84c]/80 border border-white/[0.06]">
+            <span className="text-[10px] px-2 py-0.5 rounded theme-pill border border-[#c9a84c]/20 text-[#c9a84c] font-semibold">
               Number Line Engine
             </span>
           </div>

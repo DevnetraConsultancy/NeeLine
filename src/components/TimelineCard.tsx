@@ -82,7 +82,7 @@ export default function TimelineCard({ timeline, onUpdate }: TimelineCardProps) 
   }
 
   return (
-    <div className="group relative rounded-2xl glass-card overflow-hidden flex flex-col justify-between border border-white/[0.08] hover:border-[#c9a84c]/40 transition-all duration-300">
+    <div className="group relative rounded-2xl theme-card overflow-hidden flex flex-col justify-between transition-all duration-300">
       {/* Top spine bar with timeline's custom spine color */}
       <div
         className="h-1.5 w-full relative"
@@ -113,13 +113,13 @@ export default function TimelineCard({ timeline, onUpdate }: TimelineCardProps) 
                       setEditing(false);
                     }
                   }}
-                  className="flex-1 px-2.5 py-1 rounded-lg bg-[#070c16] border border-[#c9a84c]/50 text-[#f5f0e8] text-sm outline-none focus:ring-1 focus:ring-[#c9a84c]"
+                  className="flex-1 px-2.5 py-1 rounded-lg theme-input text-sm font-semibold outline-none focus:ring-1 focus:ring-[#c9a84c]"
                   disabled={saving}
                 />
                 <button
                   onClick={handleRename}
                   disabled={saving}
-                  className="p-1 text-emerald-400 hover:bg-emerald-500/10 rounded"
+                  className="p-1 text-emerald-500 hover:bg-emerald-500/10 rounded cursor-pointer"
                   title="Confirm rename"
                 >
                   <Check className="w-4 h-4" />
@@ -129,7 +129,7 @@ export default function TimelineCard({ timeline, onUpdate }: TimelineCardProps) 
                     setName(timeline.name);
                     setEditing(false);
                   }}
-                  className="p-1 text-[#f5f0e8]/50 hover:bg-white/10 rounded"
+                  className="p-1 opacity-50 hover:opacity-100 rounded cursor-pointer"
                   title="Cancel"
                 >
                   <X className="w-4 h-4" />
@@ -138,7 +138,7 @@ export default function TimelineCard({ timeline, onUpdate }: TimelineCardProps) 
             ) : (
               <div className="flex items-center gap-2 group/title flex-1 min-w-0">
                 <h3
-                  className="text-base font-semibold text-[#f5f0e8] truncate cursor-pointer group-hover/title:text-[#c9a84c] transition-colors"
+                  className="text-base font-semibold theme-card-title truncate cursor-pointer group-hover/title:text-[#c9a84c] transition-colors"
                   style={{ fontFamily: "var(--font-display)" }}
                   onClick={() => setEditing(true)}
                   title="Click to rename"
@@ -147,7 +147,7 @@ export default function TimelineCard({ timeline, onUpdate }: TimelineCardProps) 
                 </h3>
                 <button
                   onClick={() => setEditing(true)}
-                  className="opacity-0 group-hover:opacity-100 text-[#f5f0e8]/30 hover:text-[#c9a84c] transition-opacity p-0.5"
+                  className="opacity-0 group-hover:opacity-100 theme-text-subtle hover:text-[#c9a84c] transition-opacity p-0.5 cursor-pointer"
                   title="Rename timeline"
                 >
                   <Edit2 className="w-3.5 h-3.5" />
@@ -157,21 +157,21 @@ export default function TimelineCard({ timeline, onUpdate }: TimelineCardProps) 
 
             {/* Timeline Color Swatch Badge */}
             <div
-              className="w-3.5 h-3.5 rounded-full border border-white/20 shrink-0 shadow-sm"
+              className="w-3.5 h-3.5 rounded-full border border-black/10 dark:border-white/20 shrink-0 shadow-sm"
               style={{ backgroundColor: timeline.spineColor }}
               title={`Spine color: ${timeline.spineColor}`}
             />
           </div>
 
           {/* Metadata chips */}
-          <div className="flex items-center gap-3 text-xs font-mono text-[#f5f0e8]/45 mt-3">
-            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/[0.03] border border-white/[0.06]">
+          <div className="flex items-center gap-3 text-xs font-mono theme-text-muted mt-3">
+            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md theme-pill">
               <Calendar className="w-3 h-3 text-[#c9a84c]" />
               <span>
                 {eventCount} {eventCount === 1 ? "event" : "events"}
               </span>
             </span>
-            <span className="flex items-center gap-1 text-[#f5f0e8]/40">
+            <span className="flex items-center gap-1 opacity-70">
               <Clock className="w-3 h-3" />
               <span>{timeAgo}</span>
             </span>
@@ -179,7 +179,7 @@ export default function TimelineCard({ timeline, onUpdate }: TimelineCardProps) 
         </div>
 
         {/* Footer Actions */}
-        <div className="mt-5 pt-4 border-t border-white/[0.06] flex items-center justify-between gap-2">
+        <div className="mt-5 pt-4 border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between gap-2">
           {isTrashed ? (
             <div className="flex items-center gap-2 w-full">
               <button
@@ -191,7 +191,7 @@ export default function TimelineCard({ timeline, onUpdate }: TimelineCardProps) 
               </button>
               <button
                 onClick={handlePermanentDelete}
-                className="flex items-center justify-center gap-1.5 text-xs py-2 px-3 rounded-lg bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 border border-rose-500/20 font-medium transition-colors cursor-pointer font-mono"
+                className="flex items-center justify-center gap-1.5 text-xs py-2 px-3 rounded-lg bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 border border-rose-500/30 font-medium transition-colors cursor-pointer font-mono"
                 title="Permanently remove"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -202,15 +202,15 @@ export default function TimelineCard({ timeline, onUpdate }: TimelineCardProps) 
             <>
               <Link
                 href={`/timeline/${timeline.id}`}
-                className="flex items-center gap-1.5 text-xs py-1.5 px-3.5 rounded-lg bg-[#c9a84c]/15 text-[#f5f0e8] hover:bg-[#c9a84c] hover:text-[#070c16] border border-[#c9a84c]/30 font-medium transition-all group/btn cursor-pointer font-mono"
+                className="flex items-center gap-1.5 text-xs py-1.5 px-3.5 rounded-lg btn-ghost-gold font-medium transition-all group/btn cursor-pointer font-mono"
               >
                 <span>Open Canvas</span>
-                <ArrowUpRight className="w-3.5 h-3.5 text-[#c9a84c] group-hover/btn:text-[#070c16] transition-colors" />
+                <ArrowUpRight className="w-3.5 h-3.5 opacity-70 group-hover/btn:opacity-100 transition-opacity" />
               </Link>
 
               <button
                 onClick={handleSoftDelete}
-                className="p-1.5 text-[#f5f0e8]/30 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+                className="p-1.5 opacity-40 hover:opacity-100 hover:text-rose-500 rounded-lg transition-colors cursor-pointer"
                 title="Move to trash"
               >
                 <Trash2 className="w-4 h-4" />

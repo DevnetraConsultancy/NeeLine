@@ -112,28 +112,28 @@ export default function TimelineSettings({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-md rounded-2xl glass-panel shadow-[0_25px_60px_rgba(0,0,0,0.8)] border border-white/[0.1] overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="w-full max-w-md rounded-2xl glass-panel shadow-[0_25px_60px_rgba(0,0,0,0.8)] border border-black/10 dark:border-white/[0.1] overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header - Renamed to Canvas Settings */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] bg-white/[0.02]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-black/[0.08] dark:border-white/[0.08] bg-black/[0.02] dark:bg-white/[0.02]">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-[#c9a84c]/15 text-[#c9a84c] border border-[#c9a84c]/20 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-[#c9a84c]/15 text-[#c9a84c] border border-[#c9a84c]/30 flex items-center justify-center">
               <Palette className="w-4 h-4" />
             </div>
             <div>
               <h2
-                className="text-base font-bold text-[#f5f0e8] leading-tight"
+                className="text-base font-bold theme-card-title leading-tight"
                 style={{ fontFamily: "var(--font-display)" }}
               >
                 Canvas Settings
               </h2>
-              <p className="text-[11px] font-mono text-[#f5f0e8]/40">
+              <p className="text-[11px] font-mono theme-text-muted">
                 Colors, chromatic theme & coordinate gap styling
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-xl text-[#f5f0e8]/40 hover:text-[#f5f0e8] hover:bg-white/[0.06] transition-colors cursor-pointer"
+            className="w-8 h-8 flex items-center justify-center rounded-xl theme-text-muted hover:opacity-100 hover:bg-black/[0.05] dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -142,12 +142,12 @@ export default function TimelineSettings({
         <div className="p-6 space-y-5 overflow-y-auto flex-1">
           {/* Live Mini-Canvas Preview with Gap Box */}
           <div>
-            <label className="block text-[11px] font-mono text-[#f5f0e8]/40 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-2 flex items-center gap-1.5 font-medium">
               <Sparkles className="w-3 h-3 text-[#c9a84c]" />
               <span>Live Canvas Preview</span>
             </label>
             <div
-              className="rounded-xl p-4 border border-white/[0.1] relative overflow-hidden transition-colors duration-300 shadow-inner"
+              className="rounded-xl p-4 border border-black/15 dark:border-white/[0.1] relative overflow-hidden transition-colors duration-300 shadow-inner"
               style={{ backgroundColor: bg }}
             >
               <div className="relative py-4 flex items-center justify-between px-6">
@@ -204,7 +204,7 @@ export default function TimelineSettings({
           </div>
 
           {/* Gap Year Box Border Setting (Add/Remove Border) */}
-          <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.08] flex items-center justify-between gap-3">
+          <div className="p-3.5 rounded-xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/[0.08] flex items-center justify-between gap-3">
             <div className="flex items-start gap-2.5">
               <button
                 type="button"
@@ -214,17 +214,17 @@ export default function TimelineSettings({
                 {showGapBorder ? (
                   <CheckSquare className="w-4 h-4 stroke-[2.5]" />
                 ) : (
-                  <Square className="w-4 h-4 text-[#f5f0e8]/30" />
+                  <Square className="w-4 h-4 opacity-40" />
                 )}
               </button>
               <div>
                 <label
                   onClick={() => onToggleGapBorder(!showGapBorder)}
-                  className="text-xs font-semibold text-[#f5f0e8] cursor-pointer block"
+                  className="text-xs font-semibold theme-card-title cursor-pointer block"
                 >
                   Gap Year Box Border
                 </label>
-                <p className="text-[11px] font-mono text-[#f5f0e8]/45 mt-0.5 leading-relaxed">
+                <p className="text-[11px] font-mono theme-text-muted mt-0.5 leading-relaxed">
                   {showGapBorder
                     ? "Border active on gap year indicator boxes"
                     : "Border removed (clean borderless gap pill)"}
@@ -235,10 +235,10 @@ export default function TimelineSettings({
             <button
               type="button"
               onClick={() => onToggleGapBorder(!showGapBorder)}
-              className={`text-[10px] font-mono px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+              className={`text-[10px] font-mono px-2.5 py-1 rounded-lg border transition-all cursor-pointer font-medium ${
                 showGapBorder
-                  ? "bg-[#c9a84c]/15 text-[#c9a84c] border-[#c9a84c]/30"
-                  : "bg-white/[0.04] text-[#f5f0e8]/40 border-white/[0.08]"
+                  ? "bg-[#c9a84c]/20 text-[#c9a84c] border-[#c9a84c]/40"
+                  : "theme-pill opacity-70"
               }`}
             >
               {showGapBorder ? "Border ON" : "Border OFF"}
@@ -247,7 +247,7 @@ export default function TimelineSettings({
 
           {/* Curated Theme Presets */}
           <div>
-            <label className="block text-[11px] font-mono text-[#f5f0e8]/40 uppercase tracking-wider mb-2">
+            <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-2 font-medium">
               Curated Theme Presets
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -262,130 +262,152 @@ export default function TimelineSettings({
                     key={preset.name}
                     type="button"
                     onClick={() => applyPreset(preset)}
-                    className={`px-3 py-2 rounded-xl border text-xs font-mono transition-all text-left flex items-center justify-between cursor-pointer ${
+                    className={`p-2 rounded-xl text-left transition-all cursor-pointer border ${
                       isActive
-                        ? "bg-[#c9a84c]/20 border-[#c9a84c] text-[#f5f0e8] shadow-sm"
-                        : "bg-white/[0.03] border-white/[0.08] text-[#f5f0e8]/60 hover:border-white/20 hover:text-[#f5f0e8]"
+                        ? "border-[#c9a84c] ring-1 ring-[#c9a84c]/50 bg-[#c9a84c]/10"
+                        : "border-black/10 dark:border-white/[0.08] hover:border-[#c9a84c]/40 theme-pill"
                     }`}
                   >
-                    <span className="truncate">{preset.name}</span>
-                    <div
-                      className="w-2.5 h-2.5 rounded-full shrink-0 ml-1.5 border border-white/20"
-                      style={{ backgroundColor: preset.spine }}
-                    />
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <div
+                        className="w-3.5 h-3.5 rounded-full border border-black/20 dark:border-white/20 shrink-0"
+                        style={{ backgroundColor: preset.bg }}
+                      />
+                      <div
+                        className="w-3.5 h-3.5 rounded-full shrink-0"
+                        style={{ backgroundColor: preset.spine }}
+                      />
+                    </div>
+                    <div className="text-xs font-semibold theme-card-title truncate">
+                      {preset.name}
+                    </div>
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Background Palette */}
-          <div>
-            <label className="block text-[11px] font-mono text-[#f5f0e8]/40 uppercase tracking-wider mb-2">
-              Canvas Background
-            </label>
-            <div className="flex gap-2 flex-wrap">
-              {BG_COLORS.map((c) => (
-                <button
-                  key={`bg-${c}`}
-                  type="button"
-                  onClick={() => setBg(c)}
-                  className={`w-7 h-7 rounded-full border-2 transition-all cursor-pointer ${
-                    bg === c
-                      ? "border-white scale-110 shadow-md ring-2 ring-white/20"
-                      : "border-transparent opacity-80 hover:opacity-100 hover:scale-105"
-                  }`}
-                  style={{ backgroundColor: c }}
-                  title={c}
+          {/* Custom Color Pickers */}
+          <div className="space-y-3 pt-2">
+            <div>
+              <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-1.5 font-medium">
+                Canvas Background Color
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={bg}
+                  onChange={(e) => setBg(e.target.value)}
+                  className="w-8 h-8 rounded-lg border border-black/15 dark:border-white/10 cursor-pointer p-0.5 bg-transparent"
                 />
-              ))}
+                <input
+                  type="text"
+                  value={bg}
+                  onChange={(e) => setBg(e.target.value)}
+                  className="w-28 px-2.5 py-1.5 rounded-xl theme-input text-xs font-mono"
+                />
+                <div className="flex items-center gap-1 overflow-x-auto py-1">
+                  {BG_COLORS.slice(0, 6).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setBg(c)}
+                      className="w-5 h-5 rounded-full border border-black/20 dark:border-white/20 shrink-0 cursor-pointer hover:scale-110 transition-transform"
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-1.5 font-medium">
+                Spine & Tick Color
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={spine}
+                  onChange={(e) => {
+                    setSpine(e.target.value);
+                    setTick(e.target.value);
+                  }}
+                  className="w-8 h-8 rounded-lg border border-black/15 dark:border-white/10 cursor-pointer p-0.5 bg-transparent"
+                />
+                <input
+                  type="text"
+                  value={spine}
+                  onChange={(e) => {
+                    setSpine(e.target.value);
+                    setTick(e.target.value);
+                  }}
+                  className="w-28 px-2.5 py-1.5 rounded-xl theme-input text-xs font-mono"
+                />
+                <div className="flex items-center gap-1 overflow-x-auto py-1">
+                  {ACCENT_COLORS.slice(0, 6).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => {
+                        setSpine(c);
+                        setTick(c);
+                      }}
+                      className="w-5 h-5 rounded-full shrink-0 cursor-pointer hover:scale-110 transition-transform"
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-1.5 font-medium">
+                Canvas Text Color
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  className="w-8 h-8 rounded-lg border border-black/15 dark:border-white/10 cursor-pointer p-0.5 bg-transparent"
+                />
+                <input
+                  type="text"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  className="w-28 px-2.5 py-1.5 rounded-xl theme-input text-xs font-mono"
+                />
+                <div className="flex items-center gap-1 overflow-x-auto py-1">
+                  {["#f5f0e8", "#ffffff", "#1a1a1a", "#e8f0fe", "#f0f8f4"].map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setText(c)}
+                      className="w-5 h-5 rounded-full border border-black/20 dark:border-white/20 shrink-0 cursor-pointer hover:scale-110 transition-transform"
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Central Axis Spine Line */}
-          <div>
-            <label className="block text-[11px] font-mono text-[#f5f0e8]/40 uppercase tracking-wider mb-2">
-              Central Axis Line
-            </label>
-            <div className="flex gap-2 flex-wrap">
-              {ACCENT_COLORS.map((c) => (
-                <button
-                  key={`spine-${c}`}
-                  type="button"
-                  onClick={() => setSpine(c)}
-                  className={`w-7 h-7 rounded-full border-2 transition-all cursor-pointer ${
-                    spine === c
-                      ? "border-white scale-110 shadow-md ring-2 ring-white/20"
-                      : "border-transparent opacity-80 hover:opacity-100 hover:scale-105"
-                  }`}
-                  style={{ backgroundColor: c }}
-                  title={c}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Tick Marks & Origin */}
-          <div>
-            <label className="block text-[11px] font-mono text-[#f5f0e8]/40 uppercase tracking-wider mb-2">
-              Tick Marks & Origin
-            </label>
-            <div className="flex gap-2 flex-wrap">
-              {ACCENT_COLORS.map((c) => (
-                <button
-                  key={`tick-${c}`}
-                  type="button"
-                  onClick={() => setTick(c)}
-                  className={`w-7 h-7 rounded-full border-2 transition-all cursor-pointer ${
-                    tick === c
-                      ? "border-white scale-110 shadow-md ring-2 ring-white/20"
-                      : "border-transparent opacity-80 hover:opacity-100 hover:scale-105"
-                  }`}
-                  style={{ backgroundColor: c }}
-                  title={c}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Typography Color */}
-          <div>
-            <label className="block text-[11px] font-mono text-[#f5f0e8]/40 uppercase tracking-wider mb-2">
-              Canvas Typography
-            </label>
-            <div className="flex gap-2 flex-wrap">
-              {ACCENT_COLORS.map((c) => (
-                <button
-                  key={`text-${c}`}
-                  type="button"
-                  onClick={() => setText(c)}
-                  className={`w-7 h-7 rounded-full border-2 transition-all cursor-pointer ${
-                    text === c
-                      ? "border-white scale-110 shadow-md ring-2 ring-white/20"
-                      : "border-transparent opacity-80 hover:opacity-100 hover:scale-105"
-                  }`}
-                  style={{ backgroundColor: c }}
-                  title={c}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Submit */}
-          <div className="pt-2">
+          {/* Action Buttons */}
+          <div className="pt-4 border-t border-black/[0.08] dark:border-white/[0.08] flex items-center justify-end gap-2.5">
             <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl theme-pill text-xs font-mono hover:opacity-100 transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
               onClick={handleSave}
               disabled={saving}
-              className="w-full btn-gold py-2.5 rounded-xl text-xs font-mono font-semibold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
+              className="btn-gold px-5 py-2 rounded-xl text-xs font-mono font-semibold cursor-pointer disabled:opacity-50 shadow-md"
             >
-              {saving ? (
-                <>
-                  <div className="w-3.5 h-3.5 border-2 border-[#070c16]/40 border-t-[#070c16] rounded-full animate-spin" />
-                  <span>Saving Canvas Settings...</span>
-                </>
-              ) : (
-                <span>Save Canvas Settings</span>
-              )}
+              {saving ? "Applying..." : "Apply Palette"}
             </button>
           </div>
         </div>

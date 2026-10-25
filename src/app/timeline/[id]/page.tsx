@@ -299,30 +299,31 @@ export default function TimelinePage() {
 
   if (loading || !timeline) {
     return (
-      <div className="h-screen bg-[#070c16] flex flex-col items-center justify-center text-[#f5f0e8]">
+      <div className="h-screen theme-bg flex flex-col items-center justify-center">
         <div className="w-8 h-8 border-2 border-[#c9a84c]/30 border-t-[#c9a84c] rounded-full animate-spin mb-4" />
-        <div className="text-xs font-mono text-[#f5f0e8]/40">Initializing Timeline Studio...</div>
+        <div className="text-xs font-mono theme-text-muted">Initializing Timeline Studio...</div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen bg-[#070c16] flex flex-col overflow-hidden select-none">
+    <div className="h-screen theme-bg flex flex-col overflow-hidden select-none">
       <Navbar />
 
       {/* Studio Header Sub-bar */}
-      <div className="fixed top-14 left-0 right-0 z-40 h-14 flex items-center justify-between px-4 sm:px-8 bg-[#090f1d]/90 backdrop-blur-xl border-b border-white/[0.08] shadow-[0_4px_24px_rgba(0,0,0,0.3)]">
+      <div className="fixed top-14 left-0 right-0 z-40 h-14 flex items-center justify-between px-4 sm:px-8 theme-subnav">
         {/* Left: Breadcrumbs & Editable Title */}
         <div className="flex items-center gap-3 min-w-0">
           <Link
             href="/dashboard"
-            className="flex items-center gap-1 text-xs font-mono text-[#f5f0e8]/40 hover:text-[#c9a84c] transition-colors shrink-0 px-2 py-1 rounded-lg hover:bg-white/[0.04]"
+            className="flex items-center gap-1 text-xs font-mono theme-pill hover:border-[#c9a84c]/50 transition-colors shrink-0 px-2.5 py-1.5 rounded-xl"
+            title="Return to Workspace Dashboard"
           >
-            <ChevronLeft className="w-3.5 h-3.5" />
+            <ChevronLeft className="w-3.5 h-3.5 text-[#c9a84c]" />
             <span className="hidden sm:inline">Dashboard</span>
           </Link>
 
-          <span className="text-[#f5f0e8]/20 text-xs">/</span>
+          <span className="opacity-30 text-xs">/</span>
 
           {editingName ? (
             <input
@@ -337,27 +338,27 @@ export default function TimelinePage() {
                 }
               }}
               onBlur={handleRename}
-              className="px-2.5 py-1 rounded-lg bg-[#070c16] border border-[#c9a84c] text-[#f5f0e8] text-sm font-semibold outline-none min-w-0 shadow-inner"
+              className="px-2.5 py-1 rounded-lg theme-input text-sm font-semibold outline-none min-w-0 border border-[#c9a84c]"
               style={{ fontFamily: "var(--font-display)" }}
             />
           ) : (
             <div
               onClick={() => setEditingName(true)}
-              className="flex items-center gap-2 group/edit cursor-pointer py-1 px-2 rounded-lg hover:bg-white/[0.04] transition-colors min-w-0"
+              className="flex items-center gap-2 group/edit cursor-pointer py-1 px-2 rounded-lg hover:bg-black/[0.04] dark:hover:bg-white/[0.04] transition-colors min-w-0"
               title="Click to rename"
             >
               <h1
-                className="text-sm sm:text-base font-semibold text-[#f5f0e8] truncate group-hover/edit:text-[#c9a84c] transition-colors"
+                className="text-sm sm:text-base font-semibold truncate theme-card-title group-hover/edit:text-[#c9a84c] transition-colors"
                 style={{ fontFamily: "var(--font-display)" }}
               >
                 {timeline.name}
               </h1>
-              <Edit2 className="w-3 h-3 text-[#f5f0e8]/30 group-hover/edit:text-[#c9a84c] transition-colors shrink-0" />
+              <Edit2 className="w-3 h-3 opacity-40 group-hover/edit:text-[#c9a84c] group-hover/edit:opacity-100 transition-all shrink-0" />
             </div>
           )}
 
           {/* Event count chip */}
-          <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.06] text-[11px] font-mono text-[#c9a84c]/80">
+          <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full theme-pill text-[11px] font-mono text-[#c9a84c] font-semibold">
             <Calendar className="w-3 h-3" />
             <span>
               {events.length} {events.length === 1 ? "event" : "events"}
@@ -380,7 +381,7 @@ export default function TimelinePage() {
             <button
               onClick={() => setShowExportMenu(!showExportMenu)}
               disabled={uploading}
-              className="w-9 h-9 rounded-xl bg-white/[0.03] border border-white/[0.1] hover:border-[#c9a84c]/40 text-[#f5f0e8]/80 hover:text-[#c9a84c] hover:bg-white/[0.06] transition-all flex items-center justify-center cursor-pointer disabled:opacity-50"
+              className="w-9 h-9 rounded-xl theme-pill hover:border-[#c9a84c]/50 flex items-center justify-center cursor-pointer transition-all disabled:opacity-50"
               title="Import & Export (JSON callset, PNG image, TXT file)"
               aria-label="Import & Export"
             >
@@ -388,24 +389,24 @@ export default function TimelinePage() {
             </button>
 
             {showExportMenu && (
-              <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl glass-panel p-1.5 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150 border border-white/[0.12]">
+              <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl glass-panel p-1.5 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                 <button
                   onClick={() => {
                     jsonInputRef.current?.click();
                     setShowExportMenu(false);
                   }}
-                  className="w-full px-3 py-2 text-left text-xs text-[#f5f0e8]/80 hover:text-[#f5f0e8] hover:bg-white/[0.06] rounded-xl transition-colors flex items-center gap-2.5 cursor-pointer font-mono"
+                  className="w-full px-3 py-2 text-left text-xs hover:bg-black/[0.05] dark:hover:bg-white/[0.06] rounded-xl transition-colors flex items-center gap-2.5 cursor-pointer font-mono theme-card-title"
                   title="Import timeline events from a JSON file"
                 >
                   <Upload className="w-3.5 h-3.5 text-[#5a9bd5]" />
                   <span>Import JSON Callset</span>
                 </button>
 
-                <div className="h-px bg-white/[0.06] my-1" />
+                <div className="h-px bg-black/[0.08] dark:bg-white/[0.06] my-1" />
 
                 <button
                   onClick={handleExportPng}
-                  className="w-full px-3 py-2 text-left text-xs text-[#f5f0e8]/80 hover:text-[#f5f0e8] hover:bg-white/[0.06] rounded-xl transition-colors flex items-center gap-2.5 cursor-pointer font-mono"
+                  className="w-full px-3 py-2 text-left text-xs hover:bg-black/[0.05] dark:hover:bg-white/[0.06] rounded-xl transition-colors flex items-center gap-2.5 cursor-pointer font-mono theme-card-title"
                   title="Export high-resolution 2x Retina PNG image"
                 >
                   <ImageIcon className="w-3.5 h-3.5 text-[#c9a84c]" />
@@ -414,10 +415,10 @@ export default function TimelinePage() {
 
                 <button
                   onClick={handleExportTxt}
-                  className="w-full px-3 py-2 text-left text-xs text-[#f5f0e8]/80 hover:text-[#f5f0e8] hover:bg-white/[0.06] rounded-xl transition-colors flex items-center gap-2.5 cursor-pointer font-mono"
+                  className="w-full px-3 py-2 text-left text-xs hover:bg-black/[0.05] dark:hover:bg-white/[0.06] rounded-xl transition-colors flex items-center gap-2.5 cursor-pointer font-mono theme-card-title"
                   title="Export chronological events as tabular plain text"
                 >
-                  <FileText className="w-3.5 h-3.5 text-[#7ab8a0]" />
+                  <FileText className="w-3.5 h-3.5 text-[#10b981]" />
                   <span>Export Tabular TXT</span>
                 </button>
               </div>
@@ -427,13 +428,13 @@ export default function TimelinePage() {
           {/* 2. Canvas Settings Small Icon Button (Beside Import/Export on the right) */}
           <button
             onClick={() => setShowSettings(true)}
-            className="w-9 h-9 rounded-xl bg-white/[0.03] border border-white/[0.1] hover:border-[#c9a84c]/40 text-[#f5f0e8]/80 hover:text-[#c9a84c] hover:bg-white/[0.06] transition-all flex items-center justify-center cursor-pointer relative"
+            className="w-9 h-9 rounded-xl theme-pill hover:border-[#c9a84c]/50 flex items-center justify-center cursor-pointer relative transition-all"
             title="Canvas Settings (Colors, Theme & Gap Year Borders)"
             aria-label="Canvas Settings"
           >
-            <Settings2 className="w-4 h-4" />
+            <Settings2 className="w-4 h-4 text-[#c9a84c]" />
             <div
-              className="w-1.5 h-1.5 rounded-full absolute bottom-1.5 right-1.5 ring-1 ring-[#070c16]"
+              className="w-1.5 h-1.5 rounded-full absolute bottom-1.5 right-1.5 ring-1 ring-black/20 dark:ring-[#070c16]"
               style={{ backgroundColor: timeline.spineColor }}
             />
           </button>
@@ -450,7 +451,7 @@ export default function TimelinePage() {
         </div>
       </div>
 
-      {/* Main Interactive Canvas Area */}
+      {/* Main Interactive Canvas Area (Retains custom canvas background) */}
       <div className="flex-1 mt-[112px] mb-[36px] relative">
         <TimelineRenderer
           events={events}
@@ -508,16 +509,16 @@ export default function TimelinePage() {
       )}
 
       {/* Studio Micro Footer Status Bar */}
-      <div className="fixed bottom-0 left-0 right-0 h-9 px-6 bg-[#070c16]/90 backdrop-blur-md border-t border-white/[0.06] z-40 flex items-center justify-between text-[11px] font-mono text-[#f5f0e8]/40">
+      <div className="fixed bottom-0 left-0 right-0 h-9 px-6 theme-footer z-40 flex items-center justify-between text-[11px] font-mono">
         <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1.5 text-emerald-400/80">
-            <CheckCircle2 className="w-3 h-3" />
+          <span className="flex items-center gap-1.5 text-emerald-500 font-semibold">
+            <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Synced</span>
           </span>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-[#f5f0e8]/50">Developed in Collaboration with Academia | Devnetra Consultancy</span>
+          <span>Developed in Collaboration with Academia | Devnetra Consultancy</span>
         </div>
       </div>
     </div>

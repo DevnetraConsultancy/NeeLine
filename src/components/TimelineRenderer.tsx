@@ -823,7 +823,7 @@ export default function TimelineRenderer({
             }}
           >
             <div
-              className="text-sm font-semibold text-[#f5f0e8]"
+              className="text-sm font-semibold theme-card-title"
               style={{ fontFamily: "var(--font-display)" }}
             >
               {item.title}
@@ -835,7 +835,7 @@ export default function TimelineRenderer({
               {formatDateLabel(item.year, item.isBce, item.month, item.day)}
             </div>
             {item.description && (
-              <div className="text-xs mt-1.5 text-[#f5f0e8]/70 leading-relaxed font-light">
+              <div className="text-xs mt-1.5 theme-text-muted leading-relaxed font-light">
                 {item.description}
               </div>
             )}
@@ -846,13 +846,13 @@ export default function TimelineRenderer({
       {/* Floating HUD: Top-Right Canvas Controls */}
       <div className="absolute top-4 right-4 flex items-center gap-2 z-30">
         {/* Layout Mode Segmented Toggle */}
-        <div className="flex items-center p-1 rounded-xl glass-panel text-[11px] font-mono shadow-lg border border-white/[0.08]">
+        <div className="flex items-center p-1 rounded-xl theme-hud text-[11px] font-mono shadow-lg">
           <button
             onClick={() => setLayoutMode("even")}
             className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
               layoutMode === "even"
-                ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/30 font-semibold"
-                : "text-[#f5f0e8]/50 hover:text-[#f5f0e8]"
+                ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/40 font-semibold"
+                : "theme-hud-btn"
             }`}
             title="Even spacing for maximum readability"
           >
@@ -862,8 +862,8 @@ export default function TimelineRenderer({
             onClick={() => setLayoutMode("proportional")}
             className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
               layoutMode === "proportional"
-                ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/30 font-semibold"
-                : "text-[#f5f0e8]/50 hover:text-[#f5f0e8]"
+                ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/40 font-semibold"
+                : "theme-hud-btn"
             }`}
             title="Proportional physical time scale"
           >
@@ -874,10 +874,10 @@ export default function TimelineRenderer({
         {/* Gaps Toggle Button */}
         <button
           onClick={() => setShowGaps((g) => !g)}
-          className={`h-8 px-3 rounded-xl glass-panel text-[11px] font-mono flex items-center gap-1.5 transition-all cursor-pointer border ${
+          className={`h-8 px-3 rounded-xl theme-hud text-[11px] font-mono flex items-center gap-1.5 transition-all cursor-pointer ${
             showGaps
-              ? "border-[#c9a84c]/40 text-[#c9a84c] bg-[#c9a84c]/10"
-              : "border-white/[0.08] text-[#f5f0e8]/40 hover:text-[#f5f0e8]/70"
+              ? "border-[#c9a84c]/50 text-[#c9a84c] bg-[#c9a84c]/15 font-semibold"
+              : "theme-hud-btn"
           }`}
           title="Toggle time span gap badges between consecutive events"
         >
@@ -887,25 +887,25 @@ export default function TimelineRenderer({
       </div>
 
       {/* Floating HUD: Bottom-Right Zoom & Fit Dock */}
-      <div className="absolute bottom-4 right-4 flex items-center gap-1.5 p-1 rounded-xl glass-panel border border-white/[0.08] shadow-2xl z-30 font-mono text-xs">
+      <div className="absolute bottom-4 right-4 flex items-center gap-1.5 p-1 rounded-xl theme-hud shadow-2xl z-30 font-mono text-xs">
         <button
           onClick={zoomOut}
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-[#f5f0e8]/60 hover:text-[#c9a84c] hover:bg-white/[0.06] transition-colors cursor-pointer"
+          className="w-8 h-8 rounded-lg flex items-center justify-center theme-hud-btn cursor-pointer"
           title="Zoom out (-)"
         >
           <ZoomOut className="w-4 h-4" />
         </button>
         <button
           onClick={zoomIn}
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-[#f5f0e8]/60 hover:text-[#c9a84c] hover:bg-white/[0.06] transition-colors cursor-pointer"
+          className="w-8 h-8 rounded-lg flex items-center justify-center theme-hud-btn cursor-pointer"
           title="Zoom in (+)"
         >
           <ZoomIn className="w-4 h-4" />
         </button>
-        <div className="w-px h-4 bg-white/[0.1] mx-0.5" />
+        <div className="w-px h-4 bg-black/10 dark:bg-white/10 mx-0.5" />
         <button
           onClick={fitAll}
-          className="px-2.5 h-8 rounded-lg flex items-center gap-1.5 text-[#c9a84c] hover:bg-[#c9a84c]/10 transition-colors cursor-pointer font-medium"
+          className="px-2.5 h-8 rounded-lg flex items-center gap-1.5 text-[#c9a84c] hover:bg-[#c9a84c]/10 transition-colors cursor-pointer font-semibold"
           title="Fit all milestones to canvas (Key: 0)"
         >
           <Maximize2 className="w-3.5 h-3.5" />
@@ -915,15 +915,15 @@ export default function TimelineRenderer({
 
       {/* Floating HUD: Bottom-Left Dynamic Coordinate Tracker */}
       <div className="absolute bottom-4 left-4 flex items-center gap-2 z-30 font-mono text-[11px] pointer-events-none">
-        <div className="px-3 py-1.5 rounded-xl glass-panel border border-white/[0.08] shadow-lg flex items-center gap-2.5 text-[#f5f0e8]/60">
+        <div className="px-3 py-1.5 rounded-xl theme-hud shadow-lg flex items-center gap-2.5">
           <span className="flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-[#c9a84c]" />
-            <span>Zoom: {Math.round(zoom * 100)}%</span>
+            <span className="font-medium">Zoom: {Math.round(zoom * 100)}%</span>
           </span>
           {cursorYear !== null && (
             <>
-              <span className="text-white/20">|</span>
-              <span className="text-[#c9a84c]">
+              <span className="opacity-30">|</span>
+              <span className="text-[#c9a84c] font-semibold">
                 Cursor: {Math.abs(cursorYear).toLocaleString()} {cursorYear < 0 ? "BCE" : "CE"}
               </span>
             </>

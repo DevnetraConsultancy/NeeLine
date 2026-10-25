@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useSession, signOut, signIn } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
+import { usePathname } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -15,9 +16,12 @@ import {
   LogIn,
 } from "lucide-react";
 import InfoButton from "@/components/InfoButton";
+import { loginWithGoogle } from "@/app/actions/auth";
 
 export default function Navbar() {
   const { data: session } = useSession();
+  const pathname = usePathname();
+  const isHome = pathname === "/";
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -69,7 +73,7 @@ export default function Navbar() {
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 h-14 flex items-center justify-between px-4 sm:px-8 theme-nav">
-      {/* Left: Brand logo & Homepage + Dashboard links */}
+      {/* Left: Brand logo & Navigation shortcuts (hidden on homepage) */}
       <div className="flex items-center gap-3 sm:gap-6">
         <Link href="/" className="flex items-center gap-2.5 sm:gap-3 group" title="NeeLine Homepage">
           <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#c9a84c] via-[#ebd48a] to-[#a3802c] p-[1.5px] shadow-[0_0_12px_rgba(201,168,76,0.3)] group-hover:shadow-[0_0_20px_rgba(201,168,76,0.5)] transition-all">
@@ -101,26 +105,28 @@ export default function Navbar() {
           </div>
         </Link>
 
-        {/* Global Navigation: Homepage & Dashboard links */}
-        <div className="flex items-center gap-1.5 pl-2 sm:pl-4 border-l border-black/10 dark:border-white/[0.1]">
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl theme-pill hover:border-[#c9a84c]/60 text-xs font-mono transition-all"
-            title="Go to Homepage"
-          >
-            <Home className="w-3.5 h-3.5 text-[#c9a84c]" />
-            <span className="hidden md:inline font-medium">Homepage</span>
-          </Link>
+        {/* Global Navigation: Homepage & Dashboard links (Shown ONLY on internal pages, removed from homepage) */}
+        {!isHome && (
+          <div className="flex items-center gap-1.5 pl-2 sm:pl-4 border-l border-black/10 dark:border-white/[0.1]">
+            <Link
+              href="/"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl theme-pill hover:border-[#c9a84c]/60 text-xs font-mono transition-all"
+              title="Go to Homepage"
+            >
+              <Home className="w-3.5 h-3.5 text-[#c9a84c]" />
+              <span className="hidden md:inline font-medium">Homepage</span>
+            </Link>
 
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl theme-pill hover:border-[#c9a84c]/60 text-xs font-mono transition-all"
-            title="Go to Workspace Dashboard"
-          >
-            <LayoutDashboard className="w-3.5 h-3.5 text-[#c9a84c]" />
-            <span className="hidden md:inline font-medium">Dashboard</span>
-          </Link>
-        </div>
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl theme-pill hover:border-[#c9a84c]/60 text-xs font-mono transition-all"
+              title="Go to Workspace Dashboard"
+            >
+              <LayoutDashboard className="w-3.5 h-3.5 text-[#c9a84c]" />
+              <span className="hidden md:inline font-medium">Dashboard</span>
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Right controls */}
@@ -206,14 +212,16 @@ export default function Navbar() {
             )}
           </div>
         ) : (
-          <button
-            onClick={() => signIn()}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl btn-ghost-gold text-xs font-mono cursor-pointer transition-all"
-            title="Sign in to your account"
-          >
-            <LogIn className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Sign In</span>
-          </button>
+          <form action={loginWithGoogle}>
+            <button
+              type="submit"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl btn-ghost-gold text-xs font-mono cursor-pointer transition-all shadow-sm"
+              title="Sign in with Google"
+            >
+              <LogIn className="w-3.5 h-3.5 text-[#c9a84c]" />
+              <span className="font-semibold">Sign In</span>
+            </button>
+          </form>
         )}
       </div>
     </nav>

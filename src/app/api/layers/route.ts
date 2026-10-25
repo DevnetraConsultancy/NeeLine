@@ -1,16 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-
-// Utility: parse layer name from stored description
-function parseLayer(rawDescription: string | null): { layer: string } {
-  if (!rawDescription) return { layer: "General" };
-  const match = rawDescription.match(/^<!--layer:([^>]+)-->/);
-  if (match) {
-    return { layer: match[1].trim() || "General" };
-  }
-  return { layer: "General" };
-}
+import { parseEventMetadata } from "@/lib/event-metadata";
 
 // GET /api/layers?timelineId=xxx - Discover layers from timeline events
 export async function GET(req: NextRequest) {
@@ -46,7 +37,7 @@ export async function GET(req: NextRequest) {
 
     // Extract layers from existing events
     for (const ev of timeline.events) {
-      const { layer } = parseLayer(ev.description);
+      const { layer } = parseEventMetadata(ev.description);
       if (!layerMap.has(layer)) {
         layerMap.set(layer, {
           id: `layer-${layer.toLowerCase().replace(/\s+/g, "-")}`,

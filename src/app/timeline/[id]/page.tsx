@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
-import TimelineRenderer, { LayerItem } from "@/components/TimelineRenderer";
+import TimelineRenderer, { LayerItem, TimelineRendererHandle } from "@/components/TimelineRenderer";
 import EventForm, { EventFormData } from "@/components/EventForm";
 import TimelineSettings from "@/components/TimelineSettings";
 import ConfirmModal from "@/components/ConfirmModal";
+import ImportModal from "@/components/ImportModal";
+import JsonSchemaModal from "@/components/JsonSchemaModal";
+import ChronicleNotesModal from "@/components/ChronicleNotesModal";
 import { exportTimelineAsPng, exportTimelineAsTxt } from "@/components/PngExport";
 import {
   ChevronLeft,
@@ -20,6 +23,8 @@ import {
   Calendar,
   CheckCircle2,
   Edit2,
+  BookOpen,
+  Code,
 } from "lucide-react";
 
 interface EventData {
@@ -28,6 +33,10 @@ interface EventData {
   isBce: boolean;
   month: number | null;
   day: number | null;
+  endYear?: number | null;
+  endIsBce?: boolean | null;
+  endMonth?: number | null;
+  endDay?: number | null;
   title: string;
   description: string | null;
   color: string;
@@ -60,17 +69,19 @@ export default function TimelinePage() {
   const [loading, setLoading] = useState(true);
 
   // Modal and custom states
+  const rendererRef = useRef<TimelineRendererHandle>(null);
   const [showEventForm, setShowEventForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventData | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showChronicleNotes, setShowChronicleNotes] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showJsonSchemaModal, setShowJsonSchemaModal] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState("");
-  const [uploading, setUploading] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showGapBorder, setShowGapBorder] = useState(true);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
 
-  const jsonInputRef = useRef<HTMLInputElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
   // Load gap border preference from localStorage
@@ -119,7 +130,11 @@ export default function TimelinePage() {
         return;
       }
 
-      const desc = found.description || (typeof window !== "undefined" ? localStorage.getItem(`neeline_desc_${timelineId}`) : null);
+      const desc =
+        found.description ||
+        (typeof window !== "undefined"
+          ? localStorage.getItem(`neeline_desc_${timelineId}`)
+          : null);
       setTimeline({ ...found, description: desc });
       setNameValue(found.name);
 
@@ -143,44 +158,30 @@ export default function TimelinePage() {
         try {
           const parsed = JSON.parse(savedLayers);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            // merge cached with fetched
             const map = new Map<string, LayerItem>();
             parsed.forEach((l: LayerItem) => map.set(l.name, l));
             fetchedLayers.forEach((l: LayerItem) => map.set(l.name, l));
             fetchedLayers = Array.from(map.values());
           }
         } catch {
-          // ignore cache parse errors
+          // ignore corrupted cache
         }
       }
 
-      // Ensure "General" layer exists
+      // Fallback: ensure General layer exists
       if (!fetchedLayers.some((l) => l.name === "General")) {
         fetchedLayers.unshift({ id: "layer-general", name: "General", color: "#c9a84c" });
       }
 
-      // Discover any distinct layers present in events
-      fetchedEvents.forEach((ev) => {
-        const evLayer = ev.layer || "General";
-        if (!fetchedLayers.some((l) => l.name === evLayer)) {
-          fetchedLayers.push({
-            id: `layer-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            name: evLayer,
-            color: ev.color || "#5a9bd5",
-          });
-        }
-      });
-
       setLayers(fetchedLayers);
-      localStorage.setItem(cachedLayersKey, JSON.stringify(fetchedLayers));
 
-      // Active layers
-      const activeKey = `neeline_active_layers_${timelineId}`;
-      const savedActive = localStorage.getItem(activeKey);
+      // Restore active layers preference
+      const savedActiveKey = `neeline_active_layers_${timelineId}`;
+      const savedActive = localStorage.getItem(savedActiveKey);
       if (savedActive) {
         try {
           const parsed = JSON.parse(savedActive);
-          if (Array.isArray(parsed)) {
+          if (Array.isArray(parsed) && parsed.length > 0) {
             setActiveLayerNames(parsed);
           } else {
             setActiveLayerNames(fetchedLayers.map((l) => l.name));
@@ -296,7 +297,7 @@ export default function TimelinePage() {
     [timelineId]
   );
 
-  // Save event (create or update)
+  // Save event (create or update, supports point milestones and horizontal bracket periods)
   const handleSaveEvent = useCallback(
     async (data: EventFormData) => {
       const isEdit = !!data.id;
@@ -314,6 +315,10 @@ export default function TimelinePage() {
         description: data.description || null,
         color: data.color,
         layer: data.layer || "General",
+        endYear: data.isSpan && data.endYear ? data.endYear : null,
+        endIsBce: data.isSpan ? Boolean(data.endIsBce) : null,
+        endMonth: data.isSpan && data.endMonth ? data.endMonth : null,
+        endDay: data.isSpan && data.endDay ? data.endDay : null,
       };
 
       await fetch(url, {
@@ -379,119 +384,150 @@ export default function TimelinePage() {
     });
     setEditingName(false);
     fetchData();
-  }, [nameValue, timeline, timelineId, fetchData]);
+  }, [nameValue, timeline?.name, timelineId, fetchData]);
 
-  // JSON upload handler
-  const handleJsonUpload = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      setUploading(true);
+  // Save Chronicle Overview Notes
+  const handleSaveChronicleNotes = useCallback(
+    async (updatedNotes: string) => {
       try {
-        const text = await file.text();
-        const data: unknown = JSON.parse(text);
-        const rawItems = Array.isArray(data)
-          ? data
-          : data && typeof data === "object" && "events" in data && Array.isArray(data.events)
-            ? data.events
-            : [];
-        const items = rawItems.filter(
-          (item): item is Record<string, unknown> =>
-            typeof item === "object" && item !== null
-        );
-        if (items.length > 0) {
-          const res = await fetch("/api/events", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              timelineId,
-              events: items.map((item) => ({
-                year: typeof item.year === "number" ? Math.abs(item.year) : 0,
-                isBce: typeof item.isBce === "boolean" ? item.isBce : false,
-                month: typeof item.month === "number" ? item.month : null,
-                day: typeof item.day === "number" ? item.day : null,
-                title: typeof item.title === "string" && item.title.trim() ? item.title.trim() : "Untitled",
-                description: typeof item.description === "string" ? item.description.trim() : null,
-                color: typeof item.color === "string" && item.color.startsWith("#") ? item.color : "#c9a84c",
-                layer: typeof item.layer === "string" && item.layer.trim() ? item.layer.trim() : "General",
-              })),
-            }),
-          });
-          if (!res.ok) throw new Error("Batch import failed");
-        }
-        fetchData();
+        await fetch(`/api/timelines?id=${timelineId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ description: updatedNotes }),
+        });
+        localStorage.setItem(`neeline_desc_${timelineId}`, updatedNotes);
+        setTimeline((prev) => (prev ? { ...prev, description: updatedNotes } : null));
+        setNoticeMessage("Chronicle notes updated successfully.");
       } catch {
-        setNoticeMessage("Invalid JSON file. Expected an array of milestone events.");
-      } finally {
-        setUploading(false);
-        if (jsonInputRef.current) jsonInputRef.current.value = "";
+        setNoticeMessage("Failed to save chronicle notes. Please try again.");
       }
     },
-    [timelineId, fetchData]
+    [timelineId]
   );
 
-  // PNG export handler
-  const handleExportPng = useCallback(() => {
-    let svg: SVGSVGElement | null = document.getElementById("timeline-canvas-svg") as SVGSVGElement | null;
-    if (!svg) {
-      let maxArea = 0;
-      document.querySelectorAll("svg").forEach((s) => {
-        const r = s.getBoundingClientRect();
-        const area = r.width * r.height;
-        if (area > maxArea) {
-          maxArea = area;
-          svg = s as SVGSVGElement;
-        }
-      });
-    }
-    if (!svg) return;
-    exportTimelineAsPng(
-      svg,
-      timeline?.bgColor || "#070c16",
-      `${timeline?.name || "timeline"}.png`
-    );
+  // Export as Full JSON Callset
+  const handleExportJson = useCallback(() => {
+    if (!timeline) return;
+
+    const payload = {
+      format: "neeline-chronicle-v1",
+      exportedAt: new Date().toISOString(),
+      timeline: {
+        name: timeline.name,
+        description: timeline.description || null,
+        bgColor: timeline.bgColor,
+        spineColor: timeline.spineColor,
+        tickColor: timeline.tickColor,
+        textColor: timeline.textColor,
+      },
+      layers: layers.map((l) => ({ name: l.name, color: l.color })),
+      events: events.map((e) => ({
+        title: e.title,
+        year: e.year,
+        isBce: e.isBce,
+        month: e.month,
+        day: e.day,
+        endYear: e.endYear || null,
+        endIsBce: e.endIsBce || null,
+        endMonth: e.endMonth || null,
+        endDay: e.endDay || null,
+        color: e.color,
+        layer: e.layer || "General",
+        description: e.description,
+      })),
+    };
+
+    const jsonStr = JSON.stringify(payload, null, 2);
+    const blob = new Blob([jsonStr], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${timeline.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-chronicle.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
     setShowExportMenu(false);
+  }, [timeline, layers, events]);
+
+  // Export as 2x Retina PNG (Automatically fits entire viewport and all events!)
+  const handleExportPng = useCallback(() => {
+    if (!timeline) return;
+    setShowExportMenu(false);
+    const filename = `${timeline.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-full-chronicle.png`;
+    if (rendererRef.current) {
+      rendererRef.current.exportPng(filename);
+    } else {
+      const svgEl = document.getElementById("timeline-canvas-svg") as SVGSVGElement | null;
+      if (svgEl) {
+        exportTimelineAsPng(svgEl, timeline.bgColor, filename);
+      }
+    }
   }, [timeline]);
 
-  // TXT export handler
+  // Export as Tabular Plain Text
   const handleExportTxt = useCallback(() => {
-    exportTimelineAsTxt(events, `${timeline?.name || "timeline"}.txt`);
+    if (!timeline) return;
+    const filename = `${timeline.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-events.txt`;
+    exportTimelineAsTxt(events, filename);
     setShowExportMenu(false);
   }, [events, timeline]);
 
+  // Stats for Chronicle Notes Modal
+  const spanCount = useMemo(
+    () => events.filter((e) => e.endYear !== undefined && e.endYear !== null).length,
+    [events]
+  );
+
+  const { earliestDate, latestDate } = useMemo(() => {
+    if (events.length === 0) return { earliestDate: undefined, latestDate: undefined };
+    const sorted = [...events].sort((a, b) => {
+      const ya = a.isBce ? -Math.abs(a.year) : a.year;
+      const yb = b.isBce ? -Math.abs(b.year) : b.year;
+      return ya - yb;
+    });
+    const earliest = sorted[0];
+    const latest = sorted[sorted.length - 1];
+    return {
+      earliestDate: `${earliest.year} ${earliest.isBce ? "BCE" : "CE"}`,
+      latestDate: `${latest.year} ${latest.isBce ? "BCE" : "CE"}`,
+    };
+  }, [events]);
+
   if (loading || !timeline) {
     return (
-      <div className="h-screen theme-bg flex flex-col items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#c9a84c]/30 border-t-[#c9a84c] rounded-full animate-spin mb-4" />
-        <div className="text-xs font-mono theme-text-muted">Initializing Timeline Studio...</div>
+      <div className="min-h-screen theme-bg flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-[#c9a84c]/30 border-t-[#c9a84c] rounded-full animate-spin" />
+          <span className="text-xs font-mono theme-text-muted">Loading Chronicle Studio...</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen theme-bg flex flex-col overflow-hidden select-none">
+    <div className="min-h-screen theme-bg flex flex-col overflow-hidden select-none">
       <Navbar />
 
-      {/* Studio Header Sub-bar */}
-      <div className="fixed top-14 left-0 right-0 z-40 h-14 flex items-center justify-between px-4 sm:px-8 theme-subnav">
-        {/* Left: Breadcrumbs & Editable Title */}
+      {/* Studio Header Bar */}
+      <div className="fixed top-14 left-0 right-0 h-14 px-4 sm:px-6 z-40 border-b border-black/[0.08] dark:border-white/[0.08] glass-panel flex items-center justify-between gap-3">
+        {/* Left Side: Back button, Name edit & Event counter & Chronicle Notes */}
         <div className="flex items-center gap-3 min-w-0">
           <Link
             href="/dashboard"
-            className="flex items-center gap-1 text-xs font-mono theme-pill hover:border-[#c9a84c]/50 transition-colors shrink-0 px-2.5 py-1.5 rounded-xl"
-            title="Return to Workspace Dashboard"
+            className="w-9 h-9 rounded-xl theme-pill hover:border-[#c9a84c]/50 flex items-center justify-center shrink-0 transition-colors"
+            title="Return to Dashboard"
           >
-            <ChevronLeft className="w-3.5 h-3.5 text-[#c9a84c]" />
-            <span className="hidden sm:inline">Dashboard</span>
+            <ChevronLeft className="w-4 h-4" />
           </Link>
 
-          <span className="opacity-30 text-xs">/</span>
-
+          {/* Timeline Name inline editable */}
           {editingName ? (
             <input
-              autoFocus
+              type="text"
               value={nameValue}
               onChange={(e) => setNameValue(e.target.value)}
+              autoFocus
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleRename();
                 if (e.key === "Escape") {
@@ -520,61 +556,80 @@ export default function TimelinePage() {
           )}
 
           {/* Event count chip */}
-          <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full theme-pill text-[11px] font-mono text-[#c9a84c] font-semibold">
+          <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full theme-pill text-[11px] font-mono text-[#c9a84c] font-semibold">
             <Calendar className="w-3 h-3" />
             <span>
               {events.length} {events.length === 1 ? "event" : "events"}
             </span>
           </span>
+
+          {/* Premium Chronicle Notes Mechanism Button */}
+          <button
+            onClick={() => setShowChronicleNotes(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl theme-pill hover:border-[#c9a84c]/60 text-xs font-mono transition-all cursor-pointer text-[#c9a84c] group shrink-0"
+            title="View & Edit Chronicle Notes (Scope, Overview & Context)"
+            aria-label="Chronicle Notes"
+          >
+            <BookOpen className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+            <span className="font-medium hidden md:inline">Chronicle Notes</span>
+            <span className="font-medium md:hidden">Notes</span>
+            {timeline.description ? (
+              <span className="w-1.5 h-1.5 rounded-full bg-[#c9a84c] shadow-[0_0_6px_rgba(201,168,76,0.8)]" />
+            ) : null}
+          </button>
         </div>
 
         {/* Right Studio Action Icons: Import/Export -> Canvas Settings -> Add Event */}
         <div className="flex items-center gap-2 shrink-0">
-          <input
-            ref={jsonInputRef}
-            type="file"
-            accept=".json"
-            onChange={handleJsonUpload}
-            className="hidden"
-          />
-
           {/* 1. Import / Export Small Icon Button */}
           <div className="relative" ref={exportMenuRef}>
             <button
               onClick={() => setShowExportMenu(!showExportMenu)}
-              disabled={uploading}
-              className="w-9 h-9 rounded-xl theme-pill hover:border-[#c9a84c]/50 flex items-center justify-center cursor-pointer transition-all disabled:opacity-50"
-              title="Import & Export (JSON callset, PNG image, TXT file)"
+              className="w-9 h-9 rounded-xl theme-pill hover:border-[#c9a84c]/50 flex items-center justify-center cursor-pointer transition-all"
+              title="Import & Export (JSON callset, PNG image, Schema, TXT)"
               aria-label="Import & Export"
             >
               <Download className="w-4 h-4 text-[#c9a84c]" />
             </button>
 
             {showExportMenu && (
-              <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl glass-panel p-1.5 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150 border border-black/10 dark:border-white/[0.08]">
+              <div className="absolute right-0 top-full mt-2 w-64 rounded-2xl glass-panel p-2 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150 border border-black/10 dark:border-white/[0.1]">
+                {/* Option 1: Import as JSON (with Layer Option) */}
                 <button
                   onClick={() => {
-                    jsonInputRef.current?.click();
                     setShowExportMenu(false);
+                    setShowImportModal(true);
                   }}
                   className="w-full px-3 py-2 text-left text-xs hover:bg-black/[0.05] dark:hover:bg-white/[0.06] rounded-xl transition-colors flex items-center gap-2.5 cursor-pointer font-mono theme-card-title"
-                  title="Import timeline events from a JSON file"
+                  title="Import timeline events with layer routing options"
                 >
                   <Upload className="w-3.5 h-3.5 text-[#5a9bd5]" />
-                  <span>Import JSON Callset</span>
+                  <span>Import as JSON...</span>
+                </button>
+
+                {/* Option 2: Export as JSON */}
+                <button
+                  onClick={handleExportJson}
+                  className="w-full px-3 py-2 text-left text-xs hover:bg-black/[0.05] dark:hover:bg-white/[0.06] rounded-xl transition-colors flex items-center gap-2.5 cursor-pointer font-mono theme-card-title"
+                  title="Export complete chronicle callset as JSON"
+                >
+                  <Download className="w-3.5 h-3.5 text-[#c9a84c]" />
+                  <span>Export as JSON</span>
                 </button>
 
                 <div className="h-px bg-black/[0.08] dark:bg-white/[0.06] my-1" />
 
+                {/* Option 3: Export 2x Retina PNG (Fit Viewport, All Events) */}
                 <button
                   onClick={handleExportPng}
                   className="w-full px-3 py-2 text-left text-xs hover:bg-black/[0.05] dark:hover:bg-white/[0.06] rounded-xl transition-colors flex items-center gap-2.5 cursor-pointer font-mono theme-card-title"
-                  title="Export high-resolution 2x Retina PNG image"
+                  title="Fit canvas to all events and export high-resolution 2x Retina PNG image"
                 >
-                  <ImageIcon className="w-3.5 h-3.5 text-[#c9a84c]" />
+                  <ImageIcon className="w-3.5 h-3.5 text-[#38bdf8]" />
                   <span>Export 2x Retina PNG</span>
                 </button>
 
+                {/* Option 4: Export Tabular TXT */}
                 <button
                   onClick={handleExportTxt}
                   className="w-full px-3 py-2 text-left text-xs hover:bg-black/[0.05] dark:hover:bg-white/[0.06] rounded-xl transition-colors flex items-center gap-2.5 cursor-pointer font-mono theme-card-title"
@@ -582,6 +637,21 @@ export default function TimelinePage() {
                 >
                   <FileText className="w-3.5 h-3.5 text-[#10b981]" />
                   <span>Export Tabular TXT</span>
+                </button>
+
+                <div className="h-px bg-black/[0.08] dark:bg-white/[0.06] my-1" />
+
+                {/* Option 5: JSON Schema & Template Spec */}
+                <button
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    setShowJsonSchemaModal(true);
+                  }}
+                  className="w-full px-3 py-2 text-left text-xs hover:bg-black/[0.05] dark:hover:bg-white/[0.06] rounded-xl transition-colors flex items-center gap-2.5 cursor-pointer font-mono text-[#c9a84c]"
+                  title="View JSON format specification and download starter template"
+                >
+                  <Code className="w-3.5 h-3.5" />
+                  <span>Import JSON Schema</span>
                 </button>
               </div>
             )}
@@ -608,7 +678,7 @@ export default function TimelinePage() {
               setShowEventForm(true);
             }}
             className="btn-gold w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer shadow-md"
-            title="Add Chronicle Milestone"
+            title="Add Chronicle Milestone or Bracketed Period"
             aria-label="Add Chronicle Milestone"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
@@ -619,6 +689,7 @@ export default function TimelinePage() {
       {/* Main Interactive Canvas Area */}
       <div className="flex-1 mt-[112px] mb-[36px] relative">
         <TimelineRenderer
+          ref={rendererRef}
           events={events}
           bgColor={timeline.bgColor}
           spineColor={timeline.spineColor}
@@ -638,7 +709,7 @@ export default function TimelinePage() {
         />
       </div>
 
-      {/* Event Add/Edit Modal: ONLY 'X' closes it */}
+      {/* Event Add/Edit Modal: Supports Point Milestones & Horizontal Bracket Spans */}
       {showEventForm && (
         <EventForm
           initialData={
@@ -653,9 +724,15 @@ export default function TimelinePage() {
                   description: editingEvent.description || "",
                   color: editingEvent.color,
                   layer: editingEvent.layer || "General",
+                  isSpan: Boolean(editingEvent.endYear !== undefined && editingEvent.endYear !== null),
+                  endYear: editingEvent.endYear !== undefined && editingEvent.endYear !== null ? String(editingEvent.endYear) : "",
+                  endIsBce: editingEvent.endIsBce || false,
+                  endMonth: editingEvent.endMonth ? String(editingEvent.endMonth) : "",
+                  endDay: editingEvent.endDay ? String(editingEvent.endDay) : "",
                 }
               : undefined
           }
+          existingEvents={events}
           availableLayers={layers}
           onCreateLayer={handleCreateLayer}
           onSave={handleSaveEvent}
@@ -667,7 +744,7 @@ export default function TimelinePage() {
         />
       )}
 
-      {/* Canvas Settings Modal (Renamed from TimelineSettings) */}
+      {/* Canvas Settings Modal */}
       {showSettings && (
         <TimelineSettings
           bgColor={timeline.bgColor}
@@ -680,6 +757,44 @@ export default function TimelinePage() {
           onClose={() => setShowSettings(false)}
         />
       )}
+
+      {/* Chronicle Overview Notes Modal */}
+      {timeline && (
+        <ChronicleNotesModal
+          isOpen={showChronicleNotes}
+          timelineName={timeline.name}
+          notes={timeline.description || ""}
+          eventsCount={events.length}
+          spanCount={spanCount}
+          layersCount={layers.length}
+          earliestDate={earliestDate}
+          latestDate={latestDate}
+          onSaveNotes={handleSaveChronicleNotes}
+          onClose={() => setShowChronicleNotes(false)}
+        />
+      )}
+
+      {/* Import JSON Modal with Layer Option */}
+      <ImportModal
+        isOpen={showImportModal}
+        timelineId={timelineId}
+        availableLayers={layers}
+        onImportComplete={(count, newLayer) => {
+          if (newLayer) {
+            setLayers((prev) => [...prev, newLayer]);
+            setActiveLayerNames((prev) => [...prev, newLayer.name]);
+          }
+          fetchData();
+          setNoticeMessage(`Successfully imported ${count} events into the chronicle.`);
+        }}
+        onClose={() => setShowImportModal(false)}
+      />
+
+      {/* JSON Schema & Template Spec Modal */}
+      <JsonSchemaModal
+        isOpen={showJsonSchemaModal}
+        onClose={() => setShowJsonSchemaModal(false)}
+      />
 
       {/* In-Viewport Notification / Error Modal */}
       <ConfirmModal

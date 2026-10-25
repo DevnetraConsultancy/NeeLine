@@ -1,29 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-
-// Utility: parse layer name from stored description
-function parseLayer(rawDescription: string | null): { layer: string; description: string | null } {
-  if (!rawDescription) return { layer: "General", description: null };
-  const match = rawDescription.match(/^<!--layer:([^>]+)-->([\s\S]*)$/);
-  if (match) {
-    return {
-      layer: match[1].trim() || "General",
-      description: match[2].trim() || null,
-    };
-  }
-  return { layer: "General", description: rawDescription };
-}
-
-// Utility: encode layer name into stored description
-function serializeLayer(layer: string | undefined | null, description: string | null): string | null {
-  const safeLayer = layer && layer.trim() && layer.trim() !== "General" ? layer.trim() : null;
-  const safeDesc = description ? description.trim() : "";
-  if (safeLayer) {
-    return `<!--layer:${safeLayer}-->${safeDesc}`;
-  }
-  return safeDesc || null;
-}
+import {
+  parseEventMetadata,
+  serializeEventMetadata,
+} from "@/lib/event-metadata";
 
 // GET /api/events?timelineId=xxx
 export async function GET(req: NextRequest) {
@@ -51,13 +32,17 @@ export async function GET(req: NextRequest) {
       where: { timelineId },
     });
 
-    // Parse layer metadata out of description
+    // Parse layer and span metadata out of description
     const events = rawEvents.map((e) => {
-      const parsed = parseLayer(e.description);
+      const parsed = parseEventMetadata(e.description);
       return {
         ...e,
         layer: parsed.layer,
         description: parsed.description,
+        endYear: parsed.endYear,
+        endIsBce: parsed.endIsBce,
+        endMonth: parsed.endMonth,
+        endDay: parsed.endDay,
       };
     });
 
@@ -109,18 +94,34 @@ export async function POST(req: NextRequest) {
         description?: string | null;
         color?: string;
         layer?: string | null;
+        endYear?: number | string | null;
+        endIsBce?: boolean | null;
+        endMonth?: number | string | null;
+        endDay?: number | string | null;
       }
 
-      const createData = (body.events as RawEventItem[]).map((e) => ({
-        timelineId: body.timelineId as string,
-        year: Math.abs(parseInt(String(e.year || 0), 10)),
-        isBce: Boolean(e.isBce),
-        month: e.month ? Math.min(12, Math.max(1, parseInt(String(e.month), 10))) : null,
-        day: e.day ? Math.min(31, Math.max(1, parseInt(String(e.day), 10))) : null,
-        title: String(e.title || "Untitled").trim(),
-        description: serializeLayer(e.layer, e.description || null),
-        color: typeof e.color === "string" && e.color.startsWith("#") ? e.color : "#c9a84c",
-      }));
+      const createData = (body.events as RawEventItem[]).map((e) => {
+        const hasSpan = e.endYear !== undefined && e.endYear !== null && String(e.endYear).trim() !== "";
+        return {
+          timelineId: body.timelineId as string,
+          year: Math.abs(parseInt(String(e.year || 0), 10)),
+          isBce: Boolean(e.isBce),
+          month: e.month ? Math.min(12, Math.max(1, parseInt(String(e.month), 10))) : null,
+          day: e.day ? Math.min(31, Math.max(1, parseInt(String(e.day), 10))) : null,
+          title: String(e.title || "Untitled").trim(),
+          description: serializeEventMetadata(
+            {
+              layer: e.layer,
+              endYear: hasSpan ? Math.abs(parseInt(String(e.endYear), 10)) : null,
+              endIsBce: hasSpan ? Boolean(e.endIsBce) : null,
+              endMonth: e.endMonth ? Math.min(12, Math.max(1, parseInt(String(e.endMonth), 10))) : null,
+              endDay: e.endDay ? Math.min(31, Math.max(1, parseInt(String(e.endDay), 10))) : null,
+            },
+            e.description || null
+          ),
+          color: typeof e.color === "string" && e.color.startsWith("#") ? e.color : "#c9a84c",
+        };
+      });
 
       await prisma.event.createMany({
         data: createData,
@@ -135,7 +136,21 @@ export async function POST(req: NextRequest) {
     }
 
     // Single event creation
-    const { timelineId, year, isBce, month, day, title, description, color, layer } = body;
+    const {
+      timelineId,
+      year,
+      isBce,
+      month,
+      day,
+      title,
+      description,
+      color,
+      layer,
+      endYear,
+      endIsBce,
+      endMonth,
+      endDay,
+    } = body;
 
     if (!timelineId || year === undefined || !title) {
       return NextResponse.json(
@@ -152,7 +167,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Timeline not found" }, { status: 404 });
     }
 
-    const fullDescription = serializeLayer(layer, description || null);
+    const hasSpan = endYear !== undefined && endYear !== null && String(endYear).trim() !== "";
+    const fullDescription = serializeEventMetadata(
+      {
+        layer,
+        endYear: hasSpan ? Math.abs(parseInt(String(endYear), 10)) : null,
+        endIsBce: hasSpan ? Boolean(endIsBce) : null,
+        endMonth: endMonth ? Math.min(12, Math.max(1, parseInt(String(endMonth), 10))) : null,
+        endDay: endDay ? Math.min(31, Math.max(1, parseInt(String(endDay), 10))) : null,
+      },
+      description || null
+    );
 
     const event = await prisma.event.create({
       data: {
@@ -173,7 +198,7 @@ export async function POST(req: NextRequest) {
       data: { updatedAt: new Date() },
     });
 
-    const parsed = parseLayer(event.description);
+    const parsed = parseEventMetadata(event.description);
     return NextResponse.json({ ...event, ...parsed }, { status: 201 });
   } catch (error) {
     console.error("POST /api/events error:", error);
@@ -224,11 +249,44 @@ export async function PATCH(req: NextRequest) {
       data.color = typeof body.color === "string" && body.color.startsWith("#") ? body.color : "#c9a84c";
     }
 
-    if (body.description !== undefined || body.layer !== undefined) {
-      const parsed = parseLayer(existing.description);
+    if (
+      body.description !== undefined ||
+      body.layer !== undefined ||
+      body.endYear !== undefined ||
+      body.endIsBce !== undefined ||
+      body.endMonth !== undefined ||
+      body.endDay !== undefined
+    ) {
+      const parsed = parseEventMetadata(existing.description);
       const nextDesc = body.description !== undefined ? body.description : parsed.description;
       const nextLayer = body.layer !== undefined ? body.layer : parsed.layer;
-      data.description = serializeLayer(nextLayer, nextDesc);
+      const nextEndYear =
+        body.endYear !== undefined
+          ? body.endYear !== null && String(body.endYear).trim() !== ""
+            ? Math.abs(parseInt(String(body.endYear), 10))
+            : null
+          : parsed.endYear;
+      const nextEndIsBce =
+        body.endIsBce !== undefined ? (nextEndYear !== null ? Boolean(body.endIsBce) : null) : parsed.endIsBce;
+      const nextEndMonth =
+        body.endMonth !== undefined
+          ? body.endMonth ? Math.min(12, Math.max(1, parseInt(String(body.endMonth), 10))) : null
+          : parsed.endMonth;
+      const nextEndDay =
+        body.endDay !== undefined
+          ? body.endDay ? Math.min(31, Math.max(1, parseInt(String(body.endDay), 10))) : null
+          : parsed.endDay;
+
+      data.description = serializeEventMetadata(
+        {
+          layer: nextLayer,
+          endYear: nextEndYear,
+          endIsBce: nextEndIsBce,
+          endMonth: nextEndMonth,
+          endDay: nextEndDay,
+        },
+        nextDesc
+      );
     }
 
     const updated = await prisma.event.update({
@@ -242,7 +300,7 @@ export async function PATCH(req: NextRequest) {
       data: { updatedAt: new Date() },
     });
 
-    const parsed = parseLayer(updated.description);
+    const parsed = parseEventMetadata(updated.description);
     return NextResponse.json({ ...updated, ...parsed });
   } catch (error) {
     console.error("PATCH /api/events error:", error);

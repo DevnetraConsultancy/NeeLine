@@ -1,7 +1,16 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { layoutLabels, formatDateLabel, TIER_SPACING } from "@/lib/timeline-layout";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
+import { layoutLabels, formatDateLabel, formatSpanLabel, TIER_SPACING, LayoutItem } from "@/lib/timeline-layout";
+import { exportTimelineAsPng } from "@/components/PngExport";
 import {
   ZoomIn,
   ZoomOut,
@@ -11,6 +20,8 @@ import {
   Trash2,
   CheckSquare,
   Square,
+  X,
+  Sparkles,
 } from "lucide-react";
 
 export interface LayerItem {
@@ -25,10 +36,19 @@ export interface EventData {
   isBce: boolean;
   month: number | null;
   day: number | null;
+  endYear?: number | null;
+  endIsBce?: boolean | null;
+  endMonth?: number | null;
+  endDay?: number | null;
   title: string;
   description: string | null;
   color: string;
   layer?: string | null;
+}
+
+export interface TimelineRendererHandle {
+  fitAll: () => void;
+  exportPng: (filename: string) => void;
 }
 
 interface TimelineRendererProps {
@@ -66,21 +86,25 @@ const PRESET_LAYER_COLORS = [
   "#f472b6", // Rose Quartz
 ];
 
-export default function TimelineRenderer({
-  events,
-  bgColor,
-  spineColor,
-  tickColor,
-  textColor,
-  showGapBorder = true,
-  layers = [],
-  activeLayerNames = [],
-  onToggleLayer,
-  onToggleAllLayers,
-  onCreateLayer,
-  onDeleteLayer,
-  onEventClick,
-}: TimelineRendererProps) {
+const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProps>(
+  function TimelineRenderer(
+    {
+      events,
+      bgColor,
+      spineColor,
+      tickColor,
+      textColor,
+      showGapBorder = true,
+      layers = [],
+      activeLayerNames = [],
+      onToggleLayer,
+      onToggleAllLayers,
+      onCreateLayer,
+      onDeleteLayer,
+      onEventClick,
+    },
+    ref
+  ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 1200, height: 800 });
   const [zoom, setZoom] = useState(1);
@@ -91,6 +115,7 @@ export default function TimelineRenderer({
   const [showGaps, setShowGaps] = useState(true);
   const [cursorYear, setCursorYear] = useState<number | null>(null);
   const [cursorX, setCursorX] = useState<number | null>(null);
+  const [selectedNoteEvent, setSelectedNoteEvent] = useState<LayoutItem | null>(null);
 
   // Layers Popover Menu state
   const [showLayersMenu, setShowLayersMenu] = useState(false);
@@ -322,6 +347,11 @@ export default function TimelineRenderer({
     if (visibleEvents.length === 0) return;
     if (layoutMode === "proportional") {
       const years = visibleEvents.map((e) => (e.isBce ? -Math.abs(e.year) : e.year));
+      visibleEvents.forEach((e) => {
+        if (e.endYear !== undefined && e.endYear !== null) {
+          years.push(e.endIsBce ? -Math.abs(e.endYear) : e.endYear);
+        }
+      });
       years.push(0);
       const minYear = Math.min(...years);
       const maxYear = Math.max(...years);
@@ -348,6 +378,27 @@ export default function TimelineRenderer({
     setZoom(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom)));
     setPanX(0);
   }, [visibleEvents, layoutMode, dimensions.width]);
+
+  // Export full timeline fitted as 2x Retina PNG
+  const exportPng = useCallback(
+    (filename: string) => {
+      fitAll();
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const svgEl = document.getElementById("timeline-canvas-svg") as SVGSVGElement | null;
+          if (svgEl) {
+            exportTimelineAsPng(svgEl, bgColor, filename);
+          }
+        });
+      });
+    },
+    [fitAll, bgColor]
+  );
+
+  useImperativeHandle(ref, () => ({
+    fitAll,
+    exportPng,
+  }));
 
   // Auto-fit on first load and when visible events change
   const prevEventCount = useRef(visibleEvents.length);
@@ -488,6 +539,7 @@ export default function TimelineRenderer({
     if (hasDragged.current) return;
     setShowLayersMenu(false);
     setHoveredEvent(null);
+    setSelectedNoteEvent(null);
   }, []);
 
   // Zoom In / Zoom Out functions
@@ -692,153 +744,369 @@ export default function TimelineRenderer({
               })}
 
             {/* Event ticks, connectors, and cards */}
-            {layoutItems.map((item) => (
-              <g key={item.eventId} className="event-group">
-                {/* Vertical tick on axis with layer's unique color */}
-                <line
-                  x1={item.x}
-                  y1={spineY - TICK_HEIGHT / 2}
-                  x2={item.x}
-                  y2={spineY + TICK_HEIGHT / 2}
-                  stroke={item.color}
-                  strokeWidth="2.5"
-                  opacity="0.95"
-                />
+            {layoutItems.map((item) => {
+              if (item.isSpan) {
+                const x1 = item.x1 ?? item.x;
+                const x2 = item.x2 ?? item.x;
+                const bracketY = spineY - 75 - (item.bracketTier || 0) * 38;
+                const labelW = Math.max(80, item.labelWidth);
 
-                {/* Spine dot node with layer's unique color */}
-                <circle
-                  cx={item.x}
-                  cy={spineY}
-                  r="3.5"
-                  fill={item.color}
-                  stroke={bgColor}
-                  strokeWidth="1.5"
-                />
-
-                {item.collapsed ? (
-                  // Collapsed dot with rich tooltip
-                  <g
-                    onMouseEnter={() => {
-                      setHoveredEvent(item.eventId);
-                      setTooltipPos({ x: item.x, y: spineY });
-                    }}
-                    onMouseLeave={() => setHoveredEvent(null)}
-                    style={{ cursor: "pointer" }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!hasDragged.current) {
-                        onEventClick({
-                          id: item.eventId,
-                          year: item.year,
-                          isBce: item.isBce,
-                          month: item.month,
-                          day: item.day,
-                          title: item.title,
-                          description: item.description,
-                          color: item.color,
-                          layer: item.layer,
-                        });
-                      }
-                    }}
-                  >
-                    {/* Vertical guideline */}
+                return (
+                  <g key={item.eventId} className="bracket-period-group">
+                    {/* Projection drop-lines down to the golden spine */}
                     <line
-                      x1={item.x}
-                      y1={spineY - TICK_HEIGHT / 2}
-                      x2={item.x}
-                      y2={spineY - TICK_HEIGHT / 2 - 8 - item.tier * TIER_SPACING}
+                      x1={x1}
+                      y1={bracketY + 12}
+                      x2={x1}
+                      y2={spineY}
                       stroke={item.color}
                       strokeWidth="1"
-                      strokeDasharray="2 2"
-                      opacity="0.5"
+                      strokeDasharray="2 3"
+                      opacity="0.35"
                     />
-                    {/* Collapsed glowing node */}
-                    <circle
-                      cx={item.x}
-                      cy={spineY - TICK_HEIGHT / 2 - DOT_RADIUS - 6 - item.tier * TIER_SPACING}
-                      r={DOT_RADIUS}
-                      fill={item.color}
-                      stroke={bgColor}
-                      strokeWidth="1.5"
-                      opacity="0.95"
-                    />
-                  </g>
-                ) : (
-                  // Full Label Card with Layer's Unique Line & Border Color
-                  <g
-                    style={{ cursor: "pointer" }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!hasDragged.current) {
-                        onEventClick({
-                          id: item.eventId,
-                          year: item.year,
-                          isBce: item.isBce,
-                          month: item.month,
-                          day: item.day,
-                          title: item.title,
-                          description: item.description,
-                          color: item.color,
-                          layer: item.layer,
-                        });
-                      }
-                    }}
-                  >
-                    {/* Connector line with layer color */}
                     <line
-                      x1={item.x}
-                      y1={spineY - TICK_HEIGHT / 2}
-                      x2={item.x}
-                      y2={spineY - TICK_HEIGHT / 2 - 8 - item.tier * TIER_SPACING}
+                      x1={x2}
+                      y1={bracketY + 12}
+                      x2={x2}
+                      y2={spineY}
                       stroke={item.color}
-                      strokeWidth="1.5"
-                      opacity="0.8"
+                      strokeWidth="1"
+                      strokeDasharray="2 3"
+                      opacity="0.35"
                     />
 
-                    {/* Card background with layer's unique border color */}
-                    <rect
-                      x={item.x - item.labelWidth / 2}
-                      y={spineY - TICK_HEIGHT / 2 - 26 - item.tier * TIER_SPACING}
-                      width={item.labelWidth}
-                      height="24"
-                      rx="6"
-                      fill={bgColor}
+                    {/* Spine dots at start and end coordinates */}
+                    <circle cx={x1} cy={spineY} r="3" fill={item.color} stroke={bgColor} strokeWidth="1.5" />
+                    <circle cx={x2} cy={spineY} r="3" fill={item.color} stroke={bgColor} strokeWidth="1.5" />
+
+                    {/* Horizontal Square Bracket Outline */}
+                    {/* Left vertical cap */}
+                    <line
+                      x1={x1}
+                      y1={bracketY + 12}
+                      x2={x1}
+                      y2={bracketY}
                       stroke={item.color}
-                      strokeWidth="1.8"
-                      opacity="0.95"
+                      strokeWidth="2"
+                      opacity="0.9"
+                    />
+                    {/* Left horizontal crossbar arm */}
+                    <line
+                      x1={x1}
+                      y1={bracketY}
+                      x2={Math.min(x2, item.x - labelW / 2 - 4)}
+                      y2={bracketY}
+                      stroke={item.color}
+                      strokeWidth="2"
+                      opacity="0.9"
+                    />
+                    {/* Right horizontal crossbar arm */}
+                    <line
+                      x1={Math.max(x1, item.x + labelW / 2 + 4)}
+                      y1={bracketY}
+                      x2={x2}
+                      y2={bracketY}
+                      stroke={item.color}
+                      strokeWidth="2"
+                      opacity="0.9"
+                    />
+                    {/* Right vertical cap */}
+                    <line
+                      x1={x2}
+                      y1={bracketY + 12}
+                      x2={x2}
+                      y2={bracketY}
+                      stroke={item.color}
+                      strokeWidth="2"
+                      opacity="0.9"
                     />
 
-                    {/* Event Title */}
+                    {/* Extremity Date labels */}
                     <text
-                      x={item.x}
-                      y={spineY - TICK_HEIGHT / 2 - 10 - item.tier * TIER_SPACING}
-                      textAnchor="middle"
-                      fill={textColor}
-                      fontSize="12.5"
-                      fontFamily="var(--font-display)"
-                      fontWeight="600"
-                      letterSpacing="0.01em"
-                    >
-                      {item.title}
-                    </text>
-
-                    {/* Date label beneath the axis */}
-                    <text
-                      x={item.x}
-                      y={spineY + TICK_HEIGHT / 2 + 16 + item.tier * 2}
+                      x={x1}
+                      y={bracketY - 6}
                       textAnchor="middle"
                       fill={item.color}
-                      fontSize="10"
+                      fontSize="9.5"
                       fontFamily="var(--font-mono)"
                       fontWeight="500"
                       opacity="0.9"
                     >
-                      {formatDateLabel(item.year, item.isBce, item.month, item.day)}
+                      {formatDateLabel(item.year, item.isBce)}
                     </text>
+                    <text
+                      x={x2}
+                      y={bracketY - 6}
+                      textAnchor="middle"
+                      fill={item.color}
+                      fontSize="9.5"
+                      fontFamily="var(--font-mono)"
+                      fontWeight="500"
+                      opacity="0.9"
+                    >
+                      {formatDateLabel(item.endYear || item.year, item.endIsBce || false)}
+                    </text>
+
+                    {/* Center Label Card */}
+                    <g
+                      style={{ cursor: "pointer" }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!hasDragged.current) {
+                          onEventClick({
+                            id: item.eventId,
+                            year: item.year,
+                            isBce: item.isBce,
+                            month: item.month,
+                            day: item.day,
+                            endYear: item.endYear,
+                            endIsBce: item.endIsBce,
+                            endMonth: item.endMonth,
+                            endDay: item.endDay,
+                            title: item.title,
+                            description: item.description,
+                            color: item.color,
+                            layer: item.layer,
+                          });
+                        }
+                      }}
+                    >
+                      <rect
+                        x={item.x - labelW / 2}
+                        y={bracketY - 12}
+                        width={labelW}
+                        height="24"
+                        rx="6"
+                        fill={bgColor}
+                        stroke={item.color}
+                        strokeWidth="1.8"
+                        opacity="0.96"
+                      />
+                      <text
+                        x={item.x - 8}
+                        y={bracketY + 4}
+                        textAnchor="middle"
+                        fill={textColor}
+                        fontSize="12"
+                        fontFamily="var(--font-display)"
+                        fontWeight="600"
+                      >
+                        {item.title}
+                      </text>
+
+                      {/* Chronicle Notes Mechanism on Center Label */}
+                      <g
+                        className="hover:scale-125 transition-transform"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedNoteEvent(item);
+                        }}
+                      >
+                        <title>View Chronicle Notes</title>
+                        <rect
+                          x={item.x + labelW / 2 - 20}
+                          y={bracketY - 9}
+                          width="16"
+                          height="18"
+                          rx="4"
+                          fill={item.color}
+                          opacity="0.25"
+                        />
+                        <text
+                          x={item.x + labelW / 2 - 12}
+                          y={bracketY + 4}
+                          textAnchor="middle"
+                          fill={item.color}
+                          fontSize="10"
+                        >
+                          📖
+                        </text>
+                      </g>
+                    </g>
                   </g>
-                )}
-              </g>
-            ))}
+                );
+              }
+
+              // Standard Point Milestone
+              return (
+                <g key={item.eventId} className="event-group">
+                  {/* Vertical tick on axis with layer's unique color */}
+                  <line
+                    x1={item.x}
+                    y1={spineY - TICK_HEIGHT / 2}
+                    x2={item.x}
+                    y2={spineY + TICK_HEIGHT / 2}
+                    stroke={item.color}
+                    strokeWidth="2.5"
+                    opacity="0.95"
+                  />
+
+                  {/* Spine dot node with layer's unique color */}
+                  <circle
+                    cx={item.x}
+                    cy={spineY}
+                    r="3.5"
+                    fill={item.color}
+                    stroke={bgColor}
+                    strokeWidth="1.5"
+                  />
+
+                  {item.collapsed ? (
+                    // Collapsed dot with rich tooltip
+                    <g
+                      onMouseEnter={() => {
+                        setHoveredEvent(item.eventId);
+                        setTooltipPos({ x: item.x, y: spineY });
+                      }}
+                      onMouseLeave={() => setHoveredEvent(null)}
+                      style={{ cursor: "pointer" }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!hasDragged.current) {
+                          onEventClick({
+                            id: item.eventId,
+                            year: item.year,
+                            isBce: item.isBce,
+                            month: item.month,
+                            day: item.day,
+                            title: item.title,
+                            description: item.description,
+                            color: item.color,
+                            layer: item.layer,
+                          });
+                        }
+                      }}
+                    >
+                      {/* Vertical guideline */}
+                      <line
+                        x1={item.x}
+                        y1={spineY - TICK_HEIGHT / 2}
+                        x2={item.x}
+                        y2={spineY - TICK_HEIGHT / 2 - 8 - item.tier * TIER_SPACING}
+                        stroke={item.color}
+                        strokeWidth="1"
+                        strokeDasharray="2 2"
+                        opacity="0.5"
+                      />
+                      {/* Collapsed glowing node */}
+                      <circle
+                        cx={item.x}
+                        cy={spineY - TICK_HEIGHT / 2 - DOT_RADIUS - 6 - item.tier * TIER_SPACING}
+                        r={DOT_RADIUS}
+                        fill={item.color}
+                        stroke={bgColor}
+                        strokeWidth="1.5"
+                        opacity="0.95"
+                      />
+                    </g>
+                  ) : (
+                    // Full Label Card with Layer's Unique Line & Border Color
+                    <g
+                      style={{ cursor: "pointer" }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!hasDragged.current) {
+                          onEventClick({
+                            id: item.eventId,
+                            year: item.year,
+                            isBce: item.isBce,
+                            month: item.month,
+                            day: item.day,
+                            title: item.title,
+                            description: item.description,
+                            color: item.color,
+                            layer: item.layer,
+                          });
+                        }
+                      }}
+                    >
+                      {/* Connector line with layer color */}
+                      <line
+                        x1={item.x}
+                        y1={spineY - TICK_HEIGHT / 2}
+                        x2={item.x}
+                        y2={spineY - TICK_HEIGHT / 2 - 8 - item.tier * TIER_SPACING}
+                        stroke={item.color}
+                        strokeWidth="1.5"
+                        opacity="0.8"
+                      />
+
+                      {/* Card background with layer's unique border color */}
+                      <rect
+                        x={item.x - item.labelWidth / 2}
+                        y={spineY - TICK_HEIGHT / 2 - 26 - item.tier * TIER_SPACING}
+                        width={item.labelWidth}
+                        height="24"
+                        rx="6"
+                        fill={bgColor}
+                        stroke={item.color}
+                        strokeWidth="1.8"
+                        opacity="0.95"
+                      />
+
+                      {/* Event Title */}
+                      <text
+                        x={item.description ? item.x - 7 : item.x}
+                        y={spineY - TICK_HEIGHT / 2 - 10 - item.tier * TIER_SPACING}
+                        textAnchor="middle"
+                        fill={textColor}
+                        fontSize="12.5"
+                        fontFamily="var(--font-display)"
+                        fontWeight="600"
+                        letterSpacing="0.01em"
+                      >
+                        {item.title}
+                      </text>
+
+                      {/* Chronicle Notes Icon Button on Point Milestone */}
+                      {item.description && (
+                        <g
+                          className="hover:scale-125 transition-transform"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedNoteEvent(item);
+                          }}
+                        >
+                          <title>View Chronicle Notes</title>
+                          <rect
+                            x={item.x + item.labelWidth / 2 - 18}
+                            y={spineY - TICK_HEIGHT / 2 - 23 - item.tier * TIER_SPACING}
+                            width="15"
+                            height="18"
+                            rx="4"
+                            fill={item.color}
+                            opacity="0.22"
+                          />
+                          <text
+                            x={item.x + item.labelWidth / 2 - 10.5}
+                            y={spineY - TICK_HEIGHT / 2 - 10 - item.tier * TIER_SPACING}
+                            textAnchor="middle"
+                            fill={item.color}
+                            fontSize="10"
+                          >
+                            📖
+                          </text>
+                        </g>
+                      )}
+
+                      {/* Date label beneath the axis */}
+                      <text
+                        x={item.x}
+                        y={spineY + TICK_HEIGHT / 2 + 16 + item.tier * 2}
+                        textAnchor="middle"
+                        fill={item.color}
+                        fontSize="10"
+                        fontFamily="var(--font-mono)"
+                        fontWeight="500"
+                        opacity="0.9"
+                      >
+                        {formatDateLabel(item.year, item.isBce, item.month, item.day)}
+                      </text>
+                    </g>
+                  )}
+                </g>
+              );
+            })}
 
             {/* Interactive Hairline Mouse Cursor Guide */}
             {cursorX !== null && cursorYear !== null && !isDragging.current && (
@@ -942,6 +1210,114 @@ export default function TimelineRenderer({
           </div>
         );
       })()}
+
+      {/* Chronicle Notes Floating Popover Inspector */}
+      {selectedNoteEvent && (
+        <div
+          className="absolute z-50 p-4 rounded-2xl glass-panel shadow-[0_25px_60px_rgba(0,0,0,0.85)] border border-black/10 dark:border-white/[0.14] max-w-sm w-full animate-in fade-in zoom-in-95 duration-150"
+          style={{
+            left: Math.min(
+              Math.max(16, selectedNoteEvent.x - 140),
+              Math.max(16, dimensions.width - 340)
+            ),
+            top: Math.max(16, Math.min(spineY - 210, dimensions.height - 260)),
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Popover Header */}
+          <div className="flex items-start justify-between gap-2 pb-2.5 mb-2.5 border-b border-black/[0.08] dark:border-white/[0.08]">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 mb-1">
+                <div
+                  className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
+                  style={{ backgroundColor: selectedNoteEvent.color }}
+                />
+                <span className="text-[10px] font-mono font-semibold" style={{ color: selectedNoteEvent.color }}>
+                  {selectedNoteEvent.layer || "General"}
+                </span>
+                <span className="text-[10px] font-mono theme-text-muted">
+                  • {selectedNoteEvent.isSpan ? "Horizontal Bracket" : "Point Milestone"}
+                </span>
+              </div>
+              <h4
+                className="text-sm font-bold theme-card-title truncate"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                {selectedNoteEvent.title}
+              </h4>
+              <div className="text-[10.5px] font-mono text-[#c9a84c] font-medium mt-0.5">
+                {selectedNoteEvent.isSpan
+                  ? formatSpanLabel(
+                      selectedNoteEvent.year,
+                      selectedNoteEvent.isBce,
+                      selectedNoteEvent.endYear || selectedNoteEvent.year,
+                      selectedNoteEvent.endIsBce || false
+                    )
+                  : formatDateLabel(
+                      selectedNoteEvent.year,
+                      selectedNoteEvent.isBce,
+                      selectedNoteEvent.month,
+                      selectedNoteEvent.day
+                    )}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setSelectedNoteEvent(null)}
+              className="w-6 h-6 flex items-center justify-center rounded-lg theme-text-muted hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer shrink-0"
+              title="Close Notes"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Notes Body */}
+          <div className="text-xs leading-relaxed max-h-48 overflow-y-auto font-sans font-light theme-card-title whitespace-pre-wrap pr-1 selection:bg-[#c9a84c]/30">
+            {selectedNoteEvent.description ? (
+              selectedNoteEvent.description
+            ) : (
+              <span className="text-xs font-mono theme-text-muted italic">
+                No chronicle notes recorded for this milestone. Click &quot;Edit in Studio&quot; to add notes.
+              </span>
+            )}
+          </div>
+
+          {/* Popover Footer with Edit in Studio Button */}
+          <div className="mt-3 pt-2.5 border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between">
+            <span className="text-[10px] font-mono theme-text-muted flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-[#c9a84c]" />
+              <span>Chronicle Record</span>
+            </span>
+
+            <button
+              type="button"
+              onClick={() => {
+                const ev = selectedNoteEvent;
+                setSelectedNoteEvent(null);
+                onEventClick({
+                  id: ev.eventId,
+                  year: ev.year,
+                  isBce: ev.isBce,
+                  month: ev.month,
+                  day: ev.day,
+                  endYear: ev.endYear,
+                  endIsBce: ev.endIsBce,
+                  endMonth: ev.endMonth,
+                  endDay: ev.endDay,
+                  title: ev.title,
+                  description: ev.description,
+                  color: ev.color,
+                  layer: ev.layer,
+                });
+              }}
+              className="text-[10px] font-mono font-semibold text-[#c9a84c] hover:underline cursor-pointer"
+            >
+              Edit in Studio →
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Floating HUD: Top-Right Canvas Controls */}
       <div className="absolute top-4 right-4 flex items-center gap-2 z-30">
@@ -1211,4 +1587,6 @@ export default function TimelineRenderer({
       </div>
     </div>
   );
-}
+});
+
+export default TimelineRenderer;

@@ -12,6 +12,7 @@ declare module "next-auth" {
 export interface TimelineData {
   id: string;
   name: string;
+  description?: string | null;
   bgColor: string;
   spineColor: string;
   tickColor: string;
@@ -35,8 +36,13 @@ export interface EventData {
   title: string;
   description: string | null;
   color: string;
-  createdAt: string;
-  updatedAt: string;
+  layer?: string | null;
+  endYear?: number | null;
+  endIsBce?: boolean | null;
+  endMonth?: number | null;
+  endDay?: number | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface LayoutItem {

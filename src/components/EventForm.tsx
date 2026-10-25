@@ -9,6 +9,7 @@ import {
   Sparkles,
   Layers,
   Plus,
+  BookOpen,
 } from "lucide-react";
 import ConfirmModal from "@/components/ConfirmModal";
 
@@ -16,6 +17,15 @@ export interface LayerItem {
   id: string;
   name: string;
   color: string;
+}
+
+export interface ExistingEventOption {
+  id: string;
+  title: string;
+  year: number;
+  isBce: boolean;
+  month?: number | null;
+  day?: number | null;
 }
 
 export interface EventFormData {
@@ -28,10 +38,17 @@ export interface EventFormData {
   description: string;
   color: string;
   layer?: string;
+  // Span / Horizontal Bracket
+  isSpan?: boolean;
+  endYear?: string | number | null;
+  endIsBce?: boolean;
+  endMonth?: string;
+  endDay?: string;
 }
 
 interface EventFormProps {
   initialData?: EventFormData;
+  existingEvents?: ExistingEventOption[];
   availableLayers?: LayerItem[];
   onCreateLayer?: (name: string, color: string) => Promise<LayerItem>;
   onSave: (data: EventFormData) => Promise<void>;
@@ -56,16 +73,34 @@ const COLOR_PALETTE = [
 
 export default function EventForm({
   initialData,
+  existingEvents = [],
   availableLayers = [],
   onCreateLayer,
   onSave,
   onDelete,
   onClose,
 }: EventFormProps) {
+  const [mounted, setMounted] = useState(false);
+  const [isSpan, setIsSpan] = useState(
+    Boolean(initialData?.endYear !== undefined && initialData?.endYear !== null)
+  );
+
+  // Start Date
   const [year, setYear] = useState(initialData?.year?.toString() || "");
   const [isBce, setIsBce] = useState(initialData?.isBce || false);
   const [month, setMonth] = useState(initialData?.month || "");
   const [day, setDay] = useState(initialData?.day || "");
+
+  // End Date (for horizontal square bracket span)
+  const [endYear, setEndYear] = useState(
+    initialData?.endYear !== undefined && initialData?.endYear !== null
+      ? String(initialData.endYear)
+      : ""
+  );
+  const [endIsBce, setEndIsBce] = useState(initialData?.endIsBce || false);
+  const [endMonth, setEndMonth] = useState(initialData?.endMonth || "");
+  const [endDay, setEndDay] = useState(initialData?.endDay || "");
+
   const [title, setTitle] = useState(initialData?.title || "");
   const [description, setDescription] = useState(initialData?.description || "");
   const [color, setColor] = useState(initialData?.color || "#c9a84c");
@@ -78,7 +113,6 @@ export default function EventForm({
   const [newLayerName, setNewLayerName] = useState("");
   const [newLayerColor, setNewLayerColor] = useState("#5a9bd5");
 
-  const [mounted, setMounted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -106,16 +140,42 @@ export default function EventForm({
     setShowNewLayerInput(false);
   }
 
+  // Quick Pick Event Linkers
+  const handleSelectStartEvent = (eventId: string) => {
+    const ev = existingEvents.find((e) => e.id === eventId);
+    if (!ev) return;
+    setYear(String(ev.year));
+    setIsBce(ev.isBce);
+    setMonth(ev.month ? String(ev.month) : "");
+    setDay(ev.day ? String(ev.day) : "");
+  };
+
+  const handleSelectEndEvent = (eventId: string) => {
+    const ev = existingEvents.find((e) => e.id === eventId);
+    if (!ev) return;
+    setEndYear(String(ev.year));
+    setEndIsBce(ev.isBce);
+    setEndMonth(ev.month ? String(ev.month) : "");
+    setEndDay(ev.day ? String(ev.day) : "");
+  };
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const parsed = parseInt(year, 10);
-    if (isNaN(parsed) || !title.trim()) return;
-    const yearNum = Math.abs(parsed);
+    const parsedStart = parseInt(year, 10);
+    if (isNaN(parsedStart) || !title.trim()) return;
+    const startYearNum = Math.abs(parsedStart);
+
+    let parsedEndNum: number | null = null;
+    if (isSpan) {
+      const parsedEnd = parseInt(endYear, 10);
+      if (isNaN(parsedEnd)) return;
+      parsedEndNum = Math.abs(parsedEnd);
+    }
 
     setSaving(true);
     await onSave({
       id: initialData?.id,
-      year: yearNum,
+      year: startYearNum,
       isBce,
       month: month || "",
       day: day || "",
@@ -123,6 +183,11 @@ export default function EventForm({
       description: description.trim(),
       color,
       layer: selectedLayer.trim() || "General",
+      isSpan,
+      endYear: isSpan ? parsedEndNum : null,
+      endIsBce: isSpan ? endIsBce : false,
+      endMonth: isSpan ? endMonth || "" : "",
+      endDay: isSpan ? endDay || "" : "",
     });
     setSaving(false);
   }
@@ -138,7 +203,7 @@ export default function EventForm({
     }
   }
 
-  // Live formatted date label preview
+  // Live formatted date label preview for point milestone
   const previewDate = () => {
     const parsed = parseInt(year, 10);
     const y = !isNaN(parsed) ? Math.abs(parsed).toLocaleString() : "0";
@@ -148,12 +213,33 @@ export default function EventForm({
     return `${y} ${era}`;
   };
 
+  // Live span preview for horizontal bracket
+  const previewSpan = () => {
+    const y1 = parseInt(year, 10);
+    const y2 = parseInt(endYear, 10);
+    if (isNaN(y1) || isNaN(y2)) return null;
+    const startNum = isBce ? -Math.abs(y1) : Math.abs(y1);
+    const endNum = endIsBce ? -Math.abs(y2) : Math.abs(y2);
+    let diff = Math.abs(endNum - startNum);
+    if ((isBce && !endIsBce) || (!isBce && endIsBce)) {
+      diff = Math.max(1, diff - 1);
+    }
+    const sLabel = `${Math.abs(y1).toLocaleString()} ${isBce ? "BCE" : "CE"}`;
+    const eLabel = `${Math.abs(y2).toLocaleString()} ${endIsBce ? "BCE" : "CE"}`;
+    return {
+      diffYears: diff.toLocaleString(),
+      sLabel,
+      eLabel,
+    };
+  };
+
+  const spanInfo = previewSpan();
+
   if (!mounted) return null;
 
   return createPortal(
     <div
       className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
-      // Backdrop click intentionally does NOT close the modal: ONLY 'X' closes it
     >
       <div
         className="w-full max-w-lg rounded-2xl glass-panel shadow-[0_25px_60px_rgba(0,0,0,0.85)] border border-black/10 dark:border-white/[0.1] overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-150"
@@ -170,15 +256,22 @@ export default function EventForm({
                 className="text-base font-bold theme-card-title leading-tight"
                 style={{ fontFamily: "var(--font-display)" }}
               >
-                {isEditing ? "Edit Chronicle Milestone" : "Add Chronicle Milestone"}
+                {isEditing
+                  ? isSpan
+                    ? "Edit Bracketed Period"
+                    : "Edit Chronicle Milestone"
+                  : isSpan
+                  ? "Add Horizontal Bracket Period"
+                  : "Add Chronicle Milestone"}
               </h2>
               <p className="text-[11px] font-mono theme-text-muted">
-                Temporal coordinate and historical milestone
+                {isSpan
+                  ? "Horizontal square bracket spanning between historical coordinates"
+                  : "Temporal coordinate and historical milestone"}
               </p>
             </div>
           </div>
 
-          {/* Close X Button: ONLY this button closes the modal */}
           <button
             type="button"
             onClick={onClose}
@@ -190,52 +283,138 @@ export default function EventForm({
           </button>
         </div>
 
+        {/* Milestone vs Horizontal Bracket Period Segmented Switcher */}
+        <div className="px-6 pt-4 pb-1">
+          <div className="flex p-1 rounded-xl bg-black/[0.04] dark:bg-white/[0.04] border border-black/10 dark:border-white/[0.08]">
+            <button
+              type="button"
+              onClick={() => setIsSpan(false)}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-mono font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                !isSpan
+                  ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/40 font-semibold shadow-sm"
+                  : "theme-text-muted hover:opacity-100"
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Point Milestone</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsSpan(true)}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-mono font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                isSpan
+                  ? "bg-[#38bdf8]/20 text-[#38bdf8] border border-[#38bdf8]/40 font-semibold shadow-sm"
+                  : "theme-text-muted hover:opacity-100"
+              }`}
+            >
+              <span className="font-mono font-bold text-sm leading-none">[───]</span>
+              <span>Horizontal Bracket Span</span>
+            </button>
+          </div>
+        </div>
+
         {/* Live Interactive Card Preview */}
-        <div className="px-6 pt-5 pb-3 bg-gradient-to-b from-black/[0.02] dark:from-white/[0.02] to-transparent">
+        <div className="px-6 pt-3 pb-2 bg-gradient-to-b from-black/[0.02] dark:from-white/[0.02] to-transparent">
           <div className="text-[10px] font-mono uppercase tracking-wider theme-text-muted mb-2 flex items-center justify-between">
             <span className="flex items-center gap-1.5">
               <Sparkles className="w-3 h-3 text-[#c9a84c]" />
-              <span>Canvas Milestone Preview</span>
+              <span>Canvas Visual Preview</span>
             </span>
-            <span className="text-[10px] text-[#c9a84c] font-semibold">
+            <span className="text-[10px] font-semibold" style={{ color }}>
               Layer: {selectedLayer || "General"}
             </span>
           </div>
-          <div
-            className="p-3.5 rounded-xl bg-black/[0.04] dark:bg-[#070c16]/80 border flex items-center justify-between gap-3 shadow-inner transition-colors duration-200"
-            style={{ borderColor: `${color}80` }}
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <div
-                className="w-3.5 h-8 rounded-md shrink-0 shadow-sm"
-                style={{ backgroundColor: color }}
-              />
-              <div className="min-w-0">
+
+          {!isSpan ? (
+            /* Point Milestone Preview */
+            <div
+              className="p-3.5 rounded-xl bg-black/[0.04] dark:bg-[#070c16]/80 border flex items-center justify-between gap-3 shadow-inner transition-colors duration-200"
+              style={{ borderColor: `${color}80` }}
+            >
+              <div className="flex items-center gap-3 min-w-0">
                 <div
-                  className="text-sm font-semibold theme-card-title truncate"
-                  style={{ fontFamily: "var(--font-display)" }}
-                >
-                  {title.trim() || "Milestone Title"}
+                  className="w-3.5 h-8 rounded-md shrink-0 shadow-sm"
+                  style={{ backgroundColor: color }}
+                />
+                <div className="min-w-0">
+                  <div
+                    className="text-sm font-semibold theme-card-title truncate"
+                    style={{ fontFamily: "var(--font-display)" }}
+                  >
+                    {title.trim() || "Milestone Title"}
+                  </div>
+                  <div
+                    className="text-[11px] font-mono font-medium"
+                    style={{ color }}
+                  >
+                    {previewDate()}
+                  </div>
                 </div>
+              </div>
+              <div
+                className="px-2.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider border shrink-0"
+                style={{
+                  borderColor: `${color}60`,
+                  backgroundColor: `${color}18`,
+                  color,
+                }}
+              >
+                {isBce ? "BCE Era" : "Common Era"}
+              </div>
+            </div>
+          ) : (
+            /* Horizontal Square Bracket Preview */
+            <div
+              className="p-3 rounded-xl bg-black/[0.04] dark:bg-[#070c16]/80 border flex flex-col gap-2 shadow-inner transition-colors duration-200"
+              style={{ borderColor: `${color}80` }}
+            >
+              <div className="flex items-center justify-between text-[11px] font-mono">
+                <span className="text-[#38bdf8] font-semibold flex items-center gap-1">
+                  <span>[</span>
+                  <span>{spanInfo ? spanInfo.sLabel : previewDate()}</span>
+                </span>
+                <span className="text-[10px] theme-text-muted">
+                  {spanInfo ? `${spanInfo.diffYears} yrs span` : "Bracketed Range"}
+                </span>
+                <span className="text-[#38bdf8] font-semibold flex items-center gap-1">
+                  <span>{spanInfo ? spanInfo.eLabel : "End Date"}</span>
+                  <span>]</span>
+                </span>
+              </div>
+
+              {/* Bracket Diagram Simulation */}
+              <div className="relative flex items-center justify-center my-1">
                 <div
-                  className="text-[11px] font-mono font-medium"
-                  style={{ color }}
+                  className="absolute left-0 right-0 h-[1.5px]"
+                  style={{ backgroundColor: color }}
+                />
+                <div
+                  className="absolute left-0 top-[-6px] w-[2px] h-[14px]"
+                  style={{ backgroundColor: color }}
+                />
+                <div
+                  className="absolute right-0 top-[-6px] w-[2px] h-[14px]"
+                  style={{ backgroundColor: color }}
+                />
+
+                {/* Center Badge with Title & Chronicle Notes Indicator */}
+                <div
+                  className="relative z-10 px-3 py-1 rounded-md border text-xs font-semibold flex items-center gap-1.5 shadow-sm"
+                  style={{
+                    borderColor: color,
+                    backgroundColor: "rgba(10, 16, 28, 0.95)",
+                    color,
+                    fontFamily: "var(--font-display)",
+                  }}
                 >
-                  {previewDate()}
+                  <span className="truncate max-w-[220px]">
+                    {title.trim() || "Period Name"}
+                  </span>
+                  <BookOpen className="w-3 h-3 text-[#c9a84c] shrink-0" />
                 </div>
               </div>
             </div>
-            <div
-              className="px-2.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider border shrink-0"
-              style={{
-                borderColor: `${color}60`,
-                backgroundColor: `${color}18`,
-                color,
-              }}
-            >
-              {isBce ? "BCE Era" : "Common Era"}
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Form Body */}
@@ -264,7 +443,7 @@ export default function EventForm({
                     type="text"
                     value={newLayerName}
                     onChange={(e) => setNewLayerName(e.target.value)}
-                    placeholder="Period Name (e.g. Bronze Age, Period A)"
+                    placeholder="Period Name (e.g. Bronze Age, Classical)"
                     className="flex-1 px-3 py-1.5 rounded-lg theme-input text-xs font-mono outline-none focus:ring-1 focus:ring-[#c9a84c]"
                   />
                   <input
@@ -303,169 +482,308 @@ export default function EventForm({
                       </option>
                     ))
                   ) : (
-                    <>
-                      <option value="General">General Chronicle</option>
-                      <option value="Period A">Period A</option>
-                      <option value="Period B">Period B</option>
-                    </>
+                    <option value="General">General Chronicle</option>
                   )}
                 </select>
               </div>
             )}
           </div>
 
-          {/* Era and Year */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* Era Toggle */}
-            <div>
-              <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-1.5 font-medium">
-                Era
-              </label>
-              <div className="flex rounded-xl bg-black/[0.04] dark:bg-white/[0.04] p-1 border border-black/10 dark:border-white/[0.08]">
-                <button
-                  type="button"
-                  onClick={() => setIsBce(true)}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer ${
-                    isBce
-                      ? "bg-rose-500/20 text-rose-500 border border-rose-500/40 shadow-sm"
-                      : "theme-text-muted hover:opacity-100"
-                  }`}
+          {/* Section 1: Start Temporal Coordinate */}
+          <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/[0.08] space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-mono uppercase tracking-wider font-semibold text-[#c9a84c]">
+                {isSpan ? "1. Start Temporal Coordinate" : "Temporal Coordinate"}
+              </span>
+
+              {/* Quick Pick from Existing Event */}
+              {isSpan && existingEvents.length > 0 && (
+                <select
+                  onChange={(e) => handleSelectStartEvent(e.target.value)}
+                  defaultValue=""
+                  className="px-2 py-0.5 rounded text-[10px] font-mono theme-input outline-none cursor-pointer text-[#c9a84c]"
                 >
-                  BCE
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsBce(false)}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer ${
-                    !isBce
-                      ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/40 shadow-sm"
-                      : "theme-text-muted hover:opacity-100"
-                  }`}
-                >
-                  CE
-                </button>
+                  <option value="" disabled>Link start to milestone...</option>
+                  {existingEvents.map((ev) => (
+                    <option key={`start-${ev.id}`} value={ev.id}>
+                      {ev.title} ({ev.year} {ev.isBce ? "BCE" : "CE"})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Era Toggle */}
+              <div>
+                <label className="block text-[10px] font-mono theme-text-muted uppercase tracking-wider mb-1">
+                  Start Era
+                </label>
+                <div className="flex rounded-xl bg-black/[0.04] dark:bg-white/[0.04] p-1 border border-black/10 dark:border-white/[0.08]">
+                  <button
+                    type="button"
+                    onClick={() => setIsBce(true)}
+                    className={`flex-1 py-1 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer ${
+                      isBce
+                        ? "bg-rose-500/20 text-rose-500 border border-rose-500/40 shadow-sm"
+                        : "theme-text-muted hover:opacity-100"
+                    }`}
+                  >
+                    BCE
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsBce(false)}
+                    className={`flex-1 py-1 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer ${
+                      !isBce
+                        ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/40 shadow-sm"
+                        : "theme-text-muted hover:opacity-100"
+                    }`}
+                  >
+                    CE
+                  </button>
+                </div>
+              </div>
+
+              {/* Year Input */}
+              <div className="sm:col-span-2">
+                <label className="block text-[10px] font-mono theme-text-muted uppercase tracking-wider mb-1 font-medium">
+                  Start Year <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={year}
+                  onChange={(e) => setYear(e.target.value)}
+                  placeholder="e.g. 509"
+                  required
+                  className="w-full px-3 py-1.5 rounded-xl theme-input text-xs font-mono outline-none focus:border-[#c9a84c] focus:ring-1 focus:ring-[#c9a84c]/40 transition-all"
+                />
               </div>
             </div>
 
-            {/* Year Input */}
-            <div className="sm:col-span-2">
-              <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-1.5 font-medium">
-                Year <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="number"
-                value={year}
-                onChange={(e) => setYear(e.target.value)}
-                placeholder="e.g. 1776, 44, 2500"
-                required
-                className="w-full px-3.5 py-2 rounded-xl theme-input text-xs font-mono outline-none focus:border-[#c9a84c] focus:ring-1 focus:ring-[#c9a84c]/40 transition-all"
-              />
+            {/* Optional Month and Day */}
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <div>
+                <label className="block text-[10px] font-mono theme-text-muted uppercase tracking-wider mb-1">
+                  Month (1-12)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="12"
+                  value={month}
+                  onChange={(e) => setMonth(e.target.value)}
+                  placeholder="Optional"
+                  className="w-full px-3 py-1.5 rounded-xl theme-input text-xs font-mono outline-none focus:border-[#c9a84c] transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-mono theme-text-muted uppercase tracking-wider mb-1">
+                  Day (1-31)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="31"
+                  value={day}
+                  onChange={(e) => setDay(e.target.value)}
+                  placeholder="Optional"
+                  className="w-full px-3 py-1.5 rounded-xl theme-input text-xs font-mono outline-none focus:border-[#c9a84c] transition-all"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Month & Day (Optional) */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-1.5 font-medium">
-                Month <span className="opacity-60">(optional)</span>
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="12"
-                value={month}
-                onChange={(e) => setMonth(e.target.value)}
-                placeholder="1 – 12"
-                className="w-full px-3.5 py-2 rounded-xl theme-input text-xs font-mono outline-none focus:border-[#c9a84c] focus:ring-1 focus:ring-[#c9a84c]/40 transition-all"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-1.5 font-medium">
-                Day <span className="opacity-60">(optional)</span>
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="31"
-                value={day}
-                onChange={(e) => setDay(e.target.value)}
-                placeholder="1 – 31"
-                className="w-full px-3.5 py-2 rounded-xl theme-input text-xs font-mono outline-none focus:border-[#c9a84c] focus:ring-1 focus:ring-[#c9a84c]/40 transition-all"
-              />
-            </div>
-          </div>
+          {/* Section 2: End Temporal Coordinate (When in Bracket Span Mode) */}
+          {isSpan && (
+            <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/[0.08] space-y-3 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono uppercase tracking-wider font-semibold text-[#38bdf8]">
+                  2. End Temporal Coordinate (Bracket Right Cap)
+                </span>
 
-          {/* Title */}
+                {/* Quick Pick from Existing Event */}
+                {existingEvents.length > 0 && (
+                  <select
+                    onChange={(e) => handleSelectEndEvent(e.target.value)}
+                    defaultValue=""
+                    className="px-2 py-0.5 rounded text-[10px] font-mono theme-input outline-none cursor-pointer text-[#38bdf8]"
+                  >
+                    <option value="" disabled>Link end to milestone...</option>
+                    {existingEvents.map((ev) => (
+                      <option key={`end-${ev.id}`} value={ev.id}>
+                        {ev.title} ({ev.year} {ev.isBce ? "BCE" : "CE"})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Era Toggle */}
+                <div>
+                  <label className="block text-[10px] font-mono theme-text-muted uppercase tracking-wider mb-1">
+                    End Era
+                  </label>
+                  <div className="flex rounded-xl bg-black/[0.04] dark:bg-white/[0.04] p-1 border border-black/10 dark:border-white/[0.08]">
+                    <button
+                      type="button"
+                      onClick={() => setEndIsBce(true)}
+                      className={`flex-1 py-1 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer ${
+                        endIsBce
+                          ? "bg-rose-500/20 text-rose-500 border border-rose-500/40 shadow-sm"
+                          : "theme-text-muted hover:opacity-100"
+                      }`}
+                    >
+                      BCE
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEndIsBce(false)}
+                      className={`flex-1 py-1 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer ${
+                        !endIsBce
+                          ? "bg-[#38bdf8]/20 text-[#38bdf8] border border-[#38bdf8]/40 shadow-sm"
+                          : "theme-text-muted hover:opacity-100"
+                      }`}
+                    >
+                      CE
+                    </button>
+                  </div>
+                </div>
+
+                {/* End Year Input */}
+                <div className="sm:col-span-2">
+                  <label className="block text-[10px] font-mono theme-text-muted uppercase tracking-wider mb-1 font-medium">
+                    End Year <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={endYear}
+                    onChange={(e) => setEndYear(e.target.value)}
+                    placeholder="e.g. 27"
+                    required
+                    className="w-full px-3 py-1.5 rounded-xl theme-input text-xs font-mono outline-none focus:border-[#38bdf8] focus:ring-1 focus:ring-[#38bdf8]/40 transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Optional Month and Day */}
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block text-[10px] font-mono theme-text-muted uppercase tracking-wider mb-1">
+                    End Month (1-12)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="12"
+                    value={endMonth}
+                    onChange={(e) => setEndMonth(e.target.value)}
+                    placeholder="Optional"
+                    className="w-full px-3 py-1.5 rounded-xl theme-input text-xs font-mono outline-none focus:border-[#38bdf8] transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono theme-text-muted uppercase tracking-wider mb-1">
+                    End Day (1-31)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={endDay}
+                    onChange={(e) => setEndDay(e.target.value)}
+                    placeholder="Optional"
+                    className="w-full px-3 py-1.5 rounded-xl theme-input text-xs font-mono outline-none focus:border-[#38bdf8] transition-all"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Title Input */}
           <div>
-            <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-1.5 font-medium">
-              Title <span className="text-rose-500">*</span>
+            <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-1.5 font-medium flex items-center justify-between">
+              <span>
+                {isSpan ? "Period / Span Name" : "Milestone Title"}{" "}
+                <span className="text-rose-500">*</span>
+              </span>
+              <span className="text-[10px] opacity-60">Required</span>
             </label>
             <input
               ref={titleRef}
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Declaration of Independence"
+              placeholder={isSpan ? "e.g. Roman Republic, Pax Romana, Bronze Age..." : "e.g. Magna Carta, Council of Nicaea..."}
               required
-              className="w-full px-3.5 py-2 rounded-xl theme-input text-sm outline-none focus:border-[#c9a84c] focus:ring-1 focus:ring-[#c9a84c]/40 transition-all"
+              className="w-full px-3.5 py-2.5 rounded-xl theme-input text-sm outline-none focus:border-[#c9a84c] focus:ring-1 focus:ring-[#c9a84c]/40 transition-all font-semibold"
               style={{ fontFamily: "var(--font-display)" }}
             />
           </div>
 
-          {/* Description */}
+          {/* Chronicle Notes & Narrative (with Mechanism Support) */}
           <div>
-            <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-1.5 font-medium">
-              Chronicle Notes <span className="opacity-60">(optional)</span>
+            <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-1.5 font-medium flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <BookOpen className="w-3.5 h-3.5 text-[#c9a84c]" />
+                <span>Chronicle Notes & Historical Context</span>
+              </span>
+              <span className="text-[10px] opacity-60">Hover/Click mechanism on Canvas</span>
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Historical context, participants, or significant outcomes..."
+              placeholder="Chronicle notes, primary historical citations, archaeological findings, or period scope details..."
               rows={3}
-              className="w-full px-3.5 py-2 rounded-xl theme-input text-xs outline-none focus:border-[#c9a84c] focus:ring-1 focus:ring-[#c9a84c]/40 resize-none transition-all leading-relaxed font-light"
+              className="w-full px-3.5 py-2.5 rounded-xl theme-input text-xs outline-none focus:border-[#c9a84c] focus:ring-1 focus:ring-[#c9a84c]/40 resize-none transition-all leading-relaxed font-light"
             />
           </div>
 
-          {/* Color Palette */}
+          {/* Color Palette Selection */}
           <div>
             <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-2 font-medium">
-              Milestone Chromatic Accent
+              Milestone & Bracket Line Color
             </label>
-            <div className="flex flex-wrap gap-2.5">
-              {COLOR_PALETTE.map((c) => {
-                const isSelected = color === c.hex;
-                return (
-                  <button
-                    key={c.hex}
-                    type="button"
-                    onClick={() => setColor(c.hex)}
-                    className={`w-7 h-7 rounded-xl transition-all relative flex items-center justify-center cursor-pointer ${
-                      isSelected
-                        ? "scale-110 ring-2 ring-offset-2 ring-[#c9a84c] ring-offset-white dark:ring-offset-[#0d1527] shadow-md"
-                        : "hover:scale-105 opacity-80 hover:opacity-100"
-                    }`}
-                    style={{ backgroundColor: c.hex }}
-                    title={c.label}
-                  >
-                    {isSelected && (
-                      <div className="w-2 h-2 rounded-full bg-white shadow-sm" />
-                    )}
-                  </button>
-                );
-              })}
+            <div className="flex items-center gap-2 overflow-x-auto py-1">
+              {COLOR_PALETTE.map((c) => (
+                <button
+                  key={c.hex}
+                  type="button"
+                  onClick={() => setColor(c.hex)}
+                  title={c.label}
+                  className={`w-6 h-6 rounded-full transition-transform cursor-pointer shrink-0 ${
+                    color.toLowerCase() === c.hex.toLowerCase()
+                      ? "scale-125 ring-2 ring-white ring-offset-2 ring-offset-[#070c16]"
+                      : "hover:scale-110 opacity-80"
+                  }`}
+                  style={{ backgroundColor: c.hex }}
+                />
+              ))}
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="w-6 h-6 rounded-full cursor-pointer p-0.5 bg-transparent border border-black/20 dark:border-white/20 shrink-0 ml-1"
+                title="Custom Color"
+              />
             </div>
           </div>
 
-          {/* Action Footer */}
-          <div className="pt-4 border-t border-black/[0.08] dark:border-white/[0.08] flex items-center justify-between gap-3">
+          {/* Footer Actions */}
+          <div className="pt-4 border-t border-black/[0.08] dark:border-white/[0.08] flex items-center justify-between">
             {isEditing && onDelete ? (
               <button
                 type="button"
                 onClick={() => setShowDeleteConfirm(true)}
-                disabled={saving}
-                className="px-3.5 py-2 rounded-xl text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 text-xs font-mono flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                className="p-2 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-mono font-medium"
+                title="Delete Milestone"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="w-4 h-4" />
                 <span>Delete</span>
               </button>
             ) : (
@@ -483,13 +801,21 @@ export default function EventForm({
 
               <button
                 type="submit"
-                disabled={saving || !title.trim() || !year.trim()}
+                disabled={saving || !title.trim() || !year.trim() || (isSpan && !endYear.trim())}
                 className="btn-gold px-5 py-2 rounded-xl text-xs font-mono font-semibold flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-md"
               >
                 {saving ? (
                   <span>Saving...</span>
                 ) : (
-                  <span>{isEditing ? "Update Milestone" : "Add to Number Line"}</span>
+                  <span>
+                    {isEditing
+                      ? isSpan
+                        ? "Update Bracket Period"
+                        : "Update Milestone"
+                      : isSpan
+                      ? "Add Bracket to Line"
+                      : "Add to Number Line"}
+                  </span>
                 )}
               </button>
             </div>

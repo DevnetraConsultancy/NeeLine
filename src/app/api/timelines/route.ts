@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { parseEventMetadata, serializeEventMetadata } from "@/lib/event-metadata";
 
 // GET /api/timelines - List user's timelines
 export async function GET(req: NextRequest) {
@@ -20,11 +21,34 @@ export async function GET(req: NextRequest) {
       },
       include: {
         _count: { select: { events: true } },
+        events: {
+          where: { title: "Year Zero" },
+          take: 1,
+          select: { description: true },
+        },
       },
       orderBy: { updatedAt: "desc" },
     });
 
-    return NextResponse.json(timelines);
+    const enriched = timelines.map((t) => {
+      const parsed = t.events?.[0]?.description ? parseEventMetadata(t.events[0].description) : null;
+      return {
+        id: t.id,
+        userId: t.userId,
+        name: t.name,
+        description: parsed?.description || null,
+        bgColor: t.bgColor,
+        spineColor: t.spineColor,
+        tickColor: t.tickColor,
+        textColor: t.textColor,
+        deletedAt: t.deletedAt,
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt,
+        _count: t._count,
+      };
+    });
+
+    return NextResponse.json(enriched);
   } catch (error) {
     console.error("GET /api/timelines error:", error);
     return NextResponse.json({ error: "Failed to fetch timelines" }, { status: 500 });
@@ -100,12 +124,26 @@ export async function PATCH(req: NextRequest) {
     if (body.tickColor !== undefined && typeof body.tickColor === "string") data.tickColor = body.tickColor;
     if (body.textColor !== undefined && typeof body.textColor === "string") data.textColor = body.textColor;
 
+    if (body.description !== undefined) {
+      const desc = body.description ? String(body.description).trim() : null;
+      const seedEvent = await prisma.event.findFirst({
+        where: { timelineId: id, title: "Year Zero" },
+      });
+      if (seedEvent) {
+        const meta = parseEventMetadata(seedEvent.description);
+        await prisma.event.update({
+          where: { id: seedEvent.id },
+          data: { description: serializeEventMetadata(meta, desc) },
+        });
+      }
+    }
+
     const updated = await prisma.timeline.update({
       where: { id },
       data,
     });
 
-    return NextResponse.json(updated);
+    return NextResponse.json({ ...updated, description: body.description });
   } catch (error) {
     console.error("PATCH /api/timelines error:", error);
     return NextResponse.json({ error: "Failed to update timeline" }, { status: 500 });

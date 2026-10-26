@@ -60,6 +60,7 @@ interface TimelineRendererProps {
   showGapBorder?: boolean;
   layers?: LayerItem[];
   activeLayerNames?: string[];
+  showCanvasControls?: boolean;
   onToggleLayer?: (name: string) => void;
   onToggleAllLayers?: (all: boolean) => void;
   onCreateLayer?: (name: string, color: string) => Promise<LayerItem>;
@@ -97,6 +98,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       showGapBorder = true,
       layers = [],
       activeLayerNames = [],
+      showCanvasControls = true,
       onToggleLayer,
       onToggleAllLayers,
       onCreateLayer,
@@ -1463,7 +1465,13 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       )}
 
       {/* Floating HUD: Top-Right Canvas Controls */}
-      <div className="absolute top-4 right-4 flex items-center gap-2 z-30">
+      <div
+        className={`absolute top-3 right-4 flex items-center gap-2 z-30 transition-all duration-200 ease-out ${
+          showCanvasControls
+            ? "opacity-100 translate-y-0 pointer-events-auto"
+            : "opacity-0 -translate-y-3 pointer-events-none"
+        }`}
+      >
         {/* Layout Mode Segmented Toggle */}
         <div className="flex items-center p-1 rounded-xl theme-hud text-[11px] font-mono shadow-lg">
           <button
@@ -1691,7 +1699,13 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       </div>
 
       {/* Floating HUD: Bottom-Right Zoom & Fit Dock */}
-      <div className="absolute bottom-4 right-4 flex items-center gap-1.5 p-1 rounded-xl theme-hud shadow-2xl z-30 font-mono text-xs">
+      <div
+        className={`absolute bottom-3 right-4 flex items-center gap-1.5 p-1 rounded-xl theme-hud shadow-2xl z-30 font-mono text-xs transition-all duration-200 ease-out ${
+          showCanvasControls
+            ? "opacity-100 translate-y-0 pointer-events-auto"
+            : "opacity-0 translate-y-3 pointer-events-none"
+        }`}
+      >
         <button
           onClick={zoomOut}
           className="w-8 h-8 rounded-lg flex items-center justify-center theme-hud-btn cursor-pointer"
@@ -1718,7 +1732,13 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       </div>
 
       {/* Floating HUD: Bottom-Left Dynamic Coordinate Tracker */}
-      <div className="absolute bottom-4 left-4 flex items-center gap-2 z-30 font-mono text-[11px] pointer-events-none">
+      <div
+        className={`absolute bottom-3 left-4 flex items-center gap-2 z-30 font-mono text-[11px] pointer-events-none transition-all duration-200 ease-out ${
+          showCanvasControls
+            ? "opacity-100 translate-y-0"
+            : "opacity-0 translate-y-3"
+        }`}
+      >
         <div className="px-3 py-1.5 rounded-xl theme-hud shadow-lg flex items-center gap-2.5">
           <span className="flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-[#c9a84c]" />

@@ -27,6 +27,8 @@ import {
   Undo2,
   Redo2,
   RotateCcw,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 export type HistoryAction =
@@ -129,6 +131,24 @@ export default function TimelinePage() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showGapBorder, setShowGapBorder] = useState(true);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
+
+  // Canvas floating HUD controls visibility toggle (Eye toggle)
+  const [showCanvasControls, setShowCanvasControls] = useState<boolean>(true);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("neeline_canvas_controls");
+    if (saved !== null) {
+      setShowCanvasControls(saved !== "false");
+    }
+  }, []);
+
+  const toggleCanvasControls = useCallback(() => {
+    setShowCanvasControls((prev) => {
+      const next = !prev;
+      localStorage.setItem("neeline_canvas_controls", String(next));
+      return next;
+    });
+  }, []);
 
   // Undo / Redo History Stacks (MS Word Style)
   const [undoStack, setUndoStack] = useState<HistoryAction[]>([]);
@@ -879,10 +899,16 @@ export default function TimelinePage() {
         typeof navigator !== "undefined" &&
         /Mac|iPod|iPhone|iPad/.test(navigator.platform);
       const isModifier = isMac ? e.metaKey : e.ctrlKey;
+      const key = e.key.toLowerCase();
+
+      if (!isModifier && key === "v") {
+        e.preventDefault();
+        toggleCanvasControls();
+        return;
+      }
 
       if (!isModifier) return;
 
-      const key = e.key.toLowerCase();
       if (key === "z" && !e.shiftKey) {
         e.preventDefault();
         handleUndo();
@@ -900,6 +926,7 @@ export default function TimelinePage() {
   }, [
     handleUndo,
     handleRedo,
+    toggleCanvasControls,
     showEventForm,
     showSettings,
     showImportModal,
@@ -1045,13 +1072,13 @@ export default function TimelinePage() {
     <div className="h-screen w-screen theme-bg overflow-hidden select-none relative flex flex-col">
       <Navbar />
 
-      {/* Studio Header Bar */}
-      <div className="fixed top-14 left-0 right-0 h-14 px-4 sm:px-6 z-40 border-b border-black/[0.08] dark:border-white/[0.08] glass-panel flex items-center justify-between gap-3">
+      {/* Studio Header Bar (Top 2nd Bar: Sleeker, compact ribbon) */}
+      <div className="fixed top-14 left-0 right-0 h-11 px-3 sm:px-6 z-40 border-b border-black/[0.08] dark:border-white/[0.08] glass-panel flex items-center justify-between gap-2.5">
         {/* Left Side: Back button, Name edit & Event counter & Chronicle Notes */}
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-2.5 min-w-0">
           <Link
             href="/dashboard"
-            className="w-9 h-9 rounded-xl theme-pill hover:border-[#c9a84c]/50 flex items-center justify-center shrink-0 transition-colors"
+            className="w-8 h-8 rounded-lg theme-pill hover:border-[#c9a84c]/50 flex items-center justify-center shrink-0 transition-colors"
             title="Return to Dashboard"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -1072,17 +1099,17 @@ export default function TimelinePage() {
                 }
               }}
               onBlur={handleRename}
-              className="px-2.5 py-1 rounded-lg theme-input text-sm font-semibold outline-none min-w-0 border border-[#c9a84c]"
+              className="px-2 py-0.5 rounded-lg theme-input text-xs sm:text-sm font-semibold outline-none min-w-0 border border-[#c9a84c]"
               style={{ fontFamily: "var(--font-display)" }}
             />
           ) : (
             <div
               onClick={() => setEditingName(true)}
-              className="flex items-center gap-2 group/edit cursor-pointer py-1 px-2 rounded-lg hover:bg-black/[0.04] dark:hover:bg-white/[0.04] transition-colors min-w-0"
+              className="flex items-center gap-1.5 group/edit cursor-pointer py-1 px-1.5 rounded-lg hover:bg-black/[0.04] dark:hover:bg-white/[0.04] transition-colors min-w-0"
               title="Click to rename"
             >
               <h1
-                className="text-sm sm:text-base font-semibold truncate theme-card-title group-hover/edit:text-[#c9a84c] transition-colors"
+                className="text-xs sm:text-sm font-semibold truncate theme-card-title group-hover/edit:text-[#c9a84c] transition-colors"
                 style={{ fontFamily: "var(--font-display)" }}
               >
                 {timeline.name}
@@ -1092,7 +1119,7 @@ export default function TimelinePage() {
           )}
 
           {/* Event count chip */}
-          <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full theme-pill text-[11px] font-mono text-[#c9a84c] font-semibold">
+          <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full theme-pill text-[10px] font-mono text-[#c9a84c] font-semibold">
             <Calendar className="w-3 h-3" />
             <span>
               {events.length} {events.length === 1 ? "event" : "events"}
@@ -1100,11 +1127,11 @@ export default function TimelinePage() {
           </span>
         </div>
 
-        {/* Right Studio Action Icons: Undo/Redo -> Import/Export -> Canvas Settings -> Add Event */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Right Studio Action Icons: Undo/Redo -> Import/Export -> Canvas Settings -> Eye Toggle -> Add Event */}
+        <div className="flex items-center gap-1.5 shrink-0">
           {/* Undo / Redo MS Word Style Segmented Control */}
           <div
-            className="flex items-center rounded-xl theme-pill p-0.5 border border-black/10 dark:border-white/10"
+            className="flex items-center rounded-lg theme-pill p-0.5 border border-black/10 dark:border-white/10"
             role="group"
             aria-label="Undo and Redo"
           >
@@ -1112,7 +1139,7 @@ export default function TimelinePage() {
               type="button"
               onClick={handleUndo}
               disabled={undoStack.length === 0 || isHistoryBusy}
-              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+              className={`w-7 h-7 rounded-md flex items-center justify-center transition-all ${
                 undoStack.length > 0 && !isHistoryBusy
                   ? "hover:text-[#c9a84c] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer text-slate-700 dark:text-slate-200"
                   : "opacity-30 cursor-not-allowed text-slate-400 dark:text-slate-600"
@@ -1124,14 +1151,14 @@ export default function TimelinePage() {
               }
               aria-label="Undo"
             >
-              <Undo2 className="w-4 h-4" />
+              <Undo2 className="w-3.5 h-3.5" />
             </button>
-            <div className="w-px h-4 bg-black/10 dark:bg-white/10" />
+            <div className="w-px h-3.5 bg-black/10 dark:bg-white/10" />
             <button
               type="button"
               onClick={handleRedo}
               disabled={redoStack.length === 0 || isHistoryBusy}
-              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+              className={`w-7 h-7 rounded-md flex items-center justify-center transition-all ${
                 redoStack.length > 0 && !isHistoryBusy
                   ? "hover:text-[#c9a84c] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer text-slate-700 dark:text-slate-200"
                   : "opacity-30 cursor-not-allowed text-slate-400 dark:text-slate-600"
@@ -1143,7 +1170,7 @@ export default function TimelinePage() {
               }
               aria-label="Redo"
             >
-              <Redo2 className="w-4 h-4" />
+              <Redo2 className="w-3.5 h-3.5" />
             </button>
           </div>
 
@@ -1151,11 +1178,11 @@ export default function TimelinePage() {
           <div className="relative" ref={exportMenuRef}>
             <button
               onClick={() => setShowExportMenu(!showExportMenu)}
-              className="w-9 h-9 rounded-xl theme-pill hover:border-[#c9a84c]/50 flex items-center justify-center cursor-pointer transition-all"
+              className="w-8 h-8 rounded-lg theme-pill hover:border-[#c9a84c]/50 flex items-center justify-center cursor-pointer transition-all"
               title="Import & Export (JSON callset, PNG image, Schema, TXT)"
               aria-label="Import & Export"
             >
-              <Download className="w-4 h-4 text-[#c9a84c]" />
+              <Download className="w-3.5 h-3.5 text-[#c9a84c]" />
             </button>
 
             {showExportMenu && (
@@ -1226,34 +1253,61 @@ export default function TimelinePage() {
           {/* 2. Canvas Settings Small Icon Button (Beside Import/Export on the right) */}
           <button
             onClick={() => setShowSettings(true)}
-            className="w-9 h-9 rounded-xl theme-pill hover:border-[#c9a84c]/50 flex items-center justify-center cursor-pointer relative transition-all"
+            className="w-8 h-8 rounded-lg theme-pill hover:border-[#c9a84c]/50 flex items-center justify-center cursor-pointer relative transition-all"
             title="Canvas Settings (Colors, Theme & Gap Year Borders)"
             aria-label="Canvas Settings"
           >
-            <Settings2 className="w-4 h-4 text-[#c9a84c]" />
+            <Settings2 className="w-3.5 h-3.5 text-[#c9a84c]" />
             <div
               className="w-1.5 h-1.5 rounded-full absolute bottom-1.5 right-1.5 ring-1 ring-black/20 dark:ring-[#070c16]"
               style={{ backgroundColor: timeline.spineColor }}
             />
           </button>
 
-          {/* 3. Add Event Small Icon Button (Beside Canvas Settings on the right) */}
+          {/* 3. Eye Toggle: Vanish / Show all buttons above canvas area */}
+          <button
+            type="button"
+            onClick={toggleCanvasControls}
+            className={`w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-all ${
+              !showCanvasControls
+                ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/50 shadow-sm"
+                : "theme-pill hover:border-[#c9a84c]/40 text-slate-600 dark:text-slate-300 hover:text-[#c9a84c]"
+            }`}
+            title={
+              showCanvasControls
+                ? "Vanish all buttons above canvas area (Zen View - Key: V)"
+                : "Show all buttons above canvas area (Key: V)"
+            }
+            aria-label={
+              showCanvasControls
+                ? "Vanish all buttons above canvas area"
+                : "Show all buttons above canvas area"
+            }
+          >
+            {showCanvasControls ? (
+              <Eye className="w-3.5 h-3.5" />
+            ) : (
+              <EyeOff className="w-3.5 h-3.5 text-[#c9a84c]" />
+            )}
+          </button>
+
+          {/* 4. Add Event Small Icon Button (Beside Eye Toggle on the right) */}
           <button
             onClick={() => {
               setEditingEvent(null);
               setShowEventForm(true);
             }}
-            className="btn-gold w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer shadow-md"
+            className="btn-gold w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer shadow-md"
             title="Add Chronicle Milestone or Bracketed Period"
             aria-label="Add Chronicle Milestone"
           >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
           </button>
         </div>
       </div>
 
       {/* Main Interactive Canvas Area: Fixed between top studio header and bottom footer */}
-      <div className="absolute inset-x-0 top-[112px] bottom-[36px] overflow-hidden">
+      <div className="absolute inset-x-0 top-[100px] bottom-[36px] overflow-hidden">
         <TimelineRenderer
           ref={rendererRef}
           events={events}
@@ -1264,6 +1318,7 @@ export default function TimelinePage() {
           showGapBorder={showGapBorder}
           layers={layers}
           activeLayerNames={activeLayerNames}
+          showCanvasControls={showCanvasControls}
           onToggleLayer={handleToggleLayer}
           onToggleAllLayers={handleToggleAllLayers}
           onCreateLayer={handleCreateLayer}

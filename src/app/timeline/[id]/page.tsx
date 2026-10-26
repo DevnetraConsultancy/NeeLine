@@ -1242,6 +1242,7 @@ export default function TimelinePage() {
       {/* Event Add/Edit Modal: Supports Point Milestones & Horizontal Bracket Spans */}
       {showEventForm && (
         <EventForm
+          key={editingEvent?.id ? `edit-${editingEvent.id}` : "new-event"}
           initialData={
             editingEvent
               ? {
@@ -1254,8 +1255,17 @@ export default function TimelinePage() {
                   description: editingEvent.description || "",
                   color: editingEvent.color,
                   layer: editingEvent.layer || "General",
-                  isSpan: Boolean(editingEvent.endYear !== undefined && editingEvent.endYear !== null),
-                  endYear: editingEvent.endYear !== undefined && editingEvent.endYear !== null ? String(editingEvent.endYear) : "",
+                  isSpan: Boolean(
+                    editingEvent.endYear !== undefined &&
+                    editingEvent.endYear !== null &&
+                    String(editingEvent.endYear).trim() !== ""
+                  ),
+                  endYear:
+                    editingEvent.endYear !== undefined &&
+                    editingEvent.endYear !== null &&
+                    String(editingEvent.endYear).trim() !== ""
+                      ? String(editingEvent.endYear)
+                      : null,
                   endIsBce: editingEvent.endIsBce || false,
                   endMonth: editingEvent.endMonth ? String(editingEvent.endMonth) : "",
                   endDay: editingEvent.endDay ? String(editingEvent.endDay) : "",

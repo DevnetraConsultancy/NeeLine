@@ -82,9 +82,19 @@ export default function EventForm({
   onClose,
 }: EventFormProps) {
   const [mounted, setMounted] = useState(false);
-  const [isSpan, setIsSpan] = useState(
-    Boolean(initialData?.endYear !== undefined && initialData?.endYear !== null)
-  );
+
+  // Helper to reliably determine whether event is a bracketed period span
+  const computeIsSpan = (data?: EventFormData): boolean => {
+    if (!data) return false;
+    if (typeof data.isSpan === "boolean") return data.isSpan;
+    return Boolean(
+      data.endYear !== undefined &&
+      data.endYear !== null &&
+      String(data.endYear).trim() !== ""
+    );
+  };
+
+  const [isSpan, setIsSpan] = useState(() => computeIsSpan(initialData));
 
   // Start Date
   const [year, setYear] = useState(initialData?.year?.toString() || "");
@@ -108,6 +118,44 @@ export default function EventForm({
   const [selectedLayer, setSelectedLayer] = useState(
     initialData?.layer || (availableLayers[0]?.name ?? "General")
   );
+
+  // Synchronize state when initialData or availableLayers changes
+  useEffect(() => {
+    if (initialData) {
+      const spanMode = computeIsSpan(initialData);
+      setIsSpan(spanMode);
+      setYear(initialData.year?.toString() || "");
+      setIsBce(initialData.isBce || false);
+      setMonth(initialData.month || "");
+      setDay(initialData.day || "");
+      setEndYear(
+        initialData.endYear !== undefined && initialData.endYear !== null
+          ? String(initialData.endYear)
+          : ""
+      );
+      setEndIsBce(initialData.endIsBce || false);
+      setEndMonth(initialData.endMonth || "");
+      setEndDay(initialData.endDay || "");
+      setTitle(initialData.title || "");
+      setDescription(initialData.description || "");
+      setColor(initialData.color || "#c9a84c");
+      setSelectedLayer(initialData.layer || (availableLayers[0]?.name ?? "General"));
+    } else {
+      setIsSpan(false);
+      setYear("");
+      setIsBce(false);
+      setMonth("");
+      setDay("");
+      setEndYear("");
+      setEndIsBce(false);
+      setEndMonth("");
+      setEndDay("");
+      setTitle("");
+      setDescription("");
+      setColor("#c9a84c");
+      setSelectedLayer(availableLayers[0]?.name ?? "General");
+    }
+  }, [initialData, availableLayers]);
 
   // Quick inline new layer creation
   const [showNewLayerInput, setShowNewLayerInput] = useState(false);
@@ -901,13 +949,13 @@ export default function EventForm({
         </form>
       </div>
 
-      {/* Confirmation Modal for Milestone Deletion */}
+      {/* Confirmation Modal for Milestone / Period Deletion */}
       <ConfirmModal
         isOpen={showDeleteConfirm}
-        title="Delete Chronicle Milestone"
-        message={`Are you sure you want to remove "${title || "this milestone"}" from the chronicle number line?`}
-        confirmLabel="Delete Milestone"
-        cancelLabel="Keep Milestone"
+        title={isSpan ? "Delete Bracketed Period" : "Delete Chronicle Milestone"}
+        message={`Are you sure you want to remove "${title || (isSpan ? "this period" : "this milestone")}" from the chronicle number line?`}
+        confirmLabel={isSpan ? "Delete Period" : "Delete Milestone"}
+        cancelLabel={isSpan ? "Keep Period" : "Keep Milestone"}
         isDestructive={true}
         isLoading={deleting}
         onConfirm={handleExecuteDelete}

@@ -124,7 +124,11 @@ export default function EventForm({
     if (initialData) {
       const spanMode = computeIsSpan(initialData);
       setIsSpan(spanMode);
-      setYear(initialData.year?.toString() || "");
+      setYear(
+        initialData.year !== undefined && initialData.year !== null
+          ? String(initialData.year)
+          : ""
+      );
       setIsBce(initialData.isBce || false);
       setMonth(initialData.month || "");
       setDay(initialData.day || "");
@@ -231,7 +235,7 @@ export default function EventForm({
       title: title.trim(),
       description: description.trim(),
       color,
-      layer: selectedLayer.trim() || "General",
+      layer: selectedLayer.trim() || (availableLayers[0]?.name ?? "General"),
       isSpan,
       endYear: isSpan ? parsedEndNum : null,
       endIsBce: isSpan ? endIsBce : false,

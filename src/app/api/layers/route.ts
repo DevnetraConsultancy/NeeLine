@@ -28,13 +28,6 @@ export async function GET(req: NextRequest) {
 
     const layerMap = new Map<string, { id: string; name: string; color: string }>();
 
-    // Always include General layer
-    layerMap.set("general", {
-      id: "layer-general",
-      name: "General",
-      color: "#c9a84c",
-    });
-
     // Extract layers from existing events
     for (const ev of timeline.events) {
       const { layer } = parseEventMetadata(ev.description);
@@ -47,6 +40,15 @@ export async function GET(req: NextRequest) {
           color: ev.color && ev.color.startsWith("#") ? ev.color : "#5a9bd5",
         });
       }
+    }
+
+    // If timeline has no events and no layers yet, provide General as initial starter layer
+    if (layerMap.size === 0) {
+      layerMap.set("general", {
+        id: "layer-general",
+        name: "General",
+        color: "#c9a84c",
+      });
     }
 
     return NextResponse.json(Array.from(layerMap.values()));
@@ -119,12 +121,6 @@ export async function DELETE(req: NextRequest) {
     }
 
     const safeName = decodeURIComponent(name).trim();
-    if (safeName.toLowerCase() === "general") {
-      return NextResponse.json(
-        { error: "Cannot delete the default General layer" },
-        { status: 400 }
-      );
-    }
 
     // Verify ownership
     const timeline = await prisma.timeline.findFirst({

@@ -287,8 +287,8 @@ export default function TimelinePage() {
         }
       }
 
-      // Fallback: ensure General layer exists
-      if (!fetchedLayers.some((l) => l.name.toLowerCase() === "general")) {
+      // Fallback: if no layers at all and no events exist, initialize with General
+      if (fetchedLayers.length === 0 && fetchedEvents.length === 0) {
         fetchedLayers.unshift({ id: "layer-general", name: "General", color: "#c9a84c" });
       }
 
@@ -476,7 +476,7 @@ export default function TimelinePage() {
   const handleDeleteLayer = useCallback(
     async (id: string, name: string) => {
       const trimmed = name.trim();
-      if (!trimmed || trimmed.toLowerCase() === "general") return;
+      if (!trimmed) return;
       setLayerToDelete({ id, name: trimmed });
     },
     []
@@ -518,12 +518,9 @@ export default function TimelinePage() {
       return updated;
     });
 
-    // 3. Remove from activeLayerNames and localStorage, ensure "General" is present
+    // 3. Remove from activeLayerNames and localStorage
     setActiveLayerNames((prev) => {
       const remaining = prev.filter((n) => n.trim().toLowerCase() !== lowerName);
-      if (!remaining.some((n) => n.toLowerCase() === "general")) {
-        remaining.unshift("General");
-      }
       localStorage.setItem(`neeline_active_layers_${timelineId}`, JSON.stringify(remaining));
       return remaining;
     });

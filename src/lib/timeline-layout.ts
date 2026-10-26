@@ -248,6 +248,7 @@ export function formatDateLabel(
 ): string {
   if (isNaN(Number(year))) return "Unknown";
   const safeYear = Math.abs(Number(year));
+  if (safeYear === 0) return "0";
   const era = isBce ? "BCE" : "CE";
   const formattedYear = safeYear.toLocaleString();
   if (month && day && month >= 1 && month <= 12) {

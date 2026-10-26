@@ -96,7 +96,6 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       events,
       bgColor,
       spineColor,
-      tickColor,
       textColor,
       showGapBorder = true,
       layers = [],
@@ -172,6 +171,20 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       }
     }
     return "even";
+  });
+
+  // Track if user has manually panned/zoomed the canvas.
+  // By default, layers are always fit. Once panned, that state is locked until next pan/fit.
+  const [isUserPanned, setIsUserPanned] = useState<boolean>(() => {
+    if (typeof window !== "undefined" && timelineId) {
+      try {
+        const saved = localStorage.getItem(`neeline_is_panned_${timelineId}`);
+        if (saved !== null) {
+          return saved === "true";
+        }
+      } catch {}
+    }
+    return false; // Default: fit mode
   });
 
   const [hoveredEvent, setHoveredEvent] = useState<string | null>(null);
@@ -390,12 +403,6 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     [chronologicalAnchors, anchorBasePositions, layoutMode, zoom, panX, dimensions.width]
   );
 
-  // Check if any visible event is at year 0
-  const hasYearZero = useMemo(
-    () => visibleEvents.some((e) => e.year === 0 && !e.isBce),
-    [visibleEvents]
-  );
-
   // Sorted events for gap calculation
   const sortedEvents = useMemo(() => {
     return [...visibleEvents].sort((a, b) => {
@@ -598,52 +605,17 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     prevLayoutStateRef.current.layoutMode = layoutMode;
   }, [panX, zoom, dimensions.width, layoutMode]);
 
-  // Synchronous Render-Phase Focal Alignment:
-  // When anchorBasePositions changes due to layer toggle, event add, or event delete,
-  // synchronously adjust panX in the render phase BEFORE browser paint.
-  // This eliminates 1-frame paint delays and completely eliminates flickering and jumping.
+  // Synchronous Render-Phase Focal Alignment & Viewport Mode Control:
+  // If the user has NOT panned (default fit mode): layers are always fit to view!
+  // Once the user pans the canvas: that viewport state is locked during layer add/remove until next pan or fit.
   if (
     prevLayoutStateRef.current.hasInitialized &&
     layoutMode === "even" &&
     prevLayoutStateRef.current.layoutMode === "even" &&
     prevLayoutStateRef.current.anchorBasePositions !== anchorBasePositions
   ) {
-    const prevState = prevLayoutStateRef.current;
-    const commonYears: number[] = [];
-    anchorBasePositions.forEach((_, year) => {
-      if (prevState.anchorBasePositions.has(year)) {
-        commonYears.push(year);
-      }
-    });
-
-    if (commonYears.length > 0) {
-      const centerScreenX = prevState.width / 2;
-      let bestYear = commonYears[0];
-      let minDistanceToCenter = Infinity;
-
-      commonYears.forEach((y) => {
-        const prevBaseX = prevState.anchorBasePositions.get(y)!;
-        const prevScreenX = centerScreenX + prevBaseX * prevState.zoom + prevState.panX;
-        const dist = Math.abs(prevScreenX - centerScreenX);
-        if (dist < minDistanceToCenter) {
-          minDistanceToCenter = dist;
-          bestYear = y;
-        }
-      });
-
-      const prevBaseX = prevState.anchorBasePositions.get(bestYear)!;
-      const prevScreenX = centerScreenX + prevBaseX * prevState.zoom + prevState.panX;
-
-      const newBaseX = anchorBasePositions.get(bestYear)!;
-      const targetScreenX = dimensions.width / 2;
-      const targetPanX = prevScreenX - targetScreenX - newBaseX * zoom;
-
-      if (Math.abs(targetPanX - panX) > 0.5) {
-        setPanX(targetPanX);
-        prevLayoutStateRef.current.panX = targetPanX;
-      }
-    } else if (chronologicalAnchors.length > 0) {
-      // Switched to a completely disjoint layer with 0 common events: center new layer
+    if (!isUserPanned) {
+      // By default layers are always fit: center active layer(s) cleanly
       const SPACING = 220;
       const totalSpan = Math.max(1, chronologicalAnchors.length - 1) * SPACING;
       const padding = 140;
@@ -654,6 +626,55 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       setPanX(0);
       prevLayoutStateRef.current.panX = 0;
       prevLayoutStateRef.current.zoom = clampedZoom;
+    } else {
+      // User has manually panned: lock the screen position of the focal milestone
+      const prevState = prevLayoutStateRef.current;
+      const commonYears: number[] = [];
+      anchorBasePositions.forEach((_, year) => {
+        if (prevState.anchorBasePositions.has(year)) {
+          commonYears.push(year);
+        }
+      });
+
+      if (commonYears.length > 0) {
+        const centerScreenX = prevState.width / 2;
+        let bestYear = commonYears[0];
+        let minDistanceToCenter = Infinity;
+
+        commonYears.forEach((y) => {
+          const prevBaseX = prevState.anchorBasePositions.get(y)!;
+          const prevScreenX = centerScreenX + prevBaseX * prevState.zoom + prevState.panX;
+          const dist = Math.abs(prevScreenX - centerScreenX);
+          if (dist < minDistanceToCenter) {
+            minDistanceToCenter = dist;
+            bestYear = y;
+          }
+        });
+
+        const prevBaseX = prevState.anchorBasePositions.get(bestYear)!;
+        const prevScreenX = centerScreenX + prevBaseX * prevState.zoom + prevState.panX;
+
+        const newBaseX = anchorBasePositions.get(bestYear)!;
+        const targetScreenX = dimensions.width / 2;
+        const targetPanX = prevScreenX - targetScreenX - newBaseX * zoom;
+
+        if (Math.abs(targetPanX - panX) > 0.5) {
+          setPanX(targetPanX);
+          prevLayoutStateRef.current.panX = targetPanX;
+        }
+      } else if (chronologicalAnchors.length > 0) {
+        // Disjoint layer with 0 common events: center new layer
+        const SPACING = 220;
+        const totalSpan = Math.max(1, chronologicalAnchors.length - 1) * SPACING;
+        const padding = 140;
+        const availableWidth = dimensions.width - padding * 2;
+        const newZoom = chronologicalAnchors.length > 1 ? Math.min(1.25, availableWidth / totalSpan) : 1;
+        const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
+        setZoom(clampedZoom);
+        setPanX(0);
+        prevLayoutStateRef.current.panX = 0;
+        prevLayoutStateRef.current.zoom = clampedZoom;
+      }
     }
 
     prevLayoutStateRef.current.anchorBasePositions = anchorBasePositions;
@@ -672,46 +693,33 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     };
   }
 
-  // Switch layout mode while preserving the user's focal year at screen center
+  // Clicking Even Space or Proportional button puts all events/layers into fit view
   const handleSetLayoutMode = useCallback(
     (newMode: "even" | "proportional") => {
-      if (newMode === layoutMode) return;
-      const centerYear = xToYear(dimensions.width / 2);
-
       setLayoutMode(newMode);
-
-      if (newMode === "proportional") {
-        const targetPanX = -centerYear * BASE_PIXELS_PER_YEAR * zoom;
-        setPanX(targetPanX);
-        prevLayoutStateRef.current.panX = targetPanX;
-        prevLayoutStateRef.current.layoutMode = newMode;
-      } else {
-        const exactBase = anchorBasePositions.get(centerYear);
-        if (exactBase !== undefined) {
-          const targetPanX = -exactBase * zoom;
-          setPanX(targetPanX);
-          prevLayoutStateRef.current.panX = targetPanX;
-          prevLayoutStateRef.current.layoutMode = newMode;
-        } else if (chronologicalAnchors.length > 0) {
-          let closestYear = chronologicalAnchors[0];
-          let minDiff = Math.abs(chronologicalAnchors[0] - centerYear);
-          chronologicalAnchors.forEach((y) => {
-            const diff = Math.abs(y - centerYear);
-            if (diff < minDiff) {
-              minDiff = diff;
-              closestYear = y;
-            }
-          });
-          const base = anchorBasePositions.get(closestYear) ?? 0;
-          const targetPanX = -base * zoom;
-          setPanX(targetPanX);
-          prevLayoutStateRef.current.panX = targetPanX;
-          prevLayoutStateRef.current.layoutMode = newMode;
-        }
+      setIsUserPanned(false);
+      if (timelineId) {
+        try {
+          localStorage.setItem(`neeline_is_panned_${timelineId}`, "false");
+        } catch {}
       }
+      setTimeout(() => {
+        fitAll();
+      }, 0);
     },
-    [layoutMode, xToYear, dimensions.width, zoom, anchorBasePositions, chronologicalAnchors]
+    [fitAll, timelineId]
   );
+
+  // Manual Fit button click handler
+  const handleFitClick = useCallback(() => {
+    fitAll();
+    setIsUserPanned(false);
+    if (timelineId) {
+      try {
+        localStorage.setItem(`neeline_is_panned_${timelineId}`, "false");
+      } catch {}
+    }
+  }, [fitAll, timelineId]);
 
   // Export full timeline fitted as 2x Retina PNG
   const exportPng = useCallback(
@@ -803,10 +811,18 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       const newPanX = mouseX - dimensions.width / 2 - baseX * newZoom;
       setZoom(newZoom);
       setPanX(newPanX);
+      if (!isUserPanned) {
+        setIsUserPanned(true);
+        if (timelineId) {
+          try {
+            localStorage.setItem(`neeline_is_panned_${timelineId}`, "true");
+          } catch {}
+        }
+      }
     };
     el.addEventListener("wheel", handler, { passive: false });
     return () => el.removeEventListener("wheel", handler);
-  }, [zoom, panX, dimensions.width]);
+  }, [zoom, panX, dimensions.width, isUserPanned, timelineId]);
 
   // Mouse drag pan
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -833,12 +849,20 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       const dy = e.clientY - lastMouse.current.y;
       if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
         hasDragged.current = true;
+        if (!isUserPanned) {
+          setIsUserPanned(true);
+          if (timelineId) {
+            try {
+              localStorage.setItem(`neeline_is_panned_${timelineId}`, "true");
+            } catch {}
+          }
+        }
       }
       lastMouse.current = { x: e.clientX, y: e.clientY };
 
       setPanX((prev) => prev + dx);
     },
-    [xToYear]
+    [xToYear, isUserPanned, timelineId]
   );
 
   const handleMouseUp = useCallback(() => {
@@ -868,7 +892,17 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     (e: React.TouchEvent) => {
       if (e.touches.length === 1 && isDragging.current) {
         const dx = e.touches[0].clientX - touchStart.current.x;
-        if (Math.abs(dx) > 2) hasDragged.current = true;
+        if (Math.abs(dx) > 2) {
+          hasDragged.current = true;
+          if (!isUserPanned) {
+            setIsUserPanned(true);
+            if (timelineId) {
+              try {
+                localStorage.setItem(`neeline_is_panned_${timelineId}`, "true");
+              } catch {}
+            }
+          }
+        }
         touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         setPanX((prev) => prev + dx);
       } else if (e.touches.length === 2 && pinchDist.current !== null) {
@@ -886,9 +920,17 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
         const newPanX = midX - dimensions.width / 2 - baseX * newZoom;
         setZoom(newZoom);
         setPanX(newPanX);
+        if (!isUserPanned) {
+          setIsUserPanned(true);
+          if (timelineId) {
+            try {
+              localStorage.setItem(`neeline_is_panned_${timelineId}`, "true");
+            } catch {}
+          }
+        }
       }
     },
-    [zoom, panX, dimensions.width]
+    [zoom, panX, dimensions.width, isUserPanned, timelineId]
   );
 
   const handleTouchEnd = useCallback(() => {
@@ -945,7 +987,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
         return;
       }
       if (e.key === "0") {
-        fitAll();
+        handleFitClick();
       } else if (e.key === "+" || e.key === "=") {
         zoomIn();
       } else if (e.key === "-") {
@@ -954,7 +996,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [fitAll, zoomIn, zoomOut]);
+  }, [handleFitClick, zoomIn, zoomOut]);
 
   return (
     <div
@@ -1012,43 +1054,44 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
         <circle cx={spineLeft} cy={spineY} r="3" fill={spineColor} opacity="0.85" />
         <circle cx={spineRight} cy={spineY} r="3" fill={spineColor} opacity="0.85" />
 
-        {/* Origin "0 CE" Beacon - only display if 0 CE is within the events' bounded range */}
-        {!hasYearZero && originX >= spineLeft && originX <= spineRight && (
-          <g className="origin-marker">
-            {/* Vertical tick through axis */}
+        {/* Permanent Year 0 Landmark Axis Marker: Permanent as "0" with thick solid red border */}
+        {originX >= spineLeft && originX <= spineRight && (
+          <g className="origin-marker-0" style={{ cursor: "default" }}>
+            {/* Vertical tick through axis - thick solid red */}
             <line
               x1={originX}
-              y1={spineY - TICK_HEIGHT - 2}
+              y1={spineY - TICK_HEIGHT - 4}
               x2={originX}
-              y2={spineY + TICK_HEIGHT + 2}
-              stroke={tickColor}
-              strokeWidth="2"
-              opacity="0.85"
+              y2={spineY + TICK_HEIGHT + 4}
+              stroke="#ef4444"
+              strokeWidth="3"
+              opacity="1"
             />
-            {/* Celestial orbital ring */}
-            <circle
-              cx={originX}
-              cy={spineY}
-              r="6.5"
-              fill="none"
-              stroke={tickColor}
-              strokeWidth="1.5"
-              opacity="0.75"
+            {/* Center solid red core node */}
+            <circle cx={originX} cy={spineY} r="4" fill="#ef4444" />
+
+            {/* Permanent "0" Badge with THICK SOLID RED BORDER */}
+            <rect
+              x={originX - 16}
+              y={spineY + TICK_HEIGHT + 8}
+              width="32"
+              height="22"
+              rx="5"
+              fill={bgColor}
+              stroke="#ef4444"
+              strokeWidth="2.8"
+              opacity="1"
             />
-            {/* Center pip */}
-            <circle cx={originX} cy={spineY} r="2" fill={tickColor} opacity="0.9" />
-            {/* Origin label */}
             <text
               x={originX}
-              y={spineY + TICK_HEIGHT + 20}
+              y={spineY + TICK_HEIGHT + 23}
               textAnchor="middle"
-              fill={textColor}
-              fontSize="11"
-              fontWeight="600"
-              fontFamily="var(--font-mono)"
-              opacity="0.7"
+              fill="#ef4444"
+              fontSize="12"
+              fontWeight="800"
+              fontFamily="var(--font-mono, monospace)"
             >
-              0 CE
+              0
             </text>
           </g>
         )}
@@ -1121,46 +1164,49 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
 
             {/* Unified Axis Ticks, Nodes & Date Labels (Deduplicated & Overlap-Free) */}
             <g className="spine-ticks-and-labels">
-              {axisDateMarkers.map((marker) => (
-                <g key={`axis-${marker.key}`} className="axis-point-group">
-                  {/* Vertical tick on axis */}
-                  <line
-                    x1={marker.x}
-                    y1={spineY - TICK_HEIGHT / 2}
-                    x2={marker.x}
-                    y2={spineY + TICK_HEIGHT / 2}
-                    stroke={marker.color}
-                    strokeWidth="2.5"
-                    opacity="0.95"
-                  />
+              {axisDateMarkers.map((marker) => {
+                const isZero = marker.year === 0;
+                return (
+                  <g key={`axis-${marker.key}`} className="axis-point-group">
+                    {/* Vertical tick on axis */}
+                    <line
+                      x1={marker.x}
+                      y1={spineY - TICK_HEIGHT / 2 - (isZero ? 2 : 0)}
+                      x2={marker.x}
+                      y2={spineY + TICK_HEIGHT / 2 + (isZero ? 2 : 0)}
+                      stroke={isZero ? "#ef4444" : marker.color}
+                      strokeWidth={isZero ? "3" : "2.5"}
+                      opacity="0.95"
+                    />
 
-                  {/* Spine dot node */}
-                  <circle
-                    cx={marker.x}
-                    cy={spineY}
-                    r="3.5"
-                    fill={marker.color}
-                    stroke={bgColor}
-                    strokeWidth="1.5"
-                  />
+                    {/* Spine dot node */}
+                    <circle
+                      cx={marker.x}
+                      cy={spineY}
+                      r={isZero ? "4.5" : "3.5"}
+                      fill={isZero ? "#ef4444" : marker.color}
+                      stroke={isZero ? "#ef4444" : bgColor}
+                      strokeWidth="1.5"
+                    />
 
-                  {/* Single date label beneath the axis (shown when not colliding) */}
-                  {marker.showLabel && (
-                    <text
-                      x={marker.x}
-                      y={spineY + TICK_HEIGHT / 2 + 16}
-                      textAnchor="middle"
-                      fill={marker.color}
-                      fontSize="10"
-                      fontFamily="var(--font-mono)"
-                      fontWeight="500"
-                      opacity="0.9"
-                    >
-                      {marker.label}
-                    </text>
-                  )}
-                </g>
-              ))}
+                    {/* Single date label beneath the axis (shown when not colliding) */}
+                    {marker.showLabel && (
+                      <text
+                        x={marker.x}
+                        y={spineY + TICK_HEIGHT / 2 + 16}
+                        textAnchor="middle"
+                        fill={isZero ? "#ef4444" : marker.color}
+                        fontSize="10"
+                        fontFamily="var(--font-mono)"
+                        fontWeight={isZero ? "800" : "500"}
+                        opacity="0.95"
+                      >
+                        {isZero ? "0" : marker.label}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
             </g>
 
             {/* Event cards, brackets, and connectors */}
@@ -1264,8 +1310,8 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                         height="26"
                         rx="6"
                         fill={bgColor}
-                        stroke={item.color}
-                        strokeWidth="1.8"
+                        stroke={item.year === 0 || item.endYear === 0 ? "#ef4444" : item.color}
+                        strokeWidth={item.year === 0 || item.endYear === 0 ? "3" : "1.8"}
                         opacity="0.98"
                       />
                       <text
@@ -1401,18 +1447,18 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                         }
                       }}
                     >
-                      {/* Connector line with layer color */}
+                      {/* Connector line with layer color (red if Year 0) */}
                       <line
                         x1={item.x}
                         y1={spineY - TICK_HEIGHT / 2}
                         x2={item.x}
                         y2={spineY - TICK_HEIGHT / 2 - 8 - item.tier * TIER_SPACING}
-                        stroke={item.color}
-                        strokeWidth="1.5"
-                        opacity="0.8"
+                        stroke={item.year === 0 ? "#ef4444" : item.color}
+                        strokeWidth={item.year === 0 ? "2.5" : "1.5"}
+                        opacity="0.9"
                       />
 
-                      {/* Card background with layer's unique border color */}
+                      {/* Card background with layer's unique border color (thick solid red if Year 0) */}
                       <rect
                         x={item.x - item.labelWidth / 2}
                         y={spineY - TICK_HEIGHT / 2 - 26 - item.tier * TIER_SPACING}
@@ -1420,9 +1466,9 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                         height="24"
                         rx="6"
                         fill={bgColor}
-                        stroke={item.color}
-                        strokeWidth="1.8"
-                        opacity="0.95"
+                        stroke={item.year === 0 ? "#ef4444" : item.color}
+                        strokeWidth={item.year === 0 ? "3" : "1.8"}
+                        opacity="0.98"
                       />
 
                       {/* Event Title */}
@@ -1856,7 +1902,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                           {count}
                         </span>
 
-                        {layer.name !== "General" && onDeleteLayer && (
+                        {onDeleteLayer && (
                           <button
                             type="button"
                             onClick={(e) => {
@@ -1967,7 +2013,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
         </button>
         <div className="w-px h-4 bg-black/10 dark:bg-white/10 mx-0.5" />
         <button
-          onClick={fitAll}
+          onClick={handleFitClick}
           className="px-2.5 h-8 rounded-lg flex items-center gap-1.5 text-[#c9a84c] hover:bg-[#c9a84c]/10 transition-colors cursor-pointer font-semibold"
           title="Fit all milestones to canvas (Key: 0)"
         >

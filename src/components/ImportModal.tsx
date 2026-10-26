@@ -254,19 +254,19 @@ export default function ImportModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Compact Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-black/[0.08] dark:border-white/[0.08] bg-black/[0.02] dark:bg-white/[0.02]">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-[#5a9bd5]/15 text-[#5a9bd5] border border-[#5a9bd5]/30 flex items-center justify-center">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-black/[0.08] dark:border-white/[0.08] bg-black/[0.02] dark:bg-white/[0.02]">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-lg bg-[#5a9bd5]/15 text-[#5a9bd5] border border-[#5a9bd5]/30 flex items-center justify-center">
               <Upload className="w-3.5 h-3.5" />
             </div>
             <div>
               <h2
-                className="text-sm font-bold theme-card-title leading-tight"
+                className="text-xs font-bold theme-card-title leading-tight"
                 style={{ fontFamily: "var(--font-display)" }}
               >
-                Import JSON Callset & Layer Routing
+                Import JSON Callset
               </h2>
-              <p className="text-[10px] font-mono theme-text-muted">
+              <p className="text-[9.5px] font-mono theme-text-muted">
                 Batch import milestones and route into specific historical periods
               </p>
             </div>
@@ -275,7 +275,7 @@ export default function ImportModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-lg theme-text-muted hover:opacity-100 hover:bg-black/[0.05] dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+            className="w-6 h-6 flex items-center justify-center rounded-lg theme-text-muted hover:opacity-100 hover:bg-black/[0.05] dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
             title="Close (X)"
           >
             <X className="w-3.5 h-3.5" />
@@ -283,7 +283,7 @@ export default function ImportModal({
         </div>
 
         {/* Compact Form Body */}
-        <div className="p-4 space-y-2.5 text-xs font-mono">
+        <div className="p-3 space-y-2 text-xs font-mono">
           {/* File Dropzone */}
           <input
             ref={fileInputRef}
@@ -302,22 +302,22 @@ export default function ImportModal({
               onDragLeave={() => setIsDragging(false)}
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
-              className={`p-5 rounded-xl border-2 border-dashed flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+              className={`p-3.5 rounded-xl border-2 border-dashed flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
                 isDragging
                   ? "border-[#c9a84c] bg-[#c9a84c]/10"
                   : "border-black/15 dark:border-white/15 hover:border-[#c9a84c]/60 bg-black/[0.02] dark:bg-white/[0.02]"
               }`}
             >
-              <div className="w-8 h-8 rounded-xl bg-[#c9a84c]/15 text-[#c9a84c] flex items-center justify-center mb-1.5">
-                <Upload className="w-4 h-4 stroke-[2]" />
+              <div className="w-7 h-7 rounded-lg bg-[#c9a84c]/15 text-[#c9a84c] flex items-center justify-center mb-1">
+                <Upload className="w-3.5 h-3.5 stroke-[2]" />
               </div>
               <p className="text-xs font-semibold theme-card-title font-sans">
                 Drag and drop your JSON callset here
               </p>
-              <p className="text-[10.5px] theme-text-muted font-sans font-light mt-0.5">
+              <p className="text-[10px] theme-text-muted font-sans font-light mt-0.5">
                 Supports Point Milestones, Horizontal Bracket Spans, and Layer metadata
               </p>
-              <span className="mt-2 px-2.5 py-0.5 rounded-md theme-pill text-[10px] text-[#c9a84c] border border-[#c9a84c]/30 font-semibold">
+              <span className="mt-1.5 px-2 py-0.5 rounded theme-pill text-[9.5px] text-[#c9a84c] border border-[#c9a84c]/30 font-semibold">
                 Browse File (.json)
               </span>
             </div>

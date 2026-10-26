@@ -295,14 +295,14 @@ export default function EventForm({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-black/[0.08] dark:border-white/[0.08] bg-black/[0.02] dark:bg-white/[0.02]">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-[#c9a84c]/15 text-[#c9a84c] border border-[#c9a84c]/30 flex items-center justify-center">
-              <Calendar className="w-4 h-4" />
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-black/[0.08] dark:border-white/[0.08] bg-black/[0.02] dark:bg-white/[0.02]">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-lg bg-[#c9a84c]/15 text-[#c9a84c] border border-[#c9a84c]/30 flex items-center justify-center">
+              <Calendar className="w-3.5 h-3.5" />
             </div>
             <div>
               <h2
-                className="text-base font-bold theme-card-title leading-tight"
+                className="text-xs font-bold theme-card-title leading-tight"
                 style={{ fontFamily: "var(--font-display)" }}
               >
                 {isEditing
@@ -313,9 +313,9 @@ export default function EventForm({
                   ? "Add Horizontal Bracket Period"
                   : "Add Chronicle Milestone"}
               </h2>
-              <p className="text-[11px] font-mono theme-text-muted">
+              <p className="text-[9.5px] font-mono theme-text-muted">
                 {isSpan
-                  ? "Horizontal square bracket spanning between historical coordinates"
+                  ? "Horizontal square bracket spanning between coordinates"
                   : "Temporal coordinate and historical milestone"}
               </p>
             </div>
@@ -324,52 +324,52 @@ export default function EventForm({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-xl theme-text-muted hover:opacity-100 hover:bg-black/[0.05] dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+            className="w-6 h-6 flex items-center justify-center rounded-lg theme-text-muted hover:opacity-100 hover:bg-black/[0.05] dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
             title="Close (X)"
             aria-label="Close"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {/* Milestone vs Horizontal Bracket Period Segmented Switcher */}
-        <div className="px-6 pt-4 pb-1">
-          <div className="flex p-1 rounded-xl bg-black/[0.04] dark:bg-white/[0.04] border border-black/10 dark:border-white/[0.08]">
+        <div className="px-4 pt-2 pb-1">
+          <div className="flex p-0.5 rounded-lg bg-black/[0.04] dark:bg-white/[0.04] border border-black/10 dark:border-white/[0.08]">
             <button
               type="button"
               onClick={() => setIsSpan(false)}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-mono font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              className={`flex-1 py-1 rounded-md text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                 !isSpan
-                  ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/40 font-semibold shadow-sm"
+                  ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/40 font-semibold shadow-xs"
                   : "theme-text-muted hover:opacity-100"
               }`}
             >
-              <Calendar className="w-3.5 h-3.5" />
+              <Calendar className="w-3 h-3" />
               <span>Point Milestone</span>
             </button>
             <button
               type="button"
               onClick={() => setIsSpan(true)}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-mono font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              className={`flex-1 py-1 rounded-md text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                 isSpan
-                  ? "bg-[#38bdf8]/20 text-[#38bdf8] border border-[#38bdf8]/40 font-semibold shadow-sm"
+                  ? "bg-[#38bdf8]/20 text-[#38bdf8] border border-[#38bdf8]/40 font-semibold shadow-xs"
                   : "theme-text-muted hover:opacity-100"
               }`}
             >
-              <span className="font-mono font-bold text-sm leading-none">[───]</span>
+              <span className="font-mono font-bold text-xs leading-none">[───]</span>
               <span>Horizontal Bracket Span</span>
             </button>
           </div>
         </div>
 
         {/* Live Interactive Card Preview */}
-        <div className="px-6 pt-3 pb-2 bg-gradient-to-b from-black/[0.02] dark:from-white/[0.02] to-transparent">
-          <div className="text-[10px] font-mono uppercase tracking-wider theme-text-muted mb-2 flex items-center justify-between">
-            <span className="flex items-center gap-1.5">
+        <div className="px-4 pt-1.5 pb-1 bg-gradient-to-b from-black/[0.02] dark:from-white/[0.02] to-transparent">
+          <div className="text-[9.5px] font-mono uppercase tracking-wider theme-text-muted mb-1 flex items-center justify-between">
+            <span className="flex items-center gap-1">
               <Sparkles className="w-3 h-3 text-[#c9a84c]" />
               <span>Canvas Visual Preview</span>
             </span>
-            <span className="text-[10px] font-semibold" style={{ color }}>
+            <span className="text-[9.5px] font-semibold" style={{ color }}>
               Layer: {selectedLayer || "General"}
             </span>
           </div>
@@ -377,23 +377,23 @@ export default function EventForm({
           {!isSpan ? (
             /* Point Milestone Preview */
             <div
-              className="p-3.5 rounded-xl bg-black/[0.04] dark:bg-[#070c16]/80 border flex items-center justify-between gap-3 shadow-inner transition-colors duration-200"
+              className="p-2.5 rounded-lg bg-black/[0.04] dark:bg-[#070c16]/80 border flex items-center justify-between gap-2.5 shadow-inner transition-colors duration-200"
               style={{ borderColor: `${color}80` }}
             >
-              <div className="flex items-center gap-3 min-w-0">
+              <div className="flex items-center gap-2.5 min-w-0">
                 <div
-                  className="w-3.5 h-8 rounded-md shrink-0 shadow-sm"
+                  className="w-2.5 h-6 rounded shrink-0 shadow-xs"
                   style={{ backgroundColor: color }}
                 />
                 <div className="min-w-0">
                   <div
-                    className="text-sm font-semibold theme-card-title truncate"
+                    className="text-xs font-semibold theme-card-title truncate leading-tight"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
                     {title.trim() || "Milestone Title"}
                   </div>
                   <div
-                    className="text-[11px] font-mono font-medium"
+                    className="text-[10px] font-mono font-medium"
                     style={{ color }}
                   >
                     {previewDate()}
@@ -401,7 +401,7 @@ export default function EventForm({
                 </div>
               </div>
               <div
-                className="px-2.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider border shrink-0"
+                className="px-2 py-0.5 rounded text-[9px] font-mono uppercase tracking-wider border shrink-0"
                 style={{
                   borderColor: `${color}60`,
                   backgroundColor: `${color}18`,
@@ -414,15 +414,15 @@ export default function EventForm({
           ) : (
             /* Horizontal Square Bracket Preview */
             <div
-              className="p-3 rounded-xl bg-black/[0.04] dark:bg-[#070c16]/80 border flex flex-col gap-2 shadow-inner transition-colors duration-200"
+              className="p-2 rounded-lg bg-black/[0.04] dark:bg-[#070c16]/80 border flex flex-col gap-1.5 shadow-inner transition-colors duration-200"
               style={{ borderColor: `${color}80` }}
             >
-              <div className="flex items-center justify-between text-[11px] font-mono">
+              <div className="flex items-center justify-between text-[10px] font-mono">
                 <span className="text-[#38bdf8] font-semibold flex items-center gap-1">
                   <span>[</span>
                   <span>{spanInfo ? spanInfo.sLabel : previewDate()}</span>
                 </span>
-                <span className="text-[10px] theme-text-muted">
+                <span className="text-[9.5px] theme-text-muted">
                   {spanInfo ? `${spanInfo.diffYears} yrs span` : "Bracketed Range"}
                 </span>
                 <span className="text-[#38bdf8] font-semibold flex items-center gap-1">
@@ -432,33 +432,33 @@ export default function EventForm({
               </div>
 
               {/* Bracket Diagram Simulation */}
-              <div className="relative flex items-center justify-center my-1">
+              <div className="relative flex items-center justify-center my-0.5">
                 <div
                   className="absolute left-0 right-0 h-[1.5px]"
                   style={{ backgroundColor: color }}
                 />
                 <div
-                  className="absolute left-0 top-[-6px] w-[2px] h-[14px]"
+                  className="absolute left-0 top-[-4px] w-[2px] h-[10px]"
                   style={{ backgroundColor: color }}
                 />
                 <div
-                  className="absolute right-0 top-[-6px] w-[2px] h-[14px]"
+                  className="absolute right-0 top-[-4px] w-[2px] h-[10px]"
                   style={{ backgroundColor: color }}
                 />
 
                 {/* Center Badge with Title & Chronicle Notes Indicator */}
                 <div
-                  className="relative z-10 px-3 py-1 rounded-md border text-xs font-semibold flex items-center gap-1.5 shadow-sm bg-white dark:bg-[#0a101c]"
+                  className="relative z-10 px-2 py-0.5 rounded border text-[11px] font-semibold flex items-center gap-1 shadow-xs bg-white dark:bg-[#0a101c]"
                   style={{
                     borderColor: color,
                     color,
                     fontFamily: "var(--font-display)",
                   }}
                 >
-                  <span className="truncate max-w-[220px]">
+                  <span className="truncate max-w-[200px]">
                     {title.trim() || "Period Name"}
                   </span>
-                  <BookOpen className="w-3 h-3 text-[#c9a84c] shrink-0" />
+                  <BookOpen className="w-2.5 h-2.5 text-[#c9a84c] shrink-0" />
                 </div>
               </div>
             </div>
@@ -466,7 +466,7 @@ export default function EventForm({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4 overflow-y-auto flex-1">
+        <form onSubmit={handleSubmit} className="px-4 py-3 space-y-3 overflow-y-auto flex-1">
           {/* Historical Period / Layer Selection */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
@@ -900,16 +900,16 @@ export default function EventForm({
             </div>
           </div>
 
-          {/* Footer Actions */}
-          <div className="pt-4 border-t border-black/[0.08] dark:border-white/[0.08] flex items-center justify-between">
+          {/* Compact Footer Actions */}
+          <div className="pt-2.5 border-t border-black/[0.08] dark:border-white/[0.08] flex items-center justify-between">
             {isEditing && onDelete ? (
               <button
                 type="button"
                 onClick={() => setShowDeleteConfirm(true)}
-                className="p-2 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-mono font-medium"
+                className="px-2 py-1 text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-mono font-medium"
                 title="Delete Milestone"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-3.5 h-3.5" />
                 <span>Delete</span>
               </button>
             ) : (
@@ -920,7 +920,7 @@ export default function EventForm({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl theme-pill text-xs font-mono hover:opacity-100 transition-colors cursor-pointer"
+                className="px-3 py-1 rounded-lg theme-pill text-xs font-mono hover:opacity-100 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -928,7 +928,7 @@ export default function EventForm({
               <button
                 type="submit"
                 disabled={saving || !title.trim() || !year.trim() || (isSpan && !endYear.trim())}
-                className="btn-gold px-5 py-2 rounded-xl text-xs font-mono font-semibold flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-md"
+                className="btn-gold px-4 py-1 rounded-lg text-xs font-mono font-semibold flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-sm"
               >
                 {saving ? (
                   <span>Saving...</span>

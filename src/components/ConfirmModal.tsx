@@ -44,69 +44,68 @@ export default function ConfirmModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-150"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 bg-black/75 backdrop-blur-md animate-in fade-in duration-150"
     >
       <div
-        className="w-full max-w-md rounded-2xl glass-panel shadow-[0_25px_60px_rgba(0,0,0,0.85)] border border-black/10 dark:border-white/[0.1] overflow-hidden flex flex-col animate-in zoom-in-95 duration-150"
+        className="w-full max-w-sm rounded-2xl glass-panel shadow-[0_25px_60px_rgba(0,0,0,0.85)] border border-black/10 dark:border-white/[0.1] overflow-hidden flex flex-col animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-black/[0.08] dark:border-white/[0.08] bg-black/[0.02] dark:bg-white/[0.02]">
-          <div className="flex items-center gap-3">
+        {/* Compact Header */}
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-black/[0.08] dark:border-white/[0.08] bg-black/[0.02] dark:bg-white/[0.02]">
+          <div className="flex items-center gap-2.5">
             <div
-              className={`w-9 h-9 rounded-xl flex items-center justify-center border ${
+              className={`w-7 h-7 rounded-lg flex items-center justify-center border shrink-0 ${
                 isDestructive
                   ? "bg-rose-500/15 text-rose-500 border-rose-500/30"
                   : "bg-[#c9a84c]/15 text-[#c9a84c] border-[#c9a84c]/30"
               }`}
             >
               {isDestructive ? (
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-3.5 h-3.5" />
               ) : (
-                <AlertTriangle className="w-4 h-4" />
+                <AlertTriangle className="w-3.5 h-3.5" />
               )}
             </div>
             <div>
               <h3
-                className="text-base font-bold theme-card-title leading-tight"
+                className="text-xs font-bold theme-card-title leading-tight"
                 style={{ fontFamily: "var(--font-display)" }}
               >
                 {title}
               </h3>
-              <p className="text-[11px] font-mono theme-text-muted">
+              <p className="text-[9.5px] font-mono theme-text-muted">
                 Confirmation required
               </p>
             </div>
           </div>
 
-          {/* Dedicated X close button */}
           <button
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="w-8 h-8 flex items-center justify-center rounded-xl theme-text-muted hover:opacity-100 hover:bg-black/[0.05] dark:hover:bg-white/[0.06] transition-colors cursor-pointer disabled:opacity-50"
+            className="w-6 h-6 flex items-center justify-center rounded-lg theme-text-muted hover:opacity-100 hover:bg-black/[0.05] dark:hover:bg-white/[0.06] transition-colors cursor-pointer disabled:opacity-50"
             title="Close (X)"
             aria-label="Close"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="p-6">
-          <p className="text-sm theme-text-muted leading-relaxed font-light">
+        {/* Compact Body */}
+        <div className="p-4">
+          <p className="text-xs theme-text-muted leading-relaxed font-light">
             {message}
           </p>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-black/[0.08] dark:border-white/[0.08] bg-black/[0.02] dark:bg-white/[0.02] flex items-center justify-end gap-2.5">
+        {/* Compact Footer */}
+        <div className="px-4 py-2.5 border-t border-black/[0.08] dark:border-white/[0.08] bg-black/[0.02] dark:bg-white/[0.02] flex items-center justify-end gap-2">
           <button
             ref={cancelBtnRef}
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="px-4 py-2 rounded-xl theme-pill text-xs font-mono hover:opacity-100 transition-colors cursor-pointer disabled:opacity-50"
+            className="px-3 py-1 rounded-lg theme-pill text-xs font-mono hover:opacity-100 transition-colors cursor-pointer disabled:opacity-50"
           >
             {cancelLabel}
           </button>
@@ -115,7 +114,7 @@ export default function ConfirmModal({
             type="button"
             onClick={onConfirm}
             disabled={isLoading}
-            className={`px-5 py-2 rounded-xl text-xs font-mono font-semibold flex items-center gap-2 cursor-pointer shadow-md disabled:opacity-50 transition-all ${
+            className={`px-3.5 py-1 rounded-lg text-xs font-mono font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50 transition-all ${
               isDestructive
                 ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-900/30"
                 : "btn-gold"
@@ -123,7 +122,7 @@ export default function ConfirmModal({
           >
             {isLoading ? (
               <>
-                <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                 <span>Processing...</span>
               </>
             ) : (

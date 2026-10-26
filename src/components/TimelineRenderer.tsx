@@ -72,8 +72,8 @@ interface TimelineRendererProps {
 }
 
 const BASE_PIXELS_PER_YEAR = 0.05;
-const MIN_ZOOM = 0.001;
-const MAX_ZOOM = 50;
+const MIN_ZOOM = 0.00001;
+const MAX_ZOOM = 200;
 
 const TICK_HEIGHT = 14;
 const DOT_RADIUS = 5;
@@ -171,20 +171,6 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       }
     }
     return "even";
-  });
-
-  // Track if user has manually panned/zoomed the canvas.
-  // By default, layers are always fit. Once panned, that state is locked until next pan/fit.
-  const [isUserPanned, setIsUserPanned] = useState<boolean>(() => {
-    if (typeof window !== "undefined" && timelineId) {
-      try {
-        const saved = localStorage.getItem(`neeline_is_panned_${timelineId}`);
-        if (saved !== null) {
-          return saved === "true";
-        }
-      } catch {}
-    }
-    return false; // Default: fit mode
   });
 
   const [hoveredEvent, setHoveredEvent] = useState<string | null>(null);
@@ -542,43 +528,67 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
   const spineY = dimensions.height / 2;
   const originX = yearToX(0);
 
-  // Fit all visible events to viewport (centers whichever layer is active)
-  const fitAll = useCallback(() => {
-    if (visibleEvents.length === 0) return;
-    if (layoutMode === "proportional") {
-      const years = visibleEvents.map((e) => (e.isBce ? -Math.abs(e.year) : e.year));
-      visibleEvents.forEach((e) => {
-        if (e.endYear !== undefined && e.endYear !== null) {
-          years.push(e.endIsBce ? -Math.abs(e.endYear) : e.endYear);
+  // Explicit Fit View Calculation for any layout mode:
+  // Strictly executed ONLY on the 3 designated triggers:
+  // 1. When fit button is clicked
+  // 2. When user first time logged in and opens canvas (first time opening timeline in browser)
+  // 3. When Even Space or Proportional button is clicked
+  const fitViewForMode = useCallback(
+    (targetMode: "even" | "proportional") => {
+      if (visibleEvents.length === 0) return;
+
+      if (targetMode === "proportional") {
+        const years = visibleEvents.map((e) => (e.isBce ? -Math.abs(e.year) : e.year));
+        visibleEvents.forEach((e) => {
+          if (e.endYear !== undefined && e.endYear !== null) {
+            years.push(e.endIsBce ? -Math.abs(e.endYear) : e.endYear);
+          }
+        });
+        const minYear = Math.min(...years);
+        const maxYear = Math.max(...years);
+        const range = maxYear - minYear;
+        const padding = 100;
+        const availableWidth = Math.max(200, dimensions.width - padding * 2);
+
+        if (range <= 0) {
+          setZoom(1);
+          setPanX(-minYear * BASE_PIXELS_PER_YEAR);
+          prevLayoutStateRef.current.panX = -minYear * BASE_PIXELS_PER_YEAR;
+          prevLayoutStateRef.current.zoom = 1;
+          return;
         }
-      });
-      const minYear = Math.min(...years);
-      const maxYear = Math.max(...years);
-      const range = maxYear - minYear;
-      if (range === 0) {
-        setZoom(1);
-        setPanX(0);
+
+        const calculatedZoom = availableWidth / (range * BASE_PIXELS_PER_YEAR);
+        const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, calculatedZoom));
+        setZoom(clampedZoom);
+
+        const centerX = (minYear + maxYear) / 2;
+        const targetPan = -centerX * BASE_PIXELS_PER_YEAR * clampedZoom;
+        setPanX(targetPan);
+        prevLayoutStateRef.current.panX = targetPan;
+        prevLayoutStateRef.current.zoom = clampedZoom;
         return;
       }
-      const padding = 100;
-      const availableWidth = dimensions.width - padding * 2;
-      const newZoom = availableWidth / (range * BASE_PIXELS_PER_YEAR);
-      const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
+
+      // Even Space mode: frame all active anchors evenly spaced
+      const SPACING = 220;
+      const count = Math.max(1, chronologicalAnchors.length);
+      const totalSpan = Math.max(1, count - 1) * SPACING;
+      const padding = 140;
+      const availableWidth = Math.max(200, dimensions.width - padding * 2);
+      const calculatedZoom = count > 1 ? Math.min(1.25, availableWidth / totalSpan) : 1;
+      const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, calculatedZoom));
       setZoom(clampedZoom);
-      const centerX = (minYear + maxYear) / 2;
-      setPanX(-centerX * BASE_PIXELS_PER_YEAR * clampedZoom);
-      return;
-    }
-    // Even Space mode: perfectly center the active layer's span on screen
-    const SPACING = 220;
-    const totalSpan = Math.max(1, chronologicalAnchors.length - 1) * SPACING;
-    const padding = 140;
-    const availableWidth = dimensions.width - padding * 2;
-    const newZoom = chronologicalAnchors.length > 1 ? Math.min(1.25, availableWidth / totalSpan) : 1;
-    const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
-    setZoom(clampedZoom);
-    setPanX(0);
-  }, [visibleEvents, layoutMode, chronologicalAnchors, dimensions.width]);
+      setPanX(0);
+      prevLayoutStateRef.current.panX = 0;
+      prevLayoutStateRef.current.zoom = clampedZoom;
+    },
+    [visibleEvents, chronologicalAnchors, dimensions.width]
+  );
+
+  const fitAll = useCallback(() => {
+    fitViewForMode(layoutMode);
+  }, [fitViewForMode, layoutMode]);
 
   // Stable tracking of layout geometry across renders for synchronous focal stability
   const prevLayoutStateRef = useRef<{
@@ -605,17 +615,51 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     prevLayoutStateRef.current.layoutMode = layoutMode;
   }, [panX, zoom, dimensions.width, layoutMode]);
 
-  // Synchronous Render-Phase Focal Alignment & Viewport Mode Control:
-  // If the user has NOT panned (default fit mode): layers are always fit to view!
-  // Once the user pans the canvas: that viewport state is locked during layer add/remove until next pan or fit.
+  // Synchronous Render-Phase Focal Alignment on layer toggle / milestone add or delete:
+  // Preserves the reading position of the milestone nearest to screen center with ZERO flicker.
+  // CRUCIAL: Layer add/remove NEVER triggers fit view!
   if (
     prevLayoutStateRef.current.hasInitialized &&
     layoutMode === "even" &&
     prevLayoutStateRef.current.layoutMode === "even" &&
     prevLayoutStateRef.current.anchorBasePositions !== anchorBasePositions
   ) {
-    if (!isUserPanned) {
-      // By default layers are always fit: center active layer(s) cleanly
+    const prevState = prevLayoutStateRef.current;
+    const commonYears: number[] = [];
+    anchorBasePositions.forEach((_, year) => {
+      if (prevState.anchorBasePositions.has(year)) {
+        commonYears.push(year);
+      }
+    });
+
+    if (commonYears.length > 0) {
+      const centerScreenX = prevState.width / 2;
+      let bestYear = commonYears[0];
+      let minDistanceToCenter = Infinity;
+
+      commonYears.forEach((y) => {
+        const prevBaseX = prevState.anchorBasePositions.get(y)!;
+        const prevScreenX = centerScreenX + prevBaseX * prevState.zoom + prevState.panX;
+        const dist = Math.abs(prevScreenX - centerScreenX);
+        if (dist < minDistanceToCenter) {
+          minDistanceToCenter = dist;
+          bestYear = y;
+        }
+      });
+
+      const prevBaseX = prevState.anchorBasePositions.get(bestYear)!;
+      const prevScreenX = centerScreenX + prevBaseX * prevState.zoom + prevState.panX;
+
+      const newBaseX = anchorBasePositions.get(bestYear)!;
+      const targetScreenX = dimensions.width / 2;
+      const targetPanX = prevScreenX - targetScreenX - newBaseX * zoom;
+
+      if (Math.abs(targetPanX - panX) > 0.5) {
+        setPanX(targetPanX);
+        prevLayoutStateRef.current.panX = targetPanX;
+      }
+    } else if (chronologicalAnchors.length > 0) {
+      // Switched to a completely disjoint layer with 0 common events: center new layer
       const SPACING = 220;
       const totalSpan = Math.max(1, chronologicalAnchors.length - 1) * SPACING;
       const padding = 140;
@@ -626,55 +670,6 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       setPanX(0);
       prevLayoutStateRef.current.panX = 0;
       prevLayoutStateRef.current.zoom = clampedZoom;
-    } else {
-      // User has manually panned: lock the screen position of the focal milestone
-      const prevState = prevLayoutStateRef.current;
-      const commonYears: number[] = [];
-      anchorBasePositions.forEach((_, year) => {
-        if (prevState.anchorBasePositions.has(year)) {
-          commonYears.push(year);
-        }
-      });
-
-      if (commonYears.length > 0) {
-        const centerScreenX = prevState.width / 2;
-        let bestYear = commonYears[0];
-        let minDistanceToCenter = Infinity;
-
-        commonYears.forEach((y) => {
-          const prevBaseX = prevState.anchorBasePositions.get(y)!;
-          const prevScreenX = centerScreenX + prevBaseX * prevState.zoom + prevState.panX;
-          const dist = Math.abs(prevScreenX - centerScreenX);
-          if (dist < minDistanceToCenter) {
-            minDistanceToCenter = dist;
-            bestYear = y;
-          }
-        });
-
-        const prevBaseX = prevState.anchorBasePositions.get(bestYear)!;
-        const prevScreenX = centerScreenX + prevBaseX * prevState.zoom + prevState.panX;
-
-        const newBaseX = anchorBasePositions.get(bestYear)!;
-        const targetScreenX = dimensions.width / 2;
-        const targetPanX = prevScreenX - targetScreenX - newBaseX * zoom;
-
-        if (Math.abs(targetPanX - panX) > 0.5) {
-          setPanX(targetPanX);
-          prevLayoutStateRef.current.panX = targetPanX;
-        }
-      } else if (chronologicalAnchors.length > 0) {
-        // Disjoint layer with 0 common events: center new layer
-        const SPACING = 220;
-        const totalSpan = Math.max(1, chronologicalAnchors.length - 1) * SPACING;
-        const padding = 140;
-        const availableWidth = dimensions.width - padding * 2;
-        const newZoom = chronologicalAnchors.length > 1 ? Math.min(1.25, availableWidth / totalSpan) : 1;
-        const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
-        setZoom(clampedZoom);
-        setPanX(0);
-        prevLayoutStateRef.current.panX = 0;
-        prevLayoutStateRef.current.zoom = clampedZoom;
-      }
     }
 
     prevLayoutStateRef.current.anchorBasePositions = anchorBasePositions;
@@ -682,7 +677,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     prevLayoutStateRef.current.zoom = zoom;
     prevLayoutStateRef.current.layoutMode = layoutMode;
   } else if (!prevLayoutStateRef.current.hasInitialized && anchorBasePositions.size > 0) {
-    // Initial data load: lock initial anchor state without modifying panX or calling fitAll
+    // Initial data load: lock initial anchor state without modifying panX or calling fit
     prevLayoutStateRef.current = {
       anchorBasePositions,
       panX,
@@ -693,33 +688,19 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     };
   }
 
-  // Clicking Even Space or Proportional button puts all events/layers into fit view
+  // Trigger 3: Clicking Even Space or Proportional button puts all events/layers into fit view
   const handleSetLayoutMode = useCallback(
     (newMode: "even" | "proportional") => {
       setLayoutMode(newMode);
-      setIsUserPanned(false);
-      if (timelineId) {
-        try {
-          localStorage.setItem(`neeline_is_panned_${timelineId}`, "false");
-        } catch {}
-      }
-      setTimeout(() => {
-        fitAll();
-      }, 0);
+      fitViewForMode(newMode);
     },
-    [fitAll, timelineId]
+    [fitViewForMode]
   );
 
-  // Manual Fit button click handler
+  // Trigger 1: Manual Fit button click handler
   const handleFitClick = useCallback(() => {
-    fitAll();
-    setIsUserPanned(false);
-    if (timelineId) {
-      try {
-        localStorage.setItem(`neeline_is_panned_${timelineId}`, "false");
-      } catch {}
-    }
-  }, [fitAll, timelineId]);
+    fitViewForMode(layoutMode);
+  }, [fitViewForMode, layoutMode]);
 
   // Export full timeline fitted as 2x Retina PNG
   const exportPng = useCallback(
@@ -780,7 +761,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     }
   }, [timelineId, zoom, panX, layoutMode]);
 
-  // One-time initial fit ONLY if this timeline has never been viewed before
+  // Trigger 2: One-time initial fit ONLY if this timeline has never been viewed before in this browser
   const hasCheckedInitialFit = useRef(false);
   useEffect(() => {
     if (hasCheckedInitialFit.current || !timelineId || typeof window === "undefined") return;
@@ -790,12 +771,12 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     try {
       const saved = localStorage.getItem(`neeline_viewport_${timelineId}`);
       if (!saved) {
-        fitAll();
+        fitViewForMode(layoutMode);
       }
     } catch {
       // ignore
     }
-  }, [timelineId, visibleEvents.length, fitAll]);
+  }, [timelineId, visibleEvents.length, fitViewForMode, layoutMode]);
 
   // Mouse wheel zoom
   useEffect(() => {
@@ -811,18 +792,10 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       const newPanX = mouseX - dimensions.width / 2 - baseX * newZoom;
       setZoom(newZoom);
       setPanX(newPanX);
-      if (!isUserPanned) {
-        setIsUserPanned(true);
-        if (timelineId) {
-          try {
-            localStorage.setItem(`neeline_is_panned_${timelineId}`, "true");
-          } catch {}
-        }
-      }
     };
     el.addEventListener("wheel", handler, { passive: false });
     return () => el.removeEventListener("wheel", handler);
-  }, [zoom, panX, dimensions.width, isUserPanned, timelineId]);
+  }, [zoom, panX, dimensions.width]);
 
   // Mouse drag pan
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -849,20 +822,12 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       const dy = e.clientY - lastMouse.current.y;
       if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
         hasDragged.current = true;
-        if (!isUserPanned) {
-          setIsUserPanned(true);
-          if (timelineId) {
-            try {
-              localStorage.setItem(`neeline_is_panned_${timelineId}`, "true");
-            } catch {}
-          }
-        }
       }
       lastMouse.current = { x: e.clientX, y: e.clientY };
 
       setPanX((prev) => prev + dx);
     },
-    [xToYear, isUserPanned, timelineId]
+    [xToYear]
   );
 
   const handleMouseUp = useCallback(() => {
@@ -892,17 +857,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     (e: React.TouchEvent) => {
       if (e.touches.length === 1 && isDragging.current) {
         const dx = e.touches[0].clientX - touchStart.current.x;
-        if (Math.abs(dx) > 2) {
-          hasDragged.current = true;
-          if (!isUserPanned) {
-            setIsUserPanned(true);
-            if (timelineId) {
-              try {
-                localStorage.setItem(`neeline_is_panned_${timelineId}`, "true");
-              } catch {}
-            }
-          }
-        }
+        if (Math.abs(dx) > 2) hasDragged.current = true;
         touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         setPanX((prev) => prev + dx);
       } else if (e.touches.length === 2 && pinchDist.current !== null) {
@@ -920,17 +875,9 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
         const newPanX = midX - dimensions.width / 2 - baseX * newZoom;
         setZoom(newZoom);
         setPanX(newPanX);
-        if (!isUserPanned) {
-          setIsUserPanned(true);
-          if (timelineId) {
-            try {
-              localStorage.setItem(`neeline_is_panned_${timelineId}`, "true");
-            } catch {}
-          }
-        }
       }
     },
-    [zoom, panX, dimensions.width, isUserPanned, timelineId]
+    [zoom, panX, dimensions.width]
   );
 
   const handleTouchEnd = useCallback(() => {

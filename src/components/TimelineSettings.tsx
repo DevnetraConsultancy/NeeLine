@@ -196,17 +196,16 @@ export default function TimelineSettings({
                   </div>
                 </div>
 
-                {/* Right Tick */}
+                {/* Right Tick (Year Zero Milestone) */}
                 <div className="relative z-10 flex flex-col items-center">
                   <div
-                    className="w-1 h-3.5 rounded-full transition-colors"
-                    style={{ backgroundColor: tick }}
+                    className="w-1.5 h-3.5 rounded-full border border-[#ef4444] transition-colors"
+                    style={{ backgroundColor: "#ef4444" }}
                   />
                   <span
-                    className="text-[9px] font-mono mt-1"
-                    style={{ color: text }}
+                    className="text-[9px] font-mono font-bold mt-1 text-[#ef4444]"
                   >
-                    0 CE
+                    0
                   </span>
                 </div>
               </div>

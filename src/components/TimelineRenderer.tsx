@@ -607,6 +607,17 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     hasInitialized: false,
   });
 
+  const hasCheckedInitialFit = useRef(false);
+  const lastTimelineIdRef = useRef<string | null>(timelineId || null);
+
+  // If active timeline changes (SPA navigation between timelines), reset initialization flags
+  if (lastTimelineIdRef.current !== (timelineId || null)) {
+    lastTimelineIdRef.current = timelineId || null;
+    hasCheckedInitialFit.current = false;
+    prevLayoutStateRef.current.hasInitialized = false;
+    prevLayoutStateRef.current.anchorBasePositions = new Map();
+  }
+
   // Keep ref synchronized with user interactive pan/zoom updates
   useEffect(() => {
     prevLayoutStateRef.current.panX = panX;
@@ -762,7 +773,6 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
   }, [timelineId, zoom, panX, layoutMode]);
 
   // Trigger 2: One-time initial fit ONLY if this timeline has never been viewed before in this browser
-  const hasCheckedInitialFit = useRef(false);
   useEffect(() => {
     if (hasCheckedInitialFit.current || !timelineId || typeof window === "undefined") return;
     if (visibleEvents.length === 0) return;

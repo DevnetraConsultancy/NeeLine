@@ -225,7 +225,7 @@ export default function TimelinePage() {
   const fetchData = useCallback(async () => {
     try {
       const [timelinesRes, eventsRes, layersRes] = await Promise.all([
-        fetch(`/api/timelines`),
+        fetch(`/api/timelines?id=${timelineId}`),
         fetch(`/api/events?timelineId=${timelineId}`),
         fetch(`/api/layers?timelineId=${timelineId}`),
       ]);
@@ -235,8 +235,13 @@ export default function TimelinePage() {
         return;
       }
 
-      const timelines = await timelinesRes.json();
-      const found = timelines.find((t: TimelineData) => t.id === timelineId);
+      const rawTimelineData = await timelinesRes.json();
+      const found: TimelineData | undefined = Array.isArray(rawTimelineData)
+        ? rawTimelineData.find((t: TimelineData) => t.id === timelineId)
+        : rawTimelineData?.id === timelineId
+        ? rawTimelineData
+        : undefined;
+
       if (!found) {
         router.push("/dashboard");
         return;

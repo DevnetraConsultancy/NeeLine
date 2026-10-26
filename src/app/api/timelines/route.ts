@@ -12,7 +12,51 @@ export async function GET(req: NextRequest) {
     }
 
     const url = new URL(req.url);
+    const id = url.searchParams.get("id");
     const showTrash = url.searchParams.get("trash") === "true";
+
+    if (id) {
+      const timeline = await prisma.timeline.findFirst({
+        where: {
+          id,
+          userId: session.user.id,
+          deletedAt: showTrash ? { not: null } : null,
+        },
+        include: {
+          _count: { select: { events: true } },
+          events: {
+            take: 5,
+            select: { title: true, description: true },
+            orderBy: { createdAt: "asc" },
+          },
+        },
+      });
+
+      if (!timeline) {
+        return NextResponse.json({ error: "Timeline not found" }, { status: 404 });
+      }
+
+      let desc: string | null = null;
+      const seed = timeline.events.find((e) => e.title === "Year Zero") || timeline.events[0];
+      if (seed?.description) {
+        desc = parseEventMetadata(seed.description).description;
+      }
+
+      return NextResponse.json({
+        id: timeline.id,
+        userId: timeline.userId,
+        name: timeline.name,
+        description: desc,
+        bgColor: timeline.bgColor,
+        spineColor: timeline.spineColor,
+        tickColor: timeline.tickColor,
+        textColor: timeline.textColor,
+        deletedAt: timeline.deletedAt,
+        createdAt: timeline.createdAt,
+        updatedAt: timeline.updatedAt,
+        _count: timeline._count,
+      });
+    }
 
     const timelines = await prisma.timeline.findMany({
       where: {

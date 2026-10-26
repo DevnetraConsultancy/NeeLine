@@ -217,19 +217,24 @@ export default function EventForm({
     const parsedStart = parseInt(year, 10);
     if (isNaN(parsedStart) || !title.trim()) return;
     const startYearNum = Math.abs(parsedStart);
+    const effectiveStartIsBce = parsedStart < 0 ? true : isBce;
 
     let parsedEndNum: number | null = null;
+    let effectiveEndIsBce = isSpan ? endIsBce : false;
     if (isSpan) {
       const parsedEnd = parseInt(endYear, 10);
       if (isNaN(parsedEnd)) return;
       parsedEndNum = Math.abs(parsedEnd);
+      if (parsedEnd < 0) {
+        effectiveEndIsBce = true;
+      }
     }
 
     setSaving(true);
     await onSave({
       id: initialData?.id,
       year: startYearNum,
-      isBce,
+      isBce: effectiveStartIsBce,
       month: month || "",
       day: day || "",
       title: title.trim(),
@@ -238,7 +243,7 @@ export default function EventForm({
       layer: selectedLayer.trim() || (availableLayers[0]?.name ?? "General"),
       isSpan,
       endYear: isSpan ? parsedEndNum : null,
-      endIsBce: isSpan ? endIsBce : false,
+      endIsBce: effectiveEndIsBce,
       endMonth: isSpan ? endMonth || "" : "",
       endDay: isSpan ? endDay || "" : "",
     });

@@ -13,13 +13,10 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Externalize server-only packages to avoid webpack bundling issues
+  // Externalize server-only packages to avoid bundling issues
   serverExternalPackages: [
-    "@libsql/client",
-    "@prisma/adapter-libsql",
-    "@libsql/isomorphic-fetch",
-    "@libsql/isomorphic-ws",
-    "@libsql/hrana-client",
+    "@prisma/adapter-pg",
+    "pg",
   ],
 };
 

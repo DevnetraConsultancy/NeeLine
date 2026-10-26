@@ -20,7 +20,15 @@ export async function GET(req: NextRequest) {
     // Verify ownership
     const timeline = await prisma.timeline.findFirst({
       where: { id: timelineId, userId: session.user.id },
-      include: { events: true },
+      include: {
+        events: {
+          select: {
+            id: true,
+            description: true,
+            color: true,
+          },
+        },
+      },
     });
     if (!timeline) {
       return NextResponse.json({ error: "Timeline not found" }, { status: 404 });
@@ -125,7 +133,15 @@ export async function DELETE(req: NextRequest) {
     // Verify ownership
     const timeline = await prisma.timeline.findFirst({
       where: { id: timelineId, userId: session.user.id },
-      include: { events: true },
+      include: {
+        events: {
+          select: {
+            id: true,
+            description: true,
+            color: true,
+          },
+        },
+      },
     });
     if (!timeline) {
       return NextResponse.json({ error: "Timeline not found" }, { status: 404 });

@@ -160,12 +160,6 @@ export default function ImportModal({
         });
 
         setParsedEvents(valid);
-
-        // If file had layer names specified, default to "preserve"
-        const hasExplicitLayers = valid.some((e) => e.layer);
-        if (hasExplicitLayers) {
-          setLayerMode("preserve");
-        }
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Failed to parse JSON file.";
         setParseError(message);
@@ -254,25 +248,25 @@ export default function ImportModal({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150">
       <div
-        className="w-full max-w-xl rounded-2xl glass-panel shadow-[0_25px_60px_rgba(0,0,0,0.85)] border border-black/10 dark:border-white/[0.12] overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-150"
+        className="w-full max-w-lg rounded-2xl glass-panel shadow-[0_25px_60px_rgba(0,0,0,0.85)] border border-black/10 dark:border-white/[0.12] overflow-hidden flex flex-col animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-black/[0.08] dark:border-white/[0.08] bg-black/[0.02] dark:bg-white/[0.02]">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#5a9bd5]/15 text-[#5a9bd5] border border-[#5a9bd5]/30 flex items-center justify-center">
-              <Upload className="w-4 h-4" />
+        {/* Compact Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-black/[0.08] dark:border-white/[0.08] bg-black/[0.02] dark:bg-white/[0.02]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-[#5a9bd5]/15 text-[#5a9bd5] border border-[#5a9bd5]/30 flex items-center justify-center">
+              <Upload className="w-3.5 h-3.5" />
             </div>
             <div>
               <h2
-                className="text-base font-bold theme-card-title leading-tight"
+                className="text-sm font-bold theme-card-title leading-tight"
                 style={{ fontFamily: "var(--font-display)" }}
               >
                 Import JSON Callset & Layer Routing
               </h2>
-              <p className="text-[11px] font-mono theme-text-muted">
+              <p className="text-[10px] font-mono theme-text-muted">
                 Batch import milestones and route into specific historical periods
               </p>
             </div>
@@ -281,15 +275,15 @@ export default function ImportModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-xl theme-text-muted hover:opacity-100 hover:bg-black/[0.05] dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+            className="w-7 h-7 flex items-center justify-center rounded-lg theme-text-muted hover:opacity-100 hover:bg-black/[0.05] dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
             title="Close (X)"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* Form Body */}
-        <div className="p-6 overflow-y-auto space-y-5 text-xs font-mono">
+        {/* Compact Form Body */}
+        <div className="p-4 space-y-2.5 text-xs font-mono">
           {/* File Dropzone */}
           <input
             ref={fileInputRef}
@@ -308,33 +302,33 @@ export default function ImportModal({
               onDragLeave={() => setIsDragging(false)}
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
-              className={`p-8 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+              className={`p-5 rounded-xl border-2 border-dashed flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
                 isDragging
                   ? "border-[#c9a84c] bg-[#c9a84c]/10"
                   : "border-black/15 dark:border-white/15 hover:border-[#c9a84c]/60 bg-black/[0.02] dark:bg-white/[0.02]"
               }`}
             >
-              <div className="w-12 h-12 rounded-2xl bg-[#c9a84c]/15 text-[#c9a84c] flex items-center justify-center mb-3">
-                <Upload className="w-6 h-6 stroke-[1.8]" />
+              <div className="w-8 h-8 rounded-xl bg-[#c9a84c]/15 text-[#c9a84c] flex items-center justify-center mb-1.5">
+                <Upload className="w-4 h-4 stroke-[2]" />
               </div>
-              <p className="text-sm font-semibold theme-card-title font-sans mb-1">
+              <p className="text-xs font-semibold theme-card-title font-sans">
                 Drag and drop your JSON callset here
               </p>
-              <p className="text-[11px] theme-text-muted font-sans font-light max-w-xs">
-                Supports Point Milestones, Horizontal Bracket Spans, and Custom Layers.
+              <p className="text-[10.5px] theme-text-muted font-sans font-light mt-0.5">
+                Supports Point Milestones, Horizontal Bracket Spans, and Layer metadata
               </p>
-              <span className="mt-3 px-3 py-1 rounded-lg theme-pill text-[10px] text-[#c9a84c] border border-[#c9a84c]/30 font-semibold">
+              <span className="mt-2 px-2.5 py-0.5 rounded-md theme-pill text-[10px] text-[#c9a84c] border border-[#c9a84c]/30 font-semibold">
                 Browse File (.json)
               </span>
             </div>
           ) : (
-            <div className="p-4 rounded-xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/[0.08] flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 flex items-center justify-center">
-                  <CheckCircle2 className="w-4 h-4" />
+            <div className="px-3 py-2 rounded-xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/[0.08] flex items-center justify-between">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
                 </div>
-                <div>
-                  <div className="text-xs font-semibold theme-card-title truncate max-w-xs">
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold theme-card-title truncate max-w-[280px]">
                     {file.name}
                   </div>
                   <div className="text-[10px] theme-text-muted">
@@ -350,7 +344,7 @@ export default function ImportModal({
                   setParsedEvents([]);
                   setParseError(null);
                 }}
-                className="text-[10px] font-mono text-rose-500 hover:underline px-2 py-1 rounded cursor-pointer"
+                className="text-[10px] font-mono text-rose-500 hover:underline px-2 py-1 rounded cursor-pointer shrink-0"
               >
                 Change File
               </button>
@@ -359,8 +353,8 @@ export default function ImportModal({
 
           {/* Error Message */}
           {parseError && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-500 flex items-center gap-2 text-xs font-mono">
-              <AlertCircle className="w-4 h-4 shrink-0" />
+            <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-500 flex items-center gap-2 text-xs font-mono">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
               <span>{parseError}</span>
             </div>
           )}
@@ -368,75 +362,65 @@ export default function ImportModal({
           {/* Parsed Events Summary & Layer Routing Options */}
           {parsedEvents.length > 0 && (
             <>
-              {/* Event Statistics Chip */}
-              <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/[0.08] grid grid-cols-3 gap-2 text-center">
-                <div className="p-2 rounded-lg bg-black/[0.02] dark:bg-white/[0.02]">
-                  <span className="text-[10px] theme-text-muted block font-sans">Total Events</span>
-                  <span className="text-sm font-bold text-[#c9a84c]">{parsedEvents.length}</span>
+              {/* Compact Event Statistics Bar */}
+              <div className="px-3 py-1.5 rounded-lg bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/[0.06] flex items-center justify-between text-[11px]">
+                <div className="flex items-center gap-1.5 font-sans">
+                  <span className="theme-text-muted">Total Events:</span>
+                  <span className="font-bold text-[#c9a84c] font-mono">{parsedEvents.length}</span>
                 </div>
-                <div className="p-2 rounded-lg bg-black/[0.02] dark:bg-white/[0.02]">
-                  <span className="text-[10px] theme-text-muted block font-sans">Point Milestones</span>
-                  <span className="text-sm font-bold text-[#5a9bd5]">{pointCount}</span>
+                <div className="flex items-center gap-1.5 font-sans">
+                  <span className="theme-text-muted">Point Milestones:</span>
+                  <span className="font-bold text-[#5a9bd5] font-mono">{pointCount}</span>
                 </div>
-                <div className="p-2 rounded-lg bg-black/[0.02] dark:bg-white/[0.02]">
-                  <span className="text-[10px] theme-text-muted block font-sans">Bracket Spans</span>
-                  <span className="text-sm font-bold text-[#38bdf8]">{spanCount}</span>
+                <div className="flex items-center gap-1.5 font-sans">
+                  <span className="theme-text-muted">Bracket Spans:</span>
+                  <span className="font-bold text-[#38bdf8] font-mono">{spanCount}</span>
                 </div>
               </div>
 
-              {/* Layer Creation Policy Card */}
-              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-400 text-xs font-sans flex items-start gap-3">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <div className="font-semibold text-[11px] uppercase tracking-wider font-mono">
-                    Layer Creation Notice
-                  </div>
-                  <p className="text-[11.5px] leading-relaxed opacity-90">
-                    New layers can <strong>only</strong> be created from the <strong>Layers</strong> menu on the canvas header. In order to import events into a new layer, please create that layer first using the <strong>[Layers]</strong> button on the canvas, then select it below.
-                  </p>
-                </div>
+              {/* Compact Layer Creation Policy Card */}
+              <div className="px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-400 text-[10.5px] font-sans flex items-start gap-2">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <p className="leading-snug opacity-95">
+                  New layers can <strong>only</strong> be created from the <strong>Layers</strong> menu on the canvas header. Create a layer there first to import into it.
+                </p>
               </div>
 
               {/* Layer Selection / Routing Section */}
-              <div className="space-y-3 pt-2">
-                <label className="text-[11px] font-mono theme-text-muted uppercase tracking-wider font-semibold flex items-center gap-1.5">
-                  <Layers className="w-3.5 h-3.5 text-[#c9a84c]" />
+              <div className="space-y-2 pt-1">
+                <label className="text-[10px] font-mono theme-text-muted uppercase tracking-wider font-semibold flex items-center gap-1">
+                  <Layers className="w-3 h-3 text-[#c9a84c]" />
                   <span>Which Layer Should These Events Go To?</span>
                 </label>
 
                 {/* Option 1: Existing Layer */}
                 <div
                   onClick={() => setLayerMode("existing")}
-                  className={`p-3 rounded-xl border transition-all cursor-pointer ${
+                  className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
                     layerMode === "existing"
                       ? "border-[#c9a84c] bg-[#c9a84c]/10"
                       : "border-black/10 dark:border-white/10 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
                   }`}
                 >
-                  <label className="flex items-center gap-2.5 cursor-pointer">
+                  <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="radio"
                       name="layerMode"
                       checked={layerMode === "existing"}
                       onChange={() => setLayerMode("existing")}
-                      className="accent-[#c9a84c]"
+                      className="accent-[#c9a84c] w-3.5 h-3.5"
                     />
-                    <div>
-                      <span className="font-semibold text-xs theme-card-title font-sans block">
-                        Assign all imported events to an existing layer
-                      </span>
-                      <span className="text-[10px] theme-text-muted font-sans font-light">
-                        Direct all milestones and spans in this file into a single designated layer.
-                      </span>
-                    </div>
+                    <span className="font-semibold text-xs theme-card-title font-sans">
+                      Assign all imported events to an existing layer
+                    </span>
                   </label>
 
                   {layerMode === "existing" && (
-                    <div className="mt-2.5 pl-6">
+                    <div className="mt-2 pl-5">
                       <select
                         value={selectedExistingLayer}
                         onChange={(e) => setSelectedExistingLayer(e.target.value)}
-                        className="w-full px-3 py-1.5 rounded-lg theme-input text-xs font-mono outline-none focus:ring-1 focus:ring-[#c9a84c] bg-white dark:bg-[#0d1527] text-[#0f172a] dark:text-[#f5f0e8]"
+                        className="w-full px-2.5 py-1.5 rounded-lg theme-input text-xs font-mono outline-none focus:ring-1 focus:ring-[#c9a84c] bg-white dark:bg-[#0d1527] text-[#0f172a] dark:text-[#f5f0e8]"
                         style={{
                           backgroundColor: "var(--color-bg-light, #0d1527)",
                           color: "var(--color-text, #f5f0e8)",
@@ -463,26 +447,26 @@ export default function ImportModal({
                 {/* Option 2: Preserve JSON layers (routing to existing layers) */}
                 <div
                   onClick={() => setLayerMode("preserve")}
-                  className={`p-3 rounded-xl border transition-all cursor-pointer ${
+                  className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
                     layerMode === "preserve"
                       ? "border-[#c9a84c] bg-[#c9a84c]/10"
                       : "border-black/10 dark:border-white/10 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
                   }`}
                 >
-                  <label className="flex items-center gap-2.5 cursor-pointer">
+                  <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="radio"
                       name="layerMode"
                       checked={layerMode === "preserve"}
                       onChange={() => setLayerMode("preserve")}
-                      className="accent-[#c9a84c]"
+                      className="accent-[#c9a84c] w-3.5 h-3.5"
                     />
                     <div>
                       <span className="font-semibold text-xs theme-card-title font-sans block">
                         Route matching layer tags from JSON
                       </span>
-                      <span className="text-[10px] theme-text-muted font-sans font-light">
-                        Events with layer tags matching existing layers are placed accordingly. Any uncreated or untagged layer events will safely default to &quot;{selectedExistingLayer}&quot;.
+                      <span className="text-[10px] theme-text-muted font-sans font-light block">
+                        Matching tags will route to existing layers; unmatched fall back to &quot;{selectedExistingLayer}&quot;.
                       </span>
                     </div>
                   </label>
@@ -492,13 +476,13 @@ export default function ImportModal({
           )}
         </div>
 
-        {/* Footer Actions */}
-        <div className="p-4 border-t border-black/[0.08] dark:border-white/[0.08] flex items-center justify-end gap-3 bg-black/[0.02] dark:bg-white/[0.02]">
+        {/* Compact Footer Actions */}
+        <div className="px-4 py-2.5 border-t border-black/[0.08] dark:border-white/[0.08] flex items-center justify-end gap-2 bg-black/[0.02] dark:bg-white/[0.02]">
           <button
             type="button"
             onClick={onClose}
             disabled={importing}
-            className="px-4 py-2 rounded-xl theme-pill text-xs font-mono hover:opacity-100 transition-colors cursor-pointer disabled:opacity-50"
+            className="px-3.5 py-1.5 rounded-lg theme-pill text-xs font-mono hover:opacity-100 transition-colors cursor-pointer disabled:opacity-50"
           >
             Cancel
           </button>
@@ -507,12 +491,12 @@ export default function ImportModal({
             type="button"
             onClick={handleExecuteImport}
             disabled={importing || parsedEvents.length === 0}
-            className="btn-gold px-5 py-2 rounded-xl text-xs font-mono font-semibold flex items-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
+            className="btn-gold px-4 py-1.5 rounded-lg text-xs font-mono font-semibold flex items-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50"
           >
             {importing ? (
               <>
-                <div className="w-3.5 h-3.5 border-2 border-[#070c16]/40 border-t-[#070c16] rounded-full animate-spin" />
-                <span>Importing Callset...</span>
+                <div className="w-3 h-3 border-2 border-[#070c16]/40 border-t-[#070c16] rounded-full animate-spin" />
+                <span>Importing...</span>
               </>
             ) : (
               <>

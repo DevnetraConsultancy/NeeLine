@@ -9,6 +9,7 @@ import EventForm, { EventFormData } from "@/components/EventForm";
 import TimelineSettings from "@/components/TimelineSettings";
 import ConfirmModal from "@/components/ConfirmModal";
 import ImportModal from "@/components/ImportModal";
+import ExportJsonModal from "@/components/ExportJsonModal";
 import JsonSchemaModal from "@/components/JsonSchemaModal";
 import ChronicleNotesModal from "@/components/ChronicleNotesModal";
 import { exportTimelineAsPng, exportTimelineAsTxt } from "@/components/PngExport";
@@ -125,6 +126,7 @@ export default function TimelinePage() {
   const [showSettings, setShowSettings] = useState(false);
   const [showChronicleNotes, setShowChronicleNotes] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showExportJsonModal, setShowExportJsonModal] = useState(false);
   const [showJsonSchemaModal, setShowJsonSchemaModal] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState("");
@@ -999,51 +1001,6 @@ export default function TimelinePage() {
     [timelineId]
   );
 
-  // Export as Full JSON Callset
-  const handleExportJson = useCallback(() => {
-    if (!timeline) return;
-
-    const payload = {
-      format: "neeline-chronicle-v1",
-      exportedAt: new Date().toISOString(),
-      timeline: {
-        name: timeline.name,
-        description: timeline.description || null,
-        bgColor: timeline.bgColor,
-        spineColor: timeline.spineColor,
-        tickColor: timeline.tickColor,
-        textColor: timeline.textColor,
-      },
-      layers: layers.map((l) => ({ name: l.name, color: l.color })),
-      events: events.map((e) => ({
-        title: e.title,
-        year: e.year,
-        isBce: e.isBce,
-        month: e.month,
-        day: e.day,
-        endYear: e.endYear || null,
-        endIsBce: e.endIsBce || null,
-        endMonth: e.endMonth || null,
-        endDay: e.endDay || null,
-        color: e.color,
-        layer: e.layer || "General",
-        description: e.description,
-      })),
-    };
-
-    const jsonStr = JSON.stringify(payload, null, 2);
-    const blob = new Blob([jsonStr], { type: "application/json;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${timeline.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-chronicle.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    setShowExportMenu(false);
-  }, [timeline, layers, events]);
-
   // Export as 2x Retina PNG (Automatically fits entire viewport and all events!)
   const handleExportPng = useCallback(() => {
     if (!timeline) return;
@@ -1248,12 +1205,15 @@ export default function TimelinePage() {
 
                 {/* Option 2: Export as JSON */}
                 <button
-                  onClick={handleExportJson}
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    setShowExportJsonModal(true);
+                  }}
                   className="w-full px-3 py-2 text-left text-xs hover:bg-black/[0.05] dark:hover:bg-white/[0.06] rounded-xl transition-colors flex items-center gap-2.5 cursor-pointer font-mono theme-card-title"
-                  title="Export complete chronicle callset as JSON"
+                  title="Select layers and export chronicle callset as JSON"
                 >
                   <Download className="w-3.5 h-3.5 text-[#c9a84c]" />
-                  <span>Export as JSON</span>
+                  <span>Export as JSON...</span>
                 </button>
 
                 <div className="h-px bg-black/[0.08] dark:bg-white/[0.06] my-1" />
@@ -1477,6 +1437,15 @@ export default function TimelinePage() {
           setNoticeMessage(`Successfully imported ${count} events into the chronicle.`);
         }}
         onClose={() => setShowImportModal(false)}
+      />
+
+      {/* Export JSON Modal with Layer Checkboxes */}
+      <ExportJsonModal
+        isOpen={showExportJsonModal}
+        timeline={timeline}
+        layers={layers}
+        events={events}
+        onClose={() => setShowExportJsonModal(false)}
       />
 
       {/* JSON Schema & Template Spec Modal */}

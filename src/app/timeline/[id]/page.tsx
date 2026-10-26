@@ -1416,6 +1416,7 @@ export default function TimelinePage() {
       <div className="absolute inset-x-0 top-[100px] bottom-[36px] overflow-hidden">
         <TimelineRenderer
           ref={rendererRef}
+          timelineId={timelineId}
           events={events}
           bgColor={canvasColors.bg}
           spineColor={canvasColors.spine}

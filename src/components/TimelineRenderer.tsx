@@ -52,6 +52,7 @@ export interface TimelineRendererHandle {
 }
 
 interface TimelineRendererProps {
+  timelineId?: string;
   events: EventData[];
   bgColor: string;
   spineColor: string;
@@ -91,6 +92,7 @@ const PRESET_LAYER_COLORS = [
 const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProps>(
   function TimelineRenderer(
     {
+      timelineId,
       events,
       bgColor,
       spineColor,
@@ -111,11 +113,61 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
   ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 1200, height: 800 });
-  const [zoom, setZoom] = useState(1);
-  const [panX, setPanX] = useState(0);
+
+  // Load saved viewport state from localStorage so canvas always remembers screen position
+  const [zoom, setZoom] = useState<number>(() => {
+    if (typeof window !== "undefined" && timelineId) {
+      try {
+        const saved = localStorage.getItem(`neeline_viewport_${timelineId}`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (typeof parsed.zoom === "number" && !isNaN(parsed.zoom)) {
+            return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, parsed.zoom));
+          }
+        }
+      } catch {
+        // fallback
+      }
+    }
+    return 1;
+  });
+
+  const [panX, setPanX] = useState<number>(() => {
+    if (typeof window !== "undefined" && timelineId) {
+      try {
+        const saved = localStorage.getItem(`neeline_viewport_${timelineId}`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (typeof parsed.panX === "number" && !isNaN(parsed.panX)) {
+            return parsed.panX;
+          }
+        }
+      } catch {
+        // fallback
+      }
+    }
+    return 0;
+  });
+
+  const [layoutMode, setLayoutMode] = useState<"even" | "proportional">(() => {
+    if (typeof window !== "undefined" && timelineId) {
+      try {
+        const saved = localStorage.getItem(`neeline_viewport_${timelineId}`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.layoutMode === "even" || parsed.layoutMode === "proportional") {
+            return parsed.layoutMode;
+          }
+        }
+      } catch {
+        // fallback
+      }
+    }
+    return "even";
+  });
+
   const [hoveredEvent, setHoveredEvent] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
-  const [layoutMode, setLayoutMode] = useState<"even" | "proportional">("even");
   const [showGaps, setShowGaps] = useState(true);
   const [cursorYear, setCursorYear] = useState<number | null>(null);
   const [cursorX, setCursorX] = useState<number | null>(null);
@@ -449,10 +501,11 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     return result;
   }, [visibleEvents, layoutItems, yearToX]);
 
-  // Compute spine extents covering all anchors
+  // Compute spine extents covering all anchors and full viewport
   const hasEvents = visibleEvents.length > 0;
   const spineLeft = useMemo(() => {
-    if (!hasEvents) return dimensions.width * 0.1;
+    const screenLeft = -dimensions.width * 2;
+    if (!hasEvents) return screenLeft;
     if (layoutMode === "proportional") {
       const years = visibleEvents.map((e) => (e.isBce ? -Math.abs(e.year) : e.year));
       visibleEvents.forEach((e) => {
@@ -462,17 +515,18 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       });
       years.push(0);
       const minYear = Math.min(...years);
-      return yearToX(minYear) - 80;
+      return Math.min(screenLeft, yearToX(minYear) - 120);
     }
     const positions = Array.from(anchorBasePositions.values()).map(
       (bx) => dimensions.width / 2 + bx * zoom + panX
     );
-    if (positions.length === 0) return dimensions.width * 0.1;
-    return Math.min(...positions) - 100;
+    if (positions.length === 0) return screenLeft;
+    return Math.min(screenLeft, Math.min(...positions) - 120);
   }, [hasEvents, anchorBasePositions, layoutMode, visibleEvents, zoom, panX, dimensions.width, yearToX]);
 
   const spineRight = useMemo(() => {
-    if (!hasEvents) return dimensions.width * 0.9;
+    const screenRight = dimensions.width * 3;
+    if (!hasEvents) return screenRight;
     if (layoutMode === "proportional") {
       const years = visibleEvents.map((e) => (e.isBce ? -Math.abs(e.year) : e.year));
       visibleEvents.forEach((e) => {
@@ -482,13 +536,13 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       });
       years.push(0);
       const maxYear = Math.max(...years);
-      return yearToX(maxYear) + 80;
+      return Math.max(screenRight, yearToX(maxYear) + 120);
     }
     const positions = Array.from(anchorBasePositions.values()).map(
       (bx) => dimensions.width / 2 + bx * zoom + panX
     );
-    if (positions.length === 0) return dimensions.width * 0.9;
-    return Math.max(...positions) + 100;
+    if (positions.length === 0) return screenRight;
+    return Math.max(screenRight, Math.max(...positions) + 120);
   }, [hasEvents, anchorBasePositions, layoutMode, visibleEvents, zoom, panX, dimensions.width, yearToX]);
 
   const spineY = dimensions.height / 2;
@@ -534,15 +588,20 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
   // Export full timeline fitted as 2x Retina PNG
   const exportPng = useCallback(
     (filename: string) => {
+      const currentZoom = zoom;
+      const currentPanX = panX;
       fitAll();
       setTimeout(() => {
         const svgEl = document.getElementById("timeline-canvas-svg") as SVGSVGElement | null;
         if (svgEl) {
           exportTimelineAsPng(svgEl, bgColor, filename);
         }
+        // Restore user's exact zoom and pan position after export snapshot
+        setZoom(currentZoom);
+        setPanX(currentPanX);
       }, 160);
     },
-    [fitAll, bgColor]
+    [fitAll, bgColor, zoom, panX]
   );
 
   useImperativeHandle(ref, () => ({
@@ -550,31 +609,57 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     exportPng,
   }));
 
-  // Auto-fit on first load and when visible events change
-  const prevEventCount = useRef(visibleEvents.length);
+  // Synchronize viewport state when timelineId changes
   useEffect(() => {
-    if (visibleEvents.length !== prevEventCount.current || prevEventCount.current === 0) {
-      prevEventCount.current = visibleEvents.length;
-      if (visibleEvents.length > 0) {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => fitAllRef.current());
-        });
+    if (!timelineId || typeof window === "undefined") return;
+    try {
+      const saved = localStorage.getItem(`neeline_viewport_${timelineId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.zoom === "number" && !isNaN(parsed.zoom)) {
+          setZoom(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, parsed.zoom)));
+        }
+        if (typeof parsed.panX === "number" && !isNaN(parsed.panX)) {
+          setPanX(parsed.panX);
+        }
+        if (parsed.layoutMode === "even" || parsed.layoutMode === "proportional") {
+          setLayoutMode(parsed.layoutMode);
+        }
       }
+    } catch {
+      // ignore
     }
-  }, [visibleEvents.length, fitAll]);
+  }, [timelineId]);
 
-  // Auto-fit when layout mode changes
-  const fitAllRef = useRef(fitAll);
-  fitAllRef.current = fitAll;
-  const prevLayoutMode = useRef(layoutMode);
+  // Persist user's viewport (zoom, pan, layoutMode) to localStorage on every change
   useEffect(() => {
-    if (prevLayoutMode.current !== layoutMode) {
-      prevLayoutMode.current = layoutMode;
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => fitAllRef.current());
-      });
+    if (!timelineId || typeof window === "undefined") return;
+    try {
+      localStorage.setItem(
+        `neeline_viewport_${timelineId}`,
+        JSON.stringify({ zoom, panX, layoutMode })
+      );
+    } catch {
+      // ignore
     }
-  }, [layoutMode, fitAll]);
+  }, [timelineId, zoom, panX, layoutMode]);
+
+  // One-time initial fit ONLY if this timeline has never been viewed before
+  const hasCheckedInitialFit = useRef(false);
+  useEffect(() => {
+    if (hasCheckedInitialFit.current || !timelineId || typeof window === "undefined") return;
+    if (visibleEvents.length === 0) return;
+
+    hasCheckedInitialFit.current = true;
+    try {
+      const saved = localStorage.getItem(`neeline_viewport_${timelineId}`);
+      if (!saved) {
+        fitAll();
+      }
+    } catch {
+      // ignore
+    }
+  }, [timelineId, visibleEvents.length, fitAll]);
 
   // Mouse wheel zoom
   useEffect(() => {
@@ -692,13 +777,23 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     setSelectedNoteEvent(null);
   }, []);
 
-  // Zoom In / Zoom Out functions
+  // Zoom In / Zoom Out functions (Centered on user's current screen center)
   const zoomIn = useCallback(() => {
-    setZoom((z) => Math.min(MAX_ZOOM, z * 1.25));
+    setZoom((z) => {
+      const next = Math.min(MAX_ZOOM, z * 1.25);
+      const ratio = next / z;
+      setPanX((p) => p * ratio);
+      return next;
+    });
   }, []);
 
   const zoomOut = useCallback(() => {
-    setZoom((z) => Math.max(MIN_ZOOM, z / 1.25));
+    setZoom((z) => {
+      const next = Math.max(MIN_ZOOM, z / 1.25);
+      const ratio = next / z;
+      setPanX((p) => p * ratio);
+      return next;
+    });
   }, []);
 
   // Quick Layer Creation inside popover

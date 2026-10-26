@@ -31,6 +31,30 @@ export default function LandingPage() {
   const router = useRouter();
   const [guestLoading, setGuestLoading] = useState(false);
   const [activeSampleIndex, setActiveSampleIndex] = useState(4); // Default to Gutenberg Printing Press
+  const [buildTime, setBuildTime] = useState<string>("");
+
+  useEffect(() => {
+    const raw = process.env.NEXT_PUBLIC_BUILD_TIME;
+    if (raw) {
+      try {
+        const d = new Date(raw);
+        if (!isNaN(d.getTime())) {
+          setBuildTime(
+            d.toLocaleDateString("en-US", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+              timeZoneName: "short",
+            })
+          );
+        }
+      } catch {
+        // fallback
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -342,30 +366,50 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="relative z-10 py-8 px-6 theme-footer">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono theme-text-muted">
-          <div className="flex items-center gap-2">
-            <span>© {new Date().getFullYear()} NeeLine</span>
-            <span>·</span>
-            <span className="font-medium">Developed in Collaboration with Academia | Devnetra Consultancy</span>
+        <div className="max-w-6xl mx-auto space-y-4 text-xs font-mono theme-text-muted">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <span>© {new Date().getFullYear()} NeeLine</span>
+              <span>·</span>
+              <span className="font-medium">Developed in Collaboration with Academia | Devnetra Consultancy</span>
+            </div>
+
+            <div className="flex items-center gap-6">
+              <a
+                href="mailto:devnetraconsultancy@gmail.com"
+                className="hover:text-[#c9a84c] transition-colors"
+              >
+                Support
+              </a>
+              <a
+                href="https://www.instagram.com/scien_nee/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-[#c9a84c] transition-colors"
+              >
+                @scien_nee
+              </a>
+              <span className="text-[10px] px-2 py-0.5 rounded theme-pill border border-[#c9a84c]/20 text-[#c9a84c] font-semibold">
+                Number Line Engine
+              </span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-6">
-            <a
-              href="mailto:devnetraconsultancy@gmail.com"
-              className="hover:text-[#c9a84c] transition-colors"
-            >
-              Support
-            </a>
-            <a
-              href="https://www.instagram.com/scien_nee/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-[#c9a84c] transition-colors"
-            >
-              @scien_nee
-            </a>
-            <span className="text-[10px] px-2 py-0.5 rounded theme-pill border border-[#c9a84c]/20 text-[#c9a84c] font-semibold">
-              Number Line Engine
+          {/* Dedicated Production Build Status & Last Update */}
+          <div className="pt-3 border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between flex-wrap gap-2 text-[11px] opacity-80">
+            <span className="flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)] animate-pulse" />
+              <span>Production Release</span>
+              <span>·</span>
+              <span>
+                Last build update:{" "}
+                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  {buildTime || "Latest Build"}
+                </span>
+              </span>
+            </span>
+            <span className="text-[10px] tracking-wide text-slate-500 dark:text-slate-400">
+              v0.1.0 • Academic Edition
             </span>
           </div>
         </div>

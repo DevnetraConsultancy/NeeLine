@@ -402,21 +402,21 @@ export default function ImportModal({
                       : "border-black/10 dark:border-white/10 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
                   }`}
                 >
-                  <label className="flex items-center gap-2 cursor-pointer">
+                  <div className="flex items-center gap-2">
                     <input
                       type="radio"
                       name="layerMode"
                       checked={layerMode === "existing"}
                       onChange={() => setLayerMode("existing")}
-                      className="accent-[#c9a84c] w-3.5 h-3.5"
+                      className="accent-[#c9a84c] w-3.5 h-3.5 cursor-pointer"
                     />
                     <span className="font-semibold text-xs theme-card-title font-sans">
                       Assign all imported events to an existing layer
                     </span>
-                  </label>
+                  </div>
 
                   {layerMode === "existing" && (
-                    <div className="mt-2 pl-5">
+                    <div className="mt-2 pl-5" onClick={(e) => e.stopPropagation()}>
                       <select
                         value={selectedExistingLayer}
                         onChange={(e) => setSelectedExistingLayer(e.target.value)}
@@ -453,13 +453,13 @@ export default function ImportModal({
                       : "border-black/10 dark:border-white/10 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
                   }`}
                 >
-                  <label className="flex items-center gap-2 cursor-pointer">
+                  <div className="flex items-center gap-2">
                     <input
                       type="radio"
                       name="layerMode"
                       checked={layerMode === "preserve"}
                       onChange={() => setLayerMode("preserve")}
-                      className="accent-[#c9a84c] w-3.5 h-3.5"
+                      className="accent-[#c9a84c] w-3.5 h-3.5 cursor-pointer"
                     />
                     <div>
                       <span className="font-semibold text-xs theme-card-title font-sans block">
@@ -469,7 +469,7 @@ export default function ImportModal({
                         Matching tags will route to existing layers; unmatched fall back to &quot;{selectedExistingLayer}&quot;.
                       </span>
                     </div>
-                  </label>
+                  </div>
                 </div>
               </div>
             </>

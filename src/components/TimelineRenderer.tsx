@@ -1611,6 +1611,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                 </div>
                 <div className="flex items-center gap-1 text-[10px] font-mono">
                   <button
+                    type="button"
                     onClick={() => onToggleAllLayers && onToggleAllLayers(true)}
                     className="px-1.5 py-0.5 rounded text-[#c9a84c] hover:bg-[#c9a84c]/10 cursor-pointer font-medium"
                     title="Select all layers"
@@ -1619,6 +1620,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                   </button>
                   <span className="opacity-30">|</span>
                   <button
+                    type="button"
                     onClick={() => onToggleAllLayers && onToggleAllLayers(false)}
                     className="px-1.5 py-0.5 rounded theme-text-muted hover:opacity-100 cursor-pointer"
                     title="Deselect all layers"

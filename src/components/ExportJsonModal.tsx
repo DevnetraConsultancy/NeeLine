@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Download, X, Layers, CheckSquare, Square } from "lucide-react";
+import { Download, X, Layers, Check } from "lucide-react";
 import { LayerItem } from "./TimelineRenderer";
 
 interface EventData {
@@ -48,15 +48,21 @@ export default function ExportJsonModal({
 }: ExportJsonModalProps) {
   const [mounted, setMounted] = useState(false);
   const [selectedLayers, setSelectedLayers] = useState<string[]>([]);
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Initialize all available layers as selected whenever opened
+  // When modal opens, initialize all available layers as selected
   useEffect(() => {
-    if (isOpen && layers.length > 0) {
-      setSelectedLayers(layers.map((l) => l.name));
+    if (isOpen) {
+      if (!wasOpenRef.current && layers.length > 0) {
+        setSelectedLayers(layers.map((l) => l.name));
+        wasOpenRef.current = true;
+      }
+    } else {
+      wasOpenRef.current = false;
     }
   }, [isOpen, layers]);
 
@@ -64,7 +70,7 @@ export default function ExportJsonModal({
   const layerEventCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     layers.forEach((l) => {
-      counts[l.name.toLowerCase()] = 0;
+      counts[l.name.toLowerCase().trim()] = 0;
     });
 
     events.forEach((e) => {
@@ -75,9 +81,39 @@ export default function ExportJsonModal({
     return counts;
   }, [layers, events]);
 
+  // Check if all layers are currently selected
+  const allSelected = useMemo(() => {
+    if (layers.length === 0) return false;
+    return layers.every((l) =>
+      selectedLayers.some((n) => n.trim().toLowerCase() === l.name.trim().toLowerCase())
+    );
+  }, [layers, selectedLayers]);
+
+  // Toggle single layer cleanly with no synthetic event conflicts
+  const toggleLayer = useCallback((layerName: string) => {
+    const target = layerName.trim().toLowerCase();
+    setSelectedLayers((prev) => {
+      const exists = prev.some((n) => n.trim().toLowerCase() === target);
+      if (exists) {
+        return prev.filter((n) => n.trim().toLowerCase() !== target);
+      } else {
+        return [...prev, layerName];
+      }
+    });
+  }, []);
+
+  // Toggle select all
+  const toggleSelectAll = useCallback(() => {
+    if (allSelected) {
+      setSelectedLayers([]);
+    } else {
+      setSelectedLayers(layers.map((l) => l.name));
+    }
+  }, [allSelected, layers]);
+
   // Calculate filtered events according to selected layers
   const selectedEvents = useMemo(() => {
-    const lowerSelected = selectedLayers.map((l) => l.toLowerCase());
+    const lowerSelected = selectedLayers.map((l) => l.toLowerCase().trim());
     return events.filter((e) => {
       const lyr = ((e.layer && e.layer.trim()) || "General").toLowerCase();
       return lowerSelected.includes(lyr);
@@ -86,26 +122,10 @@ export default function ExportJsonModal({
 
   if (!isOpen || !mounted || !timeline) return null;
 
-  const allSelected = layers.length > 0 && selectedLayers.length === layers.length;
-
-  const toggleSelectAll = () => {
-    if (allSelected) {
-      setSelectedLayers([]);
-    } else {
-      setSelectedLayers(layers.map((l) => l.name));
-    }
-  };
-
-  const toggleLayer = (layerName: string) => {
-    setSelectedLayers((prev) =>
-      prev.includes(layerName)
-        ? prev.filter((n) => n !== layerName)
-        : [...prev, layerName]
-    );
-  };
-
   const handleExecuteExport = () => {
     if (selectedLayers.length === 0) return;
+
+    const lowerSelected = selectedLayers.map((l) => l.toLowerCase().trim());
 
     const payload = {
       format: "neeline-chronicle-v1",
@@ -119,7 +139,7 @@ export default function ExportJsonModal({
         textColor: timeline.textColor,
       },
       layers: layers
-        .filter((l) => selectedLayers.includes(l.name))
+        .filter((l) => lowerSelected.includes(l.name.toLowerCase().trim()))
         .map((l) => ({ name: l.name, color: l.color })),
       events: selectedEvents.map((e) => ({
         title: e.title,
@@ -197,69 +217,82 @@ export default function ExportJsonModal({
             <button
               type="button"
               onClick={toggleSelectAll}
-              className="text-[10px] font-semibold text-[#c9a84c] hover:underline flex items-center gap-1 cursor-pointer"
+              className="text-[11px] font-semibold text-[#c9a84c] hover:underline flex items-center gap-1.5 cursor-pointer py-1 px-1.5 rounded-lg hover:bg-[#c9a84c]/10 transition-colors"
             >
-              {allSelected ? (
-                <>
-                  <CheckSquare className="w-3 h-3" />
-                  <span>Deselect All</span>
-                </>
-              ) : (
-                <>
-                  <Square className="w-3 h-3" />
-                  <span>Select All</span>
-                </>
-              )}
+              <div
+                className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-all shrink-0 ${
+                  allSelected
+                    ? "bg-[#c9a84c] border-[#c9a84c] text-[#070c16]"
+                    : "border-black/30 dark:border-white/30 bg-transparent"
+                }`}
+              >
+                {allSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+              </div>
+              <span>{allSelected ? "Deselect All" : "Select All"}</span>
             </button>
           </div>
 
-          {/* Layer Checkbox List */}
-          <div className="space-y-1.5 max-h-52 overflow-y-auto pr-0.5">
+          {/* Layer Interactive Row List */}
+          <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5">
             {layers.map((layer) => {
-              const isChecked = selectedLayers.includes(layer.name);
-              const count = layerEventCounts[layer.name.toLowerCase()] || 0;
+              const isChecked = selectedLayers.some(
+                (n) => n.trim().toLowerCase() === layer.name.trim().toLowerCase()
+              );
+              const count = layerEventCounts[layer.name.toLowerCase().trim()] || 0;
 
               return (
-                <div
+                <button
+                  type="button"
                   key={layer.id || layer.name}
                   onClick={() => toggleLayer(layer.name)}
-                  className={`px-3 py-2 rounded-xl border flex items-center justify-between transition-all cursor-pointer select-none ${
+                  className={`w-full text-left px-3 py-2 rounded-xl border flex items-center justify-between transition-all cursor-pointer select-none ${
                     isChecked
-                      ? "border-[#c9a84c]/50 bg-[#c9a84c]/10"
-                      : "border-black/10 dark:border-white/10 opacity-70 hover:opacity-100 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
+                      ? "border-[#c9a84c] bg-[#c9a84c]/12 shadow-xs"
+                      : "border-black/10 dark:border-white/10 opacity-70 hover:opacity-100 hover:bg-black/[0.03] dark:hover:bg-white/[0.03]"
                   }`}
                 >
-                  <label className="flex items-center gap-2.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={() => toggleLayer(layer.name)}
-                      className="accent-[#c9a84c] w-3.5 h-3.5 cursor-pointer rounded"
-                    />
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {/* Custom Checkbox Box */}
+                    <div
+                      className={`w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0 ${
+                        isChecked
+                          ? "bg-[#c9a84c] border-[#c9a84c] text-[#070c16]"
+                          : "border-black/30 dark:border-white/30 bg-transparent"
+                      }`}
+                    >
+                      {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                    </div>
+
+                    {/* Color dot */}
                     <span
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs"
                       style={{ backgroundColor: layer.color || "#c9a84c" }}
                     />
-                    <span className="font-semibold text-xs theme-card-title font-sans">
+
+                    {/* Layer Name */}
+                    <span className="font-semibold text-xs theme-card-title font-sans truncate">
                       {layer.name}
                     </span>
-                  </label>
+                  </div>
 
+                  {/* Event Count Badge */}
                   <span
-                    className={`text-[10px] font-mono px-2 py-0.5 rounded-md border ${
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded-md border shrink-0 transition-colors ${
                       count > 0
-                        ? "bg-[#c9a84c]/15 text-[#c9a84c] border-[#c9a84c]/30 font-semibold"
-                        : "bg-black/[0.03] dark:bg-white/[0.04] theme-text-muted border-black/10 dark:border-white/10"
+                        ? isChecked
+                          ? "bg-[#c9a84c]/20 text-[#c9a84c] border-[#c9a84c]/40 font-semibold"
+                          : "bg-black/[0.04] dark:bg-white/[0.05] theme-text-muted border-black/10 dark:border-white/10"
+                        : "bg-black/[0.02] dark:bg-white/[0.02] theme-text-muted opacity-50 border-black/5 dark:border-white/5"
                     }`}
                   >
                     {count} {count === 1 ? "event" : "events"}
                   </span>
-                </div>
+                </button>
               );
             })}
           </div>
 
-          {/* Summary Stats Pill */}
+          {/* Live Summary Payload Bar */}
           <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/[0.08] text-[11px]">
             <span className="theme-text-muted font-sans">Export Payload:</span>
             <div className="flex items-center gap-2 font-mono">

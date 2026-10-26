@@ -22,6 +22,8 @@ import {
   Square,
   X,
   Sparkles,
+  Compass,
+  FoldHorizontal,
 } from "lucide-react";
 
 export interface LayerItem {
@@ -180,6 +182,126 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
   const [cursorX, setCursorX] = useState<number | null>(null);
   const [selectedNoteEvent, setSelectedNoteEvent] = useState<LayoutItem | null>(null);
 
+  // Smart Accordion Epoch Compression state (folds large empty voids in proportional mode)
+  const [foldEpochs, setFoldEpochs] = useState<boolean>(() => {
+    if (typeof window !== "undefined" && timelineId) {
+      try {
+        const saved = localStorage.getItem(`neeline_fold_epochs_${timelineId}`);
+        if (saved !== null) {
+          return saved === "true";
+        }
+      } catch {
+        // fallback
+      }
+    }
+    return true;
+  });
+
+  // Mini-Map Navigator state
+  const [showMiniMap, setShowMiniMap] = useState<boolean>(() => {
+    if (typeof window !== "undefined" && timelineId) {
+      try {
+        const saved = localStorage.getItem(`neeline_show_minimap_${timelineId}`);
+        if (saved !== null) {
+          return saved === "true";
+        }
+      } catch {
+        // fallback
+      }
+    }
+    return true;
+  });
+
+  // Smooth Animated Viewport Transitions
+  const animFrameRef = useRef<number | null>(null);
+
+  const cancelActiveAnimation = useCallback(() => {
+    if (animFrameRef.current !== null) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+  }, []);
+
+  const animateToViewport = useCallback(
+    (targetPanX: number, targetZoom: number, durationMs = 360, onComplete?: () => void) => {
+      cancelActiveAnimation();
+
+      const startPanX = panX;
+      const startZoom = zoom;
+
+      // If already at target, skip animation
+      if (Math.abs(startPanX - targetPanX) < 0.5 && Math.abs(startZoom - targetZoom) < 0.00005) {
+        setPanX(targetPanX);
+        setZoom(targetZoom);
+        prevLayoutStateRef.current.panX = targetPanX;
+        prevLayoutStateRef.current.zoom = targetZoom;
+        onComplete?.();
+        return;
+      }
+
+      const startTime = performance.now();
+      const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+
+      const step = (currentTime: number) => {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(1, elapsed / durationMs);
+        const eased = easeOutCubic(progress);
+
+        const currentInterpPan = startPanX + (targetPanX - startPanX) * eased;
+        const currentInterpZoom = startZoom + (targetZoom - startZoom) * eased;
+
+        setPanX(currentInterpPan);
+        setZoom(currentInterpZoom);
+        prevLayoutStateRef.current.panX = currentInterpPan;
+        prevLayoutStateRef.current.zoom = currentInterpZoom;
+
+        if (progress < 1) {
+          animFrameRef.current = requestAnimationFrame(step);
+        } else {
+          animFrameRef.current = null;
+          setPanX(targetPanX);
+          setZoom(targetZoom);
+          prevLayoutStateRef.current.panX = targetPanX;
+          prevLayoutStateRef.current.zoom = targetZoom;
+          onComplete?.();
+        }
+      };
+
+      animFrameRef.current = requestAnimationFrame(step);
+    },
+    [panX, zoom, cancelActiveAnimation]
+  );
+
+  // Mini-Map dragging refs
+  const isDraggingMiniMap = useRef(false);
+  const miniMapDragStart = useRef({ mouseX: 0, initialPanX: 0 });
+
+  // Cancel any running animation on component unmount
+  useEffect(() => {
+    return () => {
+      cancelActiveAnimation();
+    };
+  }, [cancelActiveAnimation]);
+
+  // Persist foldEpochs and showMiniMap
+  useEffect(() => {
+    if (!timelineId || typeof window === "undefined") return;
+    try {
+      localStorage.setItem(`neeline_fold_epochs_${timelineId}`, String(foldEpochs));
+    } catch {
+      // ignore
+    }
+  }, [timelineId, foldEpochs]);
+
+  useEffect(() => {
+    if (!timelineId || typeof window === "undefined") return;
+    try {
+      localStorage.setItem(`neeline_show_minimap_${timelineId}`, String(showMiniMap));
+    } catch {
+      // ignore
+    }
+  }, [timelineId, showMiniMap]);
+
   // Layers Popover Menu state
   const [showLayersMenu, setShowLayersMenu] = useState(false);
   const [newPeriodName, setNewPeriodName] = useState("");
@@ -311,12 +433,107 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     return map;
   }, [chronologicalAnchors]);
 
-  // Year-to-x mapping (supports both modes and all span anchors)
+  // Smart Accordion Epoch Compression Constants
+  const EPOCH_FOLD_THRESHOLD = 8000; // gaps >= 8,000 years in proportional mode are compressed
+  const COMPRESSED_GAP_VIRTUAL_YEARS = 2500; // visual virtual width of the compressed void
+
+  interface FoldedEpoch {
+    startYear: number;
+    endYear: number;
+    rawSpan: number;
+    virtualStart: number;
+    virtualEnd: number;
+    label: string;
+  }
+
+  // Detect and compute folded multi-millennia voids across active chronological anchors
+  const foldedEpochGaps = useMemo<FoldedEpoch[]>(() => {
+    if (!foldEpochs || chronologicalAnchors.length < 2) return [];
+
+    const folds: FoldedEpoch[] = [];
+    let cumulativeSaved = 0;
+
+    for (let i = 0; i < chronologicalAnchors.length - 1; i++) {
+      const y0 = chronologicalAnchors[i];
+      const y1 = chronologicalAnchors[i + 1];
+      const rawSpan = y1 - y0;
+
+      if (rawSpan >= EPOCH_FOLD_THRESHOLD) {
+        const virtualStart = y0 - cumulativeSaved;
+        const virtualEnd = virtualStart + COMPRESSED_GAP_VIRTUAL_YEARS;
+        const savedInThisGap = rawSpan - COMPRESSED_GAP_VIRTUAL_YEARS;
+        cumulativeSaved += savedInThisGap;
+
+        const label =
+          rawSpan >= 1000000
+            ? `${(rawSpan / 1000000).toFixed(rawSpan % 1000000 === 0 ? 0 : 1)}M yrs folded`
+            : `${Math.round(rawSpan / 1000)}k yrs folded`;
+
+        folds.push({
+          startYear: y0,
+          endYear: y1,
+          rawSpan,
+          virtualStart,
+          virtualEnd,
+          label,
+        });
+      }
+    }
+
+    return folds;
+  }, [foldEpochs, chronologicalAnchors]);
+
+  // Strictly monotonic piecewise compression for physical year to virtual year
+  const compressYear = useCallback(
+    (year: number): number => {
+      if (!foldEpochs || foldedEpochGaps.length === 0) return year;
+
+      let v = year;
+      for (const fold of foldedEpochGaps) {
+        if (year <= fold.startYear) {
+          break;
+        }
+        if (year >= fold.endYear) {
+          v -= fold.rawSpan - COMPRESSED_GAP_VIRTUAL_YEARS;
+        } else {
+          const t = (year - fold.startYear) / fold.rawSpan;
+          return fold.virtualStart + t * COMPRESSED_GAP_VIRTUAL_YEARS;
+        }
+      }
+      return v;
+    },
+    [foldEpochs, foldedEpochGaps]
+  );
+
+  // Exact inverse of compressYear
+  const uncompressYear = useCallback(
+    (v: number): number => {
+      if (!foldEpochs || foldedEpochGaps.length === 0) return v;
+
+      let saved = 0;
+      for (const fold of foldedEpochGaps) {
+        if (v <= fold.virtualStart) {
+          break;
+        }
+        if (v >= fold.virtualEnd) {
+          saved += fold.rawSpan - COMPRESSED_GAP_VIRTUAL_YEARS;
+        } else {
+          const t = (v - fold.virtualStart) / COMPRESSED_GAP_VIRTUAL_YEARS;
+          return fold.startYear + t * fold.rawSpan;
+        }
+      }
+      return v + saved;
+    },
+    [foldEpochs, foldedEpochGaps]
+  );
+
+  // Year-to-x mapping (supports both modes, accordion compression, and all span anchors)
   const yearToX = useCallback(
     (year: number): number => {
       if (isNaN(year)) return dimensions.width / 2;
       if (layoutMode === "proportional") {
-        return dimensions.width / 2 + year * BASE_PIXELS_PER_YEAR * zoom + panX;
+        const vYear = foldEpochs ? compressYear(year) : year;
+        return dimensions.width / 2 + vYear * BASE_PIXELS_PER_YEAR * zoom + panX;
       }
       if (chronologicalAnchors.length === 0) return dimensions.width / 2;
 
@@ -353,7 +570,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       }
       return dimensions.width / 2;
     },
-    [chronologicalAnchors, anchorBasePositions, layoutMode, zoom, panX, dimensions.width]
+    [chronologicalAnchors, anchorBasePositions, layoutMode, zoom, panX, dimensions.width, foldEpochs, compressYear]
   );
 
   // X-to-year: inverse of yearToX
@@ -361,7 +578,8 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     (x: number): number => {
       if (isNaN(x)) return 0;
       if (layoutMode === "proportional") {
-        return (x - dimensions.width / 2 - panX) / (BASE_PIXELS_PER_YEAR * zoom);
+        const vYear = (x - dimensions.width / 2 - panX) / (BASE_PIXELS_PER_YEAR * zoom);
+        return foldEpochs ? uncompressYear(vYear) : vYear;
       }
       if (chronologicalAnchors.length === 0) return 0;
 
@@ -386,7 +604,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       }
       return 0;
     },
-    [chronologicalAnchors, anchorBasePositions, layoutMode, zoom, panX, dimensions.width]
+    [chronologicalAnchors, anchorBasePositions, layoutMode, zoom, panX, dimensions.width, foldEpochs, uncompressYear]
   );
 
   // Sorted events for gap calculation
@@ -534,8 +752,15 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
   // 2. When user first time logged in and opens canvas (first time opening timeline in browser)
   // 3. When Even Space or Proportional button is clicked
   const fitViewForMode = useCallback(
-    (targetMode: "even" | "proportional") => {
+    (
+      targetMode: "even" | "proportional",
+      options?: { animate?: boolean; overrideFoldEpochs?: boolean }
+    ) => {
       if (visibleEvents.length === 0) return;
+      const shouldUseFold =
+        options?.overrideFoldEpochs !== undefined
+          ? options.overrideFoldEpochs
+          : foldEpochs;
 
       if (targetMode === "proportional") {
         const years = visibleEvents.map((e) => (e.isBce ? -Math.abs(e.year) : e.year));
@@ -546,27 +771,39 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
         });
         const minYear = Math.min(...years);
         const maxYear = Math.max(...years);
-        const range = maxYear - minYear;
+
+        const vMin = shouldUseFold ? compressYear(minYear) : minYear;
+        const vMax = shouldUseFold ? compressYear(maxYear) : maxYear;
+        const range = vMax - vMin;
         const padding = 100;
         const availableWidth = Math.max(200, dimensions.width - padding * 2);
 
         if (range <= 0) {
-          setZoom(1);
-          setPanX(-minYear * BASE_PIXELS_PER_YEAR);
-          prevLayoutStateRef.current.panX = -minYear * BASE_PIXELS_PER_YEAR;
-          prevLayoutStateRef.current.zoom = 1;
+          const targetPan = -vMin * BASE_PIXELS_PER_YEAR;
+          if (options?.animate !== false) {
+            animateToViewport(targetPan, 1);
+          } else {
+            setZoom(1);
+            setPanX(targetPan);
+            prevLayoutStateRef.current.panX = targetPan;
+            prevLayoutStateRef.current.zoom = 1;
+          }
           return;
         }
 
         const calculatedZoom = availableWidth / (range * BASE_PIXELS_PER_YEAR);
         const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, calculatedZoom));
-        setZoom(clampedZoom);
+        const centerV = (vMin + vMax) / 2;
+        const targetPan = -centerV * BASE_PIXELS_PER_YEAR * clampedZoom;
 
-        const centerX = (minYear + maxYear) / 2;
-        const targetPan = -centerX * BASE_PIXELS_PER_YEAR * clampedZoom;
-        setPanX(targetPan);
-        prevLayoutStateRef.current.panX = targetPan;
-        prevLayoutStateRef.current.zoom = clampedZoom;
+        if (options?.animate !== false) {
+          animateToViewport(targetPan, clampedZoom);
+        } else {
+          setZoom(clampedZoom);
+          setPanX(targetPan);
+          prevLayoutStateRef.current.panX = targetPan;
+          prevLayoutStateRef.current.zoom = clampedZoom;
+        }
         return;
       }
 
@@ -578,17 +815,182 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       const availableWidth = Math.max(200, dimensions.width - padding * 2);
       const calculatedZoom = count > 1 ? Math.min(1.25, availableWidth / totalSpan) : 1;
       const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, calculatedZoom));
-      setZoom(clampedZoom);
-      setPanX(0);
-      prevLayoutStateRef.current.panX = 0;
-      prevLayoutStateRef.current.zoom = clampedZoom;
+
+      if (options?.animate !== false) {
+        animateToViewport(0, clampedZoom);
+      } else {
+        setZoom(clampedZoom);
+        setPanX(0);
+        prevLayoutStateRef.current.panX = 0;
+        prevLayoutStateRef.current.zoom = clampedZoom;
+      }
     },
-    [visibleEvents, chronologicalAnchors, dimensions.width]
+    [
+      visibleEvents,
+      chronologicalAnchors,
+      dimensions.width,
+      foldEpochs,
+      compressYear,
+      animateToViewport,
+    ]
   );
 
   const fitAll = useCallback(() => {
-    fitViewForMode(layoutMode);
+    fitViewForMode(layoutMode, { animate: false });
   }, [fitViewForMode, layoutMode]);
+
+  // Era Bookmarks / Quick Jump Anchors (extracted from visible period bracket spans)
+  const eraBookmarks = useMemo(() => {
+    const spans = visibleEvents.filter(
+      (e) => e.endYear !== undefined && e.endYear !== null && !isNaN(Number(e.endYear))
+    );
+    return spans.sort((a, b) => {
+      const ya = a.isBce ? -Math.abs(a.year) : a.year;
+      const yb = b.isBce ? -Math.abs(b.year) : b.year;
+      return ya - yb;
+    });
+  }, [visibleEvents]);
+
+  const jumpToEra = useCallback(
+    (era: EventData) => {
+      cancelActiveAnimation();
+      const sEy = era.isBce ? -Math.abs(era.year) : era.year;
+      const eEy = era.endIsBce ? -Math.abs(era.endYear!) : era.endYear!;
+      const minEy = Math.min(sEy, eEy);
+      const maxEy = Math.max(sEy, eEy);
+
+      if (layoutMode === "proportional") {
+        const vMin = foldEpochs ? compressYear(minEy) : minEy;
+        const vMax = foldEpochs ? compressYear(maxEy) : maxEy;
+        const rangeV = Math.max(1, vMax - vMin);
+        const centerV = (vMin + vMax) / 2;
+        const availableWidth = dimensions.width * 0.7;
+        const calculatedZoom = availableWidth / (rangeV * BASE_PIXELS_PER_YEAR);
+        const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, calculatedZoom));
+        const targetPan = -centerV * BASE_PIXELS_PER_YEAR * clampedZoom;
+        animateToViewport(targetPan, clampedZoom, 380);
+      } else {
+        const startBase =
+          anchorBasePositions.get(minEy) ?? (anchorBasePositions.get(chronologicalAnchors[0]) ?? 0);
+        const endBase =
+          anchorBasePositions.get(maxEy) ??
+          (anchorBasePositions.get(chronologicalAnchors[chronologicalAnchors.length - 1]) ?? 0);
+        const centerBase = (startBase + endBase) / 2;
+        const baseSpan = Math.max(150, Math.abs(endBase - startBase));
+        const availableWidth = dimensions.width * 0.7;
+        const calculatedZoom = Math.min(1.4, Math.max(MIN_ZOOM, availableWidth / baseSpan));
+        const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, calculatedZoom));
+        const targetPan = -centerBase * clampedZoom;
+        animateToViewport(targetPan, clampedZoom, 380);
+      }
+    },
+    [
+      layoutMode,
+      foldEpochs,
+      compressYear,
+      dimensions.width,
+      anchorBasePositions,
+      chronologicalAnchors,
+      animateToViewport,
+      cancelActiveAnimation,
+    ]
+  );
+
+  // Mini-Map Range & Navigation
+  const miniMapExtent = useMemo(() => {
+    if (chronologicalAnchors.length === 0) return null;
+    const minAnchor = chronologicalAnchors[0];
+    const maxAnchor = chronologicalAnchors[chronologicalAnchors.length - 1];
+    const range = Math.max(1, maxAnchor - minAnchor);
+    return { minAnchor, maxAnchor, range };
+  }, [chronologicalAnchors]);
+
+  // Track mouse move for mini-map lens dragging across window
+  useEffect(() => {
+    const handleWindowMouseMove = (e: MouseEvent) => {
+      if (!isDraggingMiniMap.current || !miniMapExtent) return;
+      const dx = e.clientX - miniMapDragStart.current.mouseX;
+      const trackWidth = Math.min(320, Math.max(180, dimensions.width - 460));
+      if (trackWidth <= 0) return;
+
+      if (layoutMode === "proportional") {
+        const vMin = foldEpochs ? compressYear(miniMapExtent.minAnchor) : miniMapExtent.minAnchor;
+        const vMax = foldEpochs ? compressYear(miniMapExtent.maxAnchor) : miniMapExtent.maxAnchor;
+        const rangeV = Math.max(1, vMax - vMin);
+        const panDelta = -(dx / trackWidth) * rangeV * BASE_PIXELS_PER_YEAR * zoom;
+        const newPanX = miniMapDragStart.current.initialPanX + panDelta;
+        setPanX(newPanX);
+        prevLayoutStateRef.current.panX = newPanX;
+      } else {
+        const SPACING = 220;
+        const totalSpan = Math.max(1, chronologicalAnchors.length - 1) * SPACING;
+        const panDelta = -(dx / trackWidth) * totalSpan * zoom;
+        const newPanX = miniMapDragStart.current.initialPanX + panDelta;
+        setPanX(newPanX);
+        prevLayoutStateRef.current.panX = newPanX;
+      }
+    };
+
+    const handleWindowMouseUp = () => {
+      isDraggingMiniMap.current = false;
+    };
+
+    window.addEventListener("mousemove", handleWindowMouseMove);
+    window.addEventListener("mouseup", handleWindowMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleWindowMouseMove);
+      window.removeEventListener("mouseup", handleWindowMouseUp);
+    };
+  }, [
+    miniMapExtent,
+    dimensions.width,
+    layoutMode,
+    foldEpochs,
+    compressYear,
+    zoom,
+    chronologicalAnchors.length,
+  ]);
+
+  const handleMiniMapClick = useCallback(
+    (e: React.MouseEvent<SVGSVGElement>) => {
+      if (!miniMapExtent) return;
+      cancelActiveAnimation();
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clickX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+      const t = clickX / rect.width;
+      const targetYear = miniMapExtent.minAnchor + t * miniMapExtent.range;
+
+      if (layoutMode === "proportional") {
+        const vTarget = foldEpochs ? compressYear(targetYear) : targetYear;
+        const targetPan = -vTarget * BASE_PIXELS_PER_YEAR * zoom;
+        animateToViewport(targetPan, zoom, 320);
+      } else {
+        let closestYear = chronologicalAnchors[0];
+        let minDiff = Infinity;
+        chronologicalAnchors.forEach((y) => {
+          const diff = Math.abs(y - targetYear);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closestYear = y;
+          }
+        });
+        const targetBase = anchorBasePositions.get(closestYear) ?? 0;
+        const targetPan = -targetBase * zoom;
+        animateToViewport(targetPan, zoom, 320);
+      }
+    },
+    [
+      miniMapExtent,
+      layoutMode,
+      foldEpochs,
+      compressYear,
+      zoom,
+      chronologicalAnchors,
+      anchorBasePositions,
+      animateToViewport,
+      cancelActiveAnimation,
+    ]
+  );
 
   // Stable tracking of layout geometry across renders for synchronous focal stability
   const prevLayoutStateRef = useRef<{
@@ -692,15 +1094,24 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
   const handleSetLayoutMode = useCallback(
     (newMode: "even" | "proportional") => {
       setLayoutMode(newMode);
-      fitViewForMode(newMode);
+      fitViewForMode(newMode, { animate: true });
     },
     [fitViewForMode]
   );
 
   // Trigger 1: Manual Fit button click handler
   const handleFitClick = useCallback(() => {
-    fitViewForMode(layoutMode);
+    fitViewForMode(layoutMode, { animate: true });
   }, [fitViewForMode, layoutMode]);
+
+  // Toggle Smart Accordion Epoch Compression
+  const handleToggleFoldEpochs = useCallback(() => {
+    const nextVal = !foldEpochs;
+    setFoldEpochs(nextVal);
+    if (layoutMode === "proportional") {
+      fitViewForMode("proportional", { animate: true, overrideFoldEpochs: nextVal });
+    }
+  }, [foldEpochs, layoutMode, fitViewForMode]);
 
   // Export full timeline fitted as 2x Retina PNG
   const exportPng = useCallback(
@@ -771,7 +1182,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     try {
       const saved = localStorage.getItem(`neeline_viewport_${timelineId}`);
       if (!saved) {
-        fitViewForMode(layoutMode);
+        fitViewForMode(layoutMode, { animate: false });
       }
     } catch {
       // ignore
@@ -784,6 +1195,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     if (!el) return;
     const handler = (e: WheelEvent) => {
       e.preventDefault();
+      cancelActiveAnimation();
       const rect = el.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
@@ -795,16 +1207,17 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     };
     el.addEventListener("wheel", handler, { passive: false });
     return () => el.removeEventListener("wheel", handler);
-  }, [zoom, panX, dimensions.width]);
+  }, [zoom, panX, dimensions.width, cancelActiveAnimation]);
 
   // Mouse drag pan
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
+    cancelActiveAnimation();
     isDragging.current = true;
     hasDragged.current = false;
     lastMouse.current = { x: e.clientX, y: e.clientY };
     e.preventDefault();
-  }, []);
+  }, [cancelActiveAnimation]);
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
@@ -842,6 +1255,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
 
   // Touch handlers for mobile
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    cancelActiveAnimation();
     if (e.touches.length === 1) {
       touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
       isDragging.current = true;
@@ -851,7 +1265,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       pinchDist.current = Math.sqrt(dx * dx + dy * dy);
     }
-  }, []);
+  }, [cancelActiveAnimation]);
 
   const handleTouchMove = useCallback(
     (e: React.TouchEvent) => {
@@ -1045,6 +1459,72 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
 
         {hasEvents && (
           <>
+            {/* Accordion Epoch Fold Markers (in Proportional mode when folded voids exist) */}
+            {layoutMode === "proportional" &&
+              foldEpochs &&
+              foldedEpochGaps.map((fold) => {
+                const xStart = yearToX(fold.startYear);
+                const xEnd = yearToX(fold.endYear);
+                const midX = (xStart + xEnd) / 2;
+
+                if (midX < -150 || midX > dimensions.width + 150) return null;
+
+                return (
+                  <g
+                    key={`fold-${fold.startYear}-${fold.endYear}`}
+                    className="epoch-fold-marker select-none transition-opacity duration-200"
+                    style={{ cursor: "default" }}
+                  >
+                    {/* Double stylized angled break hashes across spine */}
+                    <line
+                      x1={midX - 7}
+                      y1={spineY - 12}
+                      x2={midX - 2}
+                      y2={spineY + 12}
+                      stroke={spineColor}
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      opacity="0.95"
+                    />
+                    <line
+                      x1={midX + 2}
+                      y1={spineY - 12}
+                      x2={midX + 7}
+                      y2={spineY + 12}
+                      stroke={spineColor}
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      opacity="0.95"
+                    />
+
+                    {/* Floating Fold Badge above spine */}
+                    <rect
+                      x={midX - (fold.label.length * 6) / 2 - 8}
+                      y={spineY - 30}
+                      width={fold.label.length * 6 + 16}
+                      height="18"
+                      rx="9"
+                      fill={bgColor}
+                      stroke={spineColor}
+                      strokeWidth="1.2"
+                      strokeDasharray="3 2"
+                      opacity="0.95"
+                    />
+                    <text
+                      x={midX}
+                      y={spineY - 17}
+                      textAnchor="middle"
+                      fill={spineColor}
+                      fontSize="10"
+                      fontWeight="700"
+                      fontFamily="var(--font-mono, monospace)"
+                    >
+                      {fold.label}
+                    </text>
+                  </g>
+                );
+              })}
+
             {/* Time gap indicators between consecutive events */}
             {showGaps &&
               sortedEvents.length > 1 &&
@@ -1055,6 +1535,11 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                 const curYear = ev.isBce ? -Math.abs(ev.year) : ev.year;
                 const gap = Math.abs(curYear - prevYear);
                 if (gap === 0) return null;
+
+                // Don't render standard gap badge if already covered by accordion fold marker
+                const isFolded = layoutMode === "proportional" && foldEpochs && gap >= EPOCH_FOLD_THRESHOLD;
+                if (isFolded) return null;
+
                 const prevX = yearToX(prevYear);
                 const curX = yearToX(curYear);
                 const midX = (prevX + curX) / 2;
@@ -1685,6 +2170,51 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
         </div>
       )}
 
+      {/* Floating HUD: Top-Left Era Bookmarks / Quick Jump Anchors */}
+      {eraBookmarks.length > 0 && (
+        <div
+          className={`absolute top-3 left-4 flex items-center gap-1.5 p-1 rounded-xl theme-hud shadow-lg border border-black/10 dark:border-white/10 z-30 font-mono text-[11px] max-w-[calc(100vw-540px)] overflow-x-auto no-scrollbar transition-all duration-200 ease-out ${
+            showCanvasControls
+              ? "opacity-100 translate-y-0 pointer-events-auto"
+              : "opacity-0 -translate-y-3 pointer-events-none"
+          }`}
+        >
+          <div className="flex items-center gap-1 px-2 py-0.5 text-[#c9a84c] shrink-0 font-semibold">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Eras</span>
+          </div>
+          <div className="w-px h-3.5 bg-black/10 dark:bg-white/10 shrink-0" />
+          {eraBookmarks.map((era) => {
+            const centerScreenYear = Math.round(xToYear(dimensions.width / 2));
+            const sEy = era.isBce ? -Math.abs(era.year) : era.year;
+            const eEy = era.endIsBce ? -Math.abs(era.endYear!) : era.endYear!;
+            const minEy = Math.min(sEy, eEy);
+            const maxEy = Math.max(sEy, eEy);
+            const isCurrentEra = centerScreenYear >= minEy && centerScreenYear <= maxEy;
+
+            return (
+              <button
+                key={era.id}
+                type="button"
+                onClick={() => jumpToEra(era)}
+                className={`px-2.5 py-1 rounded-lg shrink-0 flex items-center gap-1.5 transition-all cursor-pointer ${
+                  isCurrentEra
+                    ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/50 font-bold shadow-sm"
+                    : "theme-hud-btn opacity-85 hover:opacity-100"
+                }`}
+                title={`Jump to ${era.title} (${formatSpanLabel(era.year, era.isBce, era.endYear!, era.endIsBce || false)})`}
+              >
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ backgroundColor: era.color }}
+                />
+                <span className="truncate max-w-[130px]">{era.title}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Floating HUD: Top-Right Canvas Controls */}
       <div
         className={`absolute top-3 right-4 flex items-center gap-2 z-30 transition-all duration-200 ease-out ${
@@ -1718,6 +2248,25 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
             Proportional
           </button>
         </div>
+
+        {/* Smart Accordion Epoch Fold Toggle (available in Proportional mode) */}
+        {layoutMode === "proportional" && (
+          <button
+            onClick={handleToggleFoldEpochs}
+            className={`h-8 px-2.5 rounded-xl theme-hud text-[11px] font-mono flex items-center gap-1.5 transition-all cursor-pointer ${
+              foldEpochs
+                ? "border-[#c9a84c]/50 text-[#c9a84c] bg-[#c9a84c]/15 font-semibold shadow-md"
+                : "theme-hud-btn opacity-70 hover:opacity-100"
+            }`}
+            title="Fold multi-millennia empty voids (>8,000 yrs) so prehistory and modern eras coexist legibly"
+          >
+            <FoldHorizontal className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Epoch Fold</span>
+            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10 font-bold">
+              {foldEpochs ? "ON" : "OFF"}
+            </span>
+          </button>
+        )}
 
         {/* Gaps Toggle Button */}
         <button
@@ -1935,6 +2484,152 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
           )}
         </div>
       </div>
+
+      {/* Floating Mini-Map / Bird's-Eye Navigator Bar */}
+      {miniMapExtent && showMiniMap && (
+        <div
+          className={`absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 px-2.5 py-1.5 rounded-xl theme-hud shadow-2xl border border-black/10 dark:border-white/10 z-30 font-mono transition-all duration-200 ease-out ${
+            showCanvasControls
+              ? "opacity-100 translate-y-0 pointer-events-auto"
+              : "opacity-0 translate-y-3 pointer-events-none"
+          }`}
+        >
+          {/* Compass / Map Icon with Tooltip */}
+          <div
+            className="flex items-center gap-1 text-[#c9a84c] text-[11px] font-semibold shrink-0 select-none"
+            title="Mini-Map Navigator: Drag lens or click track to travel through time"
+          >
+            <Compass className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Map</span>
+          </div>
+
+          {/* SVG Mini Track */}
+          {(() => {
+            const trackW = Math.min(320, Math.max(180, dimensions.width - 480));
+            const trackH = 20;
+
+            // Viewport Frustum Calculation:
+            const leftVisibleYear = xToYear(0);
+            const rightVisibleYear = xToYear(dimensions.width);
+            const minVis = Math.min(leftVisibleYear, rightVisibleYear);
+            const maxVis = Math.max(leftVisibleYear, rightVisibleYear);
+
+            const t1 = Math.min(1, Math.max(0, (minVis - miniMapExtent.minAnchor) / miniMapExtent.range));
+            const t2 = Math.min(1, Math.max(0, (maxVis - miniMapExtent.minAnchor) / miniMapExtent.range));
+
+            const lensX = Math.round(t1 * trackW);
+            const lensW = Math.max(16, Math.min(trackW - lensX, Math.round((t2 - t1) * trackW)));
+
+            // Year 0 marker
+            const hasZero = miniMapExtent.minAnchor <= 0 && miniMapExtent.maxAnchor >= 0;
+            const zeroT = hasZero ? (0 - miniMapExtent.minAnchor) / miniMapExtent.range : -1;
+            const zeroX = hasZero ? Math.round(zeroT * trackW) : -1;
+
+            return (
+              <svg
+                width={trackW}
+                height={trackH}
+                className="overflow-visible cursor-pointer rounded select-none"
+                onClick={handleMiniMapClick}
+              >
+                {/* Background Track Groove */}
+                <rect
+                  x={0}
+                  y={trackH / 2 - 1.5}
+                  width={trackW}
+                  height={3}
+                  rx={1.5}
+                  fill={spineColor}
+                  opacity={0.3}
+                />
+
+                {/* Event Ticks across Track */}
+                {visibleEvents.map((ev, idx) => {
+                  const ey = ev.isBce ? -Math.abs(ev.year) : ev.year;
+                  const t = Math.max(0, Math.min(1, (ey - miniMapExtent.minAnchor) / miniMapExtent.range));
+                  const x = t * trackW;
+                  return (
+                    <line
+                      key={`mini-tick-${ev.id || idx}`}
+                      x1={x}
+                      y1={4}
+                      x2={x}
+                      y2={trackH - 4}
+                      stroke={ev.color}
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      opacity="0.8"
+                    />
+                  );
+                })}
+
+                {/* Permanent Red Year 0 Indicator on Mini-Map */}
+                {hasZero && zeroX >= 0 && zeroX <= trackW && (
+                  <g>
+                    <line
+                      x1={zeroX}
+                      y1={1}
+                      x2={zeroX}
+                      y2={trackH - 1}
+                      stroke="#ef4444"
+                      strokeWidth="2"
+                    />
+                    <circle cx={zeroX} cy={trackH / 2} r="2.5" fill="#ef4444" />
+                  </g>
+                )}
+
+                {/* Draggable Viewport Lens */}
+                <rect
+                  x={lensX}
+                  y={1}
+                  width={lensW}
+                  height={trackH - 2}
+                  rx={4}
+                  fill="#c9a84c"
+                  fillOpacity="0.22"
+                  stroke="#c9a84c"
+                  strokeWidth="1.5"
+                  className="cursor-grab active:cursor-grabbing hover:fill-opacity-35 transition-colors"
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    cancelActiveAnimation();
+                    isDraggingMiniMap.current = true;
+                    miniMapDragStart.current = { mouseX: e.clientX, initialPanX: panX };
+                  }}
+                />
+              </svg>
+            );
+          })()}
+
+          {/* Quick toggle to collapse mini-map if needed */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowMiniMap(false);
+            }}
+            className="p-1 rounded text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors cursor-pointer"
+            title="Hide Mini-Map Navigator"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
+
+      {/* Floating Mini-Map Re-open Pill when collapsed */}
+      {miniMapExtent && !showMiniMap && (
+        <button
+          type="button"
+          onClick={() => setShowMiniMap(true)}
+          className={`absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-2.5 py-1 rounded-xl theme-hud shadow-md border border-black/10 dark:border-white/10 z-30 font-mono text-[11px] text-[#c9a84c] hover:bg-[#c9a84c]/10 transition-all cursor-pointer ${
+            showCanvasControls ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3 pointer-events-none"
+          }`}
+          title="Show Mini-Map Navigator"
+        >
+          <Compass className="w-3.5 h-3.5" />
+          <span>Mini-Map</span>
+        </button>
+      )}
 
       {/* Floating HUD: Bottom-Right Zoom & Fit Dock */}
       <div

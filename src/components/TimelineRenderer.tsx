@@ -241,6 +241,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
   // Year-to-x mapping (supports both modes and all span anchors)
   const yearToX = useCallback(
     (year: number): number => {
+      if (isNaN(year)) return dimensions.width / 2;
       if (layoutMode === "proportional") {
         return dimensions.width / 2 + year * BASE_PIXELS_PER_YEAR * zoom + panX;
       }
@@ -285,6 +286,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
   // X-to-year: inverse of yearToX
   const xToYear = useCallback(
     (x: number): number => {
+      if (isNaN(x)) return 0;
       if (layoutMode === "proportional") {
         return (x - dimensions.width / 2 - panX) / (BASE_PIXELS_PER_YEAR * zoom);
       }
@@ -372,14 +374,12 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       } else {
         const rawX1 = item.startX !== undefined ? item.startX : yearToX(item.isBce ? -Math.abs(item.year) : item.year);
         const rawX2 = item.endX !== undefined ? item.endX : yearToX(item.endIsBce ? -Math.abs(item.endYear || item.year) : (item.endYear || item.year));
-        const x1 = Math.min(rawX1, rawX2);
-        const x2 = Math.max(rawX1, rawX2);
 
         const effStartYear = item.isBce ? -Math.abs(item.year) : item.year;
         const startKey = `${effStartYear}_${item.month || 0}_${item.day || 0}`;
         rawList.push({
           key: startKey,
-          x: x1,
+          x: rawX1,
           year: item.year,
           isBce: item.isBce,
           month: item.month,
@@ -395,7 +395,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
         const endKey = `${effEndYear}_${item.endMonth || 0}_${item.endDay || 0}`;
         rawList.push({
           key: endKey,
-          x: x2,
+          x: rawX2,
           year: endYearVal,
           isBce: endIsBceVal,
           month: item.endMonth,
@@ -424,22 +424,25 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     // 3. Sort unique markers by X position
     const sorted = Array.from(map.values()).sort((a, b) => a.x - b.x);
 
-    // 4. Overlap & collision suppression: if two year labels would overlap horizontally, only show one time!
-    // "if year is overlapped then only one time year should be shown."
-    const nonOverlapping: RawMarker[] = [];
-    let lastX = -Infinity;
-    const MIN_LABEL_GAP = 50; // minimum horizontal distance in px between labels
+    // 4. Overlap & collision suppression:
+    // Every unique anchor tick and dot node MUST remain on the axis spine so drop-lines always connect.
+    // Date text labels beneath the axis are suppressed if they would collide horizontally!
+    const result: (RawMarker & { showLabel: boolean })[] = [];
+    let lastLabelX = -Infinity;
+    const MIN_LABEL_GAP = 52; // minimum horizontal px between date text labels
 
     sorted.forEach((marker) => {
-      if (marker.x - lastX < MIN_LABEL_GAP) {
-        // Label would overlap with previous label: skip so year is only shown once!
-        return;
+      const showLabel = marker.x - lastLabelX >= MIN_LABEL_GAP;
+      if (showLabel) {
+        lastLabelX = marker.x;
       }
-      nonOverlapping.push(marker);
-      lastX = marker.x;
+      result.push({
+        ...marker,
+        showLabel,
+      });
     });
 
-    return nonOverlapping;
+    return result;
   }, [visibleEvents, layoutItems, yearToX]);
 
   // Compute spine extents covering all anchors
@@ -519,7 +522,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     const totalSpan = Math.max(1, chronologicalAnchors.length - 1) * SPACING;
     const padding = 140;
     const availableWidth = dimensions.width - padding * 2;
-    const newZoom = chronologicalAnchors.length > 1 ? availableWidth / totalSpan : 1;
+    const newZoom = chronologicalAnchors.length > 1 ? Math.min(1.25, availableWidth / totalSpan) : 1;
     setZoom(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom)));
     setPanX(0);
   }, [visibleEvents, layoutMode, chronologicalAnchors, dimensions.width]);
@@ -911,19 +914,21 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                     strokeWidth="1.5"
                   />
 
-                  {/* Single date label beneath the axis */}
-                  <text
-                    x={marker.x}
-                    y={spineY + TICK_HEIGHT / 2 + 16}
-                    textAnchor="middle"
-                    fill={marker.color}
-                    fontSize="10"
-                    fontFamily="var(--font-mono)"
-                    fontWeight="500"
-                    opacity="0.9"
-                  >
-                    {marker.label}
-                  </text>
+                  {/* Single date label beneath the axis (shown when not colliding) */}
+                  {marker.showLabel && (
+                    <text
+                      x={marker.x}
+                      y={spineY + TICK_HEIGHT / 2 + 16}
+                      textAnchor="middle"
+                      fill={marker.color}
+                      fontSize="10"
+                      fontFamily="var(--font-mono)"
+                      fontWeight="500"
+                      opacity="0.9"
+                    >
+                      {marker.label}
+                    </text>
+                  )}
                 </g>
               ))}
             </g>
@@ -936,7 +941,8 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                 const x1 = Math.min(rawX1, rawX2);
                 const x2 = Math.max(rawX1, rawX2);
                 const centerX = (x1 + x2) / 2;
-                const bracketY = spineY - 75 - (item.bracketTier || 0) * 38;
+                // Position bracket spans cleanly above all point milestone card tiers (max tier 3 reaches spineY - 129)
+                const bracketY = spineY - 142 - (item.bracketTier || 0) * 42;
                 const labelW = Math.max(90, item.labelWidth);
 
                 return (

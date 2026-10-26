@@ -25,25 +25,43 @@ export function parseEventMetadata(rawDescription: string | null): EventMetadata
   if (metaMatch) {
     try {
       const parsed = JSON.parse(metaMatch[1]);
+      const rawEndYear =
+        parsed.endYear !== undefined && parsed.endYear !== null
+          ? parseInt(String(parsed.endYear), 10)
+          : NaN;
+      const validEndYear = !isNaN(rawEndYear) ? Math.abs(rawEndYear) : null;
+
+      let endIsBce: boolean | null =
+        parsed.endIsBce !== undefined && parsed.endIsBce !== null
+          ? Boolean(parsed.endIsBce)
+          : null;
+      if (endIsBce === null && !isNaN(rawEndYear) && rawEndYear < 0) {
+        endIsBce = true;
+      }
+
+      const rawEndMonth =
+        parsed.endMonth !== undefined && parsed.endMonth !== null
+          ? parseInt(String(parsed.endMonth), 10)
+          : NaN;
+      const validEndMonth = !isNaN(rawEndMonth)
+        ? Math.min(12, Math.max(1, rawEndMonth))
+        : null;
+
+      const rawEndDay =
+        parsed.endDay !== undefined && parsed.endDay !== null
+          ? parseInt(String(parsed.endDay), 10)
+          : NaN;
+      const validEndDay = !isNaN(rawEndDay)
+        ? Math.min(31, Math.max(1, rawEndDay))
+        : null;
+
       return {
         layer: parsed.layer ? String(parsed.layer).trim() || "General" : "General",
         description: metaMatch[2].trim() || null,
-        endYear:
-          parsed.endYear !== undefined && parsed.endYear !== null
-            ? Math.abs(parseInt(String(parsed.endYear), 10))
-            : null,
-        endIsBce:
-          parsed.endIsBce !== undefined && parsed.endIsBce !== null
-            ? Boolean(parsed.endIsBce)
-            : null,
-        endMonth:
-          parsed.endMonth !== undefined && parsed.endMonth !== null
-            ? Math.min(12, Math.max(1, parseInt(String(parsed.endMonth), 10)))
-            : null,
-        endDay:
-          parsed.endDay !== undefined && parsed.endDay !== null
-            ? Math.min(31, Math.max(1, parseInt(String(parsed.endDay), 10)))
-            : null,
+        endYear: validEndYear,
+        endIsBce: validEndYear !== null ? (endIsBce ?? false) : null,
+        endMonth: validEndMonth,
+        endDay: validEndDay,
       };
     } catch {
       // ignore JSON parse error and fallback
@@ -85,7 +103,12 @@ export function serializeEventMetadata(
 ): string | null {
   const cleanDesc = description ? description.trim() : "";
   const layer = meta.layer && meta.layer.trim() ? meta.layer.trim() : "General";
-  const hasSpan = meta.endYear !== undefined && meta.endYear !== null;
+  
+  const rawEndYear =
+    meta.endYear !== undefined && meta.endYear !== null
+      ? parseInt(String(meta.endYear), 10)
+      : NaN;
+  const hasSpan = !isNaN(rawEndYear);
   const isCustomLayer = layer !== "General";
 
   if (!hasSpan && !isCustomLayer) {
@@ -96,10 +119,27 @@ export function serializeEventMetadata(
   const payload: Record<string, any> = {};
   if (isCustomLayer) payload.layer = layer;
   if (hasSpan) {
-    payload.endYear = Math.abs(meta.endYear!);
-    payload.endIsBce = Boolean(meta.endIsBce);
-    if (meta.endMonth) payload.endMonth = meta.endMonth;
-    if (meta.endDay) payload.endDay = meta.endDay;
+    payload.endYear = Math.abs(rawEndYear);
+    payload.endIsBce =
+      meta.endIsBce !== undefined && meta.endIsBce !== null
+        ? Boolean(meta.endIsBce)
+        : rawEndYear < 0;
+
+    const rawEndMonth =
+      meta.endMonth !== undefined && meta.endMonth !== null
+        ? parseInt(String(meta.endMonth), 10)
+        : NaN;
+    if (!isNaN(rawEndMonth)) {
+      payload.endMonth = Math.min(12, Math.max(1, rawEndMonth));
+    }
+
+    const rawEndDay =
+      meta.endDay !== undefined && meta.endDay !== null
+        ? parseInt(String(meta.endDay), 10)
+        : NaN;
+    if (!isNaN(rawEndDay)) {
+      payload.endDay = Math.min(31, Math.max(1, rawEndDay));
+    }
   }
 
   return `<!--neeline-meta:${JSON.stringify(payload)}-->${cleanDesc}`;

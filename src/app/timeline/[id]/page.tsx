@@ -945,10 +945,10 @@ export default function TimelinePage() {
     } else {
       const svgEl = document.getElementById("timeline-canvas-svg") as SVGSVGElement | null;
       if (svgEl) {
-        exportTimelineAsPng(svgEl, timeline.bgColor, filename);
+        exportTimelineAsPng(svgEl, canvasColors.bg || timeline.bgColor, filename);
       }
     }
-  }, [timeline]);
+  }, [timeline, canvasColors.bg]);
 
   // Export as Tabular Plain Text
   const handleExportTxt = useCallback(() => {
@@ -966,16 +966,31 @@ export default function TimelinePage() {
 
   const { earliestDate, latestDate } = useMemo(() => {
     if (events.length === 0) return { earliestDate: undefined, latestDate: undefined };
-    const sorted = [...events].sort((a, b) => {
-      const ya = a.isBce ? -Math.abs(a.year) : a.year;
-      const yb = b.isBce ? -Math.abs(b.year) : b.year;
-      return ya - yb;
+    const allPoints: Array<{ year: number; isBce: boolean; num: number }> = [];
+    events.forEach((e) => {
+      const safeY = Math.abs(e.year);
+      allPoints.push({
+        year: safeY,
+        isBce: e.isBce,
+        num: e.isBce ? -safeY : safeY,
+      });
+      if (e.endYear !== undefined && e.endYear !== null) {
+        const safeEy = Math.abs(e.endYear);
+        const endBce = Boolean(e.endIsBce);
+        allPoints.push({
+          year: safeEy,
+          isBce: endBce,
+          num: endBce ? -safeEy : safeEy,
+        });
+      }
     });
-    const earliest = sorted[0];
-    const latest = sorted[sorted.length - 1];
+
+    allPoints.sort((a, b) => a.num - b.num);
+    const earliest = allPoints[0];
+    const latest = allPoints[allPoints.length - 1];
     return {
-      earliestDate: `${earliest.year} ${earliest.isBce ? "BCE" : "CE"}`,
-      latestDate: `${latest.year} ${latest.isBce ? "BCE" : "CE"}`,
+      earliestDate: `${earliest.year.toLocaleString()} ${earliest.isBce ? "BCE" : "CE"}`,
+      latestDate: `${latest.year.toLocaleString()} ${latest.isBce ? "BCE" : "CE"}`,
     };
   }, [events]);
 

@@ -119,8 +119,12 @@ export default function DashboardPage() {
 
   const filteredTimelines = useMemo(() => {
     if (!searchQuery.trim()) return baseList;
-    const q = searchQuery.toLowerCase();
-    return baseList.filter((t) => t.name.toLowerCase().includes(q));
+    const q = searchQuery.toLowerCase().trim();
+    return baseList.filter(
+      (t) =>
+        t.name.toLowerCase().includes(q) ||
+        (t.description && t.description.toLowerCase().includes(q))
+    );
   }, [baseList, searchQuery]);
 
   return (

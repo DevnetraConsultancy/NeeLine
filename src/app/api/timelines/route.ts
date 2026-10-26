@@ -145,6 +145,17 @@ export async function PATCH(req: NextRequest) {
           where: { id: seedEvent.id },
           data: { description: serializeEventMetadata(meta, desc) },
         });
+      } else {
+        await prisma.event.create({
+          data: {
+            timelineId: id,
+            year: 0,
+            isBce: false,
+            title: "Year Zero",
+            color: "#c9a84c",
+            description: serializeEventMetadata({ layer: "General" }, desc),
+          },
+        });
       }
     }
 

@@ -40,10 +40,10 @@ export interface LayoutItem {
 }
 
 export const TIER_SPACING = 32; // vertical spacing between point label tiers
-export const BRACKET_TIER_SPACING = 36; // vertical spacing between bracket tiers
+export const BRACKET_TIER_SPACING = 38; // vertical spacing between bracket tiers
 const LABEL_GAP = 8; // horizontal gap between labels
 const MAX_TIERS = 4;
-const MAX_BRACKET_TIERS = 5;
+const MAX_BRACKET_TIERS = 6;
 
 const MONTH_NAMES = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -72,25 +72,27 @@ export function layoutLabels(
 
   // Separate point milestones and bracketed span periods
   const pointEvents = events.filter(
-    (e) => e.endYear === undefined || e.endYear === null
+    (e) => e.endYear === undefined || e.endYear === null || isNaN(Number(e.endYear))
   );
   const spanEvents = events.filter(
-    (e) => e.endYear !== undefined && e.endYear !== null
+    (e) => e.endYear !== undefined && e.endYear !== null && !isNaN(Number(e.endYear))
   );
 
   // 1. Process Point Milestones
   const pointItems: LayoutItem[] = pointEvents
     .map((e) => {
-      const effectiveYear = e.isBce ? -Math.abs(e.year) : e.year;
-      const labelText = `${e.title}`;
+      const safeYear = !isNaN(Number(e.year)) ? Number(e.year) : 0;
+      const isBce = e.isBce || safeYear < 0;
+      const effectiveYear = isBce ? -Math.abs(safeYear) : safeYear;
+      const labelText = `${e.title || "Untitled"}`;
       const hasNote = Boolean(e.description && e.description.trim());
       const labelWidth =
         measureTextWidth(labelText, '13px "Inter", sans-serif') + (hasNote ? 36 : 24); // padding + note icon
 
       return {
         eventId: e.id,
-        year: e.year,
-        isBce: e.isBce,
+        year: Math.abs(safeYear),
+        isBce,
         month: e.month,
         day: e.day,
         title: e.title,
@@ -132,21 +134,27 @@ export function layoutLabels(
 
   // 2. Process Bracketed Period Spans
   const spanItems: LayoutItem[] = spanEvents.map((e) => {
-    const startEy = e.isBce ? -Math.abs(e.year) : e.year;
-    const endEy = e.endIsBce ? -Math.abs(e.endYear!) : e.endYear!;
+    const safeStartYear = !isNaN(Number(e.year)) ? Number(e.year) : 0;
+    const startIsBce = e.isBce || safeStartYear < 0;
+    const startEy = startIsBce ? -Math.abs(safeStartYear) : safeStartYear;
+
+    const safeEndYear = !isNaN(Number(e.endYear)) ? Number(e.endYear) : safeStartYear;
+    const endIsBce = e.endIsBce !== undefined && e.endIsBce !== null ? e.endIsBce : safeEndYear < 0;
+    const endEy = endIsBce ? -Math.abs(safeEndYear) : safeEndYear;
+
     const startX = yearToX(startEy);
     const endX = yearToX(endEy);
     const x1 = Math.min(startX, endX);
     const x2 = Math.max(startX, endX);
-    const spanWidth = Math.max(2, x2 - x1);
+    const spanWidth = Math.max(4, x2 - x1);
     const centerX = (x1 + x2) / 2;
     const labelWidth =
-      measureTextWidth(e.title, '12.5px "Inter", sans-serif') + 36; // padding + note icon
+      measureTextWidth(e.title || "Untitled", '12.5px "Inter", sans-serif') + 36; // padding + note icon
 
     return {
       eventId: e.id,
-      year: e.year,
-      isBce: e.isBce,
+      year: Math.abs(safeStartYear),
+      isBce: startIsBce,
       month: e.month,
       day: e.day,
       title: e.title,
@@ -158,8 +166,8 @@ export function layoutLabels(
       labelWidth,
       collapsed: false,
       isSpan: true,
-      endYear: e.endYear,
-      endIsBce: e.endIsBce,
+      endYear: Math.abs(safeEndYear),
+      endIsBce,
       endMonth: e.endMonth,
       endDay: e.endDay,
       startX,
@@ -171,14 +179,16 @@ export function layoutLabels(
     };
   });
 
-  // Sort bracket spans by x1 (earliest start)
+  // Sort bracket spans by left edge x1
   spanItems.sort((a, b) => (a.x1 ?? 0) - (b.x1 ?? 0));
 
-  // Greedy tier assignment for bracket spans so overlapping periods stack neatly
+  // Greedy tier assignment taking into account BOTH the physical bracket line [x1, x2] AND the title card width
   const bracketTierEdges: number[] = [];
   for (const span of spanItems) {
-    const leftBound = (span.x1 ?? 0) - 8;
-    const rightBound = (span.x2 ?? 0) + 8;
+    const cardLeft = span.x - span.labelWidth / 2;
+    const cardRight = span.x + span.labelWidth / 2;
+    const leftBound = Math.min(span.x1 ?? span.x, cardLeft) - 8;
+    const rightBound = Math.max(span.x2 ?? span.x, cardRight) + 8;
 
     let placed = false;
     for (let t = 0; t < MAX_BRACKET_TIERS; t++) {
@@ -205,8 +215,11 @@ export function formatSpanLabel(
   endYear: number,
   endBce: boolean
 ): string {
-  const sNum = startBce ? -Math.abs(startYear) : startYear;
-  const eNum = endBce ? -Math.abs(endYear) : endYear;
+  const safeStart = !isNaN(Number(startYear)) ? Number(startYear) : 0;
+  const safeEnd = !isNaN(Number(endYear)) ? Number(endYear) : safeStart;
+
+  const sNum = startBce ? -Math.abs(safeStart) : safeStart;
+  const eNum = endBce ? -Math.abs(safeEnd) : safeEnd;
   const earlyNum = Math.min(sNum, eNum);
   const lateNum = Math.max(sNum, eNum);
 
@@ -233,8 +246,10 @@ export function formatDateLabel(
   month?: number | null,
   day?: number | null
 ): string {
+  if (isNaN(Number(year))) return "Unknown";
+  const safeYear = Math.abs(Number(year));
   const era = isBce ? "BCE" : "CE";
-  const formattedYear = year.toLocaleString();
+  const formattedYear = safeYear.toLocaleString();
   if (month && day && month >= 1 && month <= 12) {
     return `${MONTH_NAMES[month - 1]} ${day}, ${formattedYear} ${era}`;
   }

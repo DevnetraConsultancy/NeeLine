@@ -101,25 +101,77 @@ export async function POST(req: NextRequest) {
       }
 
       const createData = (body.events as RawEventItem[]).map((e) => {
-        const hasSpan = e.endYear !== undefined && e.endYear !== null && String(e.endYear).trim() !== "";
+        const rawYear = parseInt(String(e.year || 0), 10);
+        const safeYear = !isNaN(rawYear) ? rawYear : 0;
+        const isBce =
+          e.isBce !== undefined && e.isBce !== null
+            ? Boolean(e.isBce)
+            : safeYear < 0;
+
+        const rawMonth =
+          e.month !== undefined && e.month !== null && String(e.month).trim() !== ""
+            ? parseInt(String(e.month), 10)
+            : NaN;
+        const validMonth = !isNaN(rawMonth)
+          ? Math.min(12, Math.max(1, rawMonth))
+          : null;
+
+        const rawDay =
+          e.day !== undefined && e.day !== null && String(e.day).trim() !== ""
+            ? parseInt(String(e.day), 10)
+            : NaN;
+        const validDay = !isNaN(rawDay)
+          ? Math.min(31, Math.max(1, rawDay))
+          : null;
+
+        const rawEndYear =
+          e.endYear !== undefined && e.endYear !== null && String(e.endYear).trim() !== ""
+            ? parseInt(String(e.endYear), 10)
+            : NaN;
+        const hasSpan = !isNaN(rawEndYear);
+        const endIsBce = hasSpan
+          ? e.endIsBce !== undefined && e.endIsBce !== null
+            ? Boolean(e.endIsBce)
+            : rawEndYear < 0
+          : null;
+
+        const rawEndMonth =
+          hasSpan && e.endMonth !== undefined && e.endMonth !== null && String(e.endMonth).trim() !== ""
+            ? parseInt(String(e.endMonth), 10)
+            : NaN;
+        const validEndMonth = !isNaN(rawEndMonth)
+          ? Math.min(12, Math.max(1, rawEndMonth))
+          : null;
+
+        const rawEndDay =
+          hasSpan && e.endDay !== undefined && e.endDay !== null && String(e.endDay).trim() !== ""
+            ? parseInt(String(e.endDay), 10)
+            : NaN;
+        const validEndDay = !isNaN(rawEndDay)
+          ? Math.min(31, Math.max(1, rawEndDay))
+          : null;
+
         return {
           timelineId: body.timelineId as string,
-          year: Math.abs(parseInt(String(e.year || 0), 10)),
-          isBce: Boolean(e.isBce),
-          month: e.month ? Math.min(12, Math.max(1, parseInt(String(e.month), 10))) : null,
-          day: e.day ? Math.min(31, Math.max(1, parseInt(String(e.day), 10))) : null,
+          year: Math.abs(safeYear),
+          isBce,
+          month: validMonth,
+          day: validDay,
           title: String(e.title || "Untitled").trim(),
           description: serializeEventMetadata(
             {
               layer: e.layer,
-              endYear: hasSpan ? Math.abs(parseInt(String(e.endYear), 10)) : null,
-              endIsBce: hasSpan ? Boolean(e.endIsBce) : null,
-              endMonth: e.endMonth ? Math.min(12, Math.max(1, parseInt(String(e.endMonth), 10))) : null,
-              endDay: e.endDay ? Math.min(31, Math.max(1, parseInt(String(e.endDay), 10))) : null,
+              endYear: hasSpan ? Math.abs(rawEndYear) : null,
+              endIsBce,
+              endMonth: validEndMonth,
+              endDay: validEndDay,
             },
             e.description || null
           ),
-          color: typeof e.color === "string" && e.color.startsWith("#") ? e.color : "#c9a84c",
+          color:
+            typeof e.color === "string" && e.color.startsWith("#")
+              ? e.color
+              : "#c9a84c",
         };
       });
 
@@ -180,14 +232,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Timeline not found" }, { status: 404 });
     }
 
-    const hasSpan = endYear !== undefined && endYear !== null && String(endYear).trim() !== "";
+    const rawYear = parseInt(String(year || 0), 10);
+    const safeYear = !isNaN(rawYear) ? rawYear : 0;
+    const finalIsBce = isBce !== undefined && isBce !== null ? Boolean(isBce) : safeYear < 0;
+
+    const rawMonth = month !== undefined && month !== null && String(month).trim() !== "" ? parseInt(String(month), 10) : NaN;
+    const validMonth = !isNaN(rawMonth) ? Math.min(12, Math.max(1, rawMonth)) : null;
+
+    const rawDay = day !== undefined && day !== null && String(day).trim() !== "" ? parseInt(String(day), 10) : NaN;
+    const validDay = !isNaN(rawDay) ? Math.min(31, Math.max(1, rawDay)) : null;
+
+    const rawEndYear = endYear !== undefined && endYear !== null && String(endYear).trim() !== "" ? parseInt(String(endYear), 10) : NaN;
+    const hasSpan = !isNaN(rawEndYear);
+    const finalEndIsBce = hasSpan
+      ? endIsBce !== undefined && endIsBce !== null
+        ? Boolean(endIsBce)
+        : rawEndYear < 0
+      : null;
+
+    const rawEndMonth = hasSpan && endMonth !== undefined && endMonth !== null && String(endMonth).trim() !== "" ? parseInt(String(endMonth), 10) : NaN;
+    const validEndMonth = !isNaN(rawEndMonth) ? Math.min(12, Math.max(1, rawEndMonth)) : null;
+
+    const rawEndDay = hasSpan && endDay !== undefined && endDay !== null && String(endDay).trim() !== "" ? parseInt(String(endDay), 10) : NaN;
+    const validEndDay = !isNaN(rawEndDay) ? Math.min(31, Math.max(1, rawEndDay)) : null;
+
     const fullDescription = serializeEventMetadata(
       {
         layer,
-        endYear: hasSpan ? Math.abs(parseInt(String(endYear), 10)) : null,
-        endIsBce: hasSpan ? Boolean(endIsBce) : null,
-        endMonth: endMonth ? Math.min(12, Math.max(1, parseInt(String(endMonth), 10))) : null,
-        endDay: endDay ? Math.min(31, Math.max(1, parseInt(String(endDay), 10))) : null,
+        endYear: hasSpan ? Math.abs(rawEndYear) : null,
+        endIsBce: finalEndIsBce,
+        endMonth: validEndMonth,
+        endDay: validEndDay,
       },
       description || null
     );
@@ -195,10 +270,10 @@ export async function POST(req: NextRequest) {
     const event = await prisma.event.create({
       data: {
         timelineId,
-        year: Math.abs(parseInt(year, 10)),
-        isBce: Boolean(isBce),
-        month: month ? Math.min(12, Math.max(1, parseInt(month, 10))) : null,
-        day: day ? Math.min(31, Math.max(1, parseInt(day, 10))) : null,
+        year: Math.abs(safeYear),
+        isBce: finalIsBce,
+        month: validMonth,
+        day: validDay,
         title: String(title).trim(),
         description: fullDescription,
         color: typeof color === "string" && color.startsWith("#") ? color : "#c9a84c",
@@ -249,13 +324,23 @@ export async function PATCH(req: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data: Record<string, any> = {};
 
-    if (body.year !== undefined) data.year = Math.abs(parseInt(body.year, 10));
+    if (body.year !== undefined) {
+      const py = parseInt(String(body.year), 10);
+      if (!isNaN(py)) {
+        data.year = Math.abs(py);
+        if (body.isBce === undefined && py < 0) {
+          data.isBce = true;
+        }
+      }
+    }
     if (body.isBce !== undefined) data.isBce = Boolean(body.isBce);
     if (body.month !== undefined) {
-      data.month = body.month ? Math.min(12, Math.max(1, parseInt(body.month, 10))) : null;
+      const pm = body.month !== null && String(body.month).trim() !== "" ? parseInt(String(body.month), 10) : NaN;
+      data.month = !isNaN(pm) ? Math.min(12, Math.max(1, pm)) : null;
     }
     if (body.day !== undefined) {
-      data.day = body.day ? Math.min(31, Math.max(1, parseInt(body.day, 10))) : null;
+      const pd = body.day !== null && String(body.day).trim() !== "" ? parseInt(String(body.day), 10) : NaN;
+      data.day = !isNaN(pd) ? Math.min(31, Math.max(1, pd)) : null;
     }
     if (body.title !== undefined) data.title = String(body.title).trim();
     if (body.color !== undefined) {
@@ -273,21 +358,44 @@ export async function PATCH(req: NextRequest) {
       const parsed = parseEventMetadata(existing.description);
       const nextDesc = body.description !== undefined ? body.description : parsed.description;
       const nextLayer = body.layer !== undefined ? body.layer : parsed.layer;
-      const nextEndYear =
-        body.endYear !== undefined
-          ? body.endYear !== null && String(body.endYear).trim() !== ""
-            ? Math.abs(parseInt(String(body.endYear), 10))
-            : null
-          : parsed.endYear;
-      const nextEndIsBce =
-        body.endIsBce !== undefined ? (nextEndYear !== null ? Boolean(body.endIsBce) : null) : parsed.endIsBce;
+      
+      let nextEndYear = parsed.endYear;
+      let nextEndIsBce = parsed.endIsBce;
+      if (body.endYear !== undefined) {
+        if (body.endYear !== null && String(body.endYear).trim() !== "") {
+          const pey = parseInt(String(body.endYear), 10);
+          if (!isNaN(pey)) {
+            nextEndYear = Math.abs(pey);
+            if (body.endIsBce === undefined && pey < 0) {
+              nextEndIsBce = true;
+            }
+          } else {
+            nextEndYear = null;
+          }
+        } else {
+          nextEndYear = null;
+        }
+      }
+      if (body.endIsBce !== undefined) {
+        nextEndIsBce = nextEndYear !== null ? Boolean(body.endIsBce) : null;
+      }
+
       const nextEndMonth =
         body.endMonth !== undefined
-          ? body.endMonth ? Math.min(12, Math.max(1, parseInt(String(body.endMonth), 10))) : null
+          ? body.endMonth !== null && String(body.endMonth).trim() !== ""
+            ? !isNaN(parseInt(String(body.endMonth), 10))
+              ? Math.min(12, Math.max(1, parseInt(String(body.endMonth), 10)))
+              : null
+            : null
           : parsed.endMonth;
+
       const nextEndDay =
         body.endDay !== undefined
-          ? body.endDay ? Math.min(31, Math.max(1, parseInt(String(body.endDay), 10))) : null
+          ? body.endDay !== null && String(body.endDay).trim() !== ""
+            ? !isNaN(parseInt(String(body.endDay), 10))
+              ? Math.min(31, Math.max(1, parseInt(String(body.endDay), 10)))
+              : null
+            : null
           : parsed.endDay;
 
       data.description = serializeEventMetadata(

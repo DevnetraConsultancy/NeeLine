@@ -125,13 +125,47 @@ export function exportTimelineAsPng(
       }
 
       context.fillText(textContent, tx, y);
-    } else if (tag === "g") {
-      // Recurse into group children
+    } else if (tag === "path") {
+      const d = el.getAttribute("d");
+      if (d) {
+        try {
+          const path = new Path2D(d);
+          const stroke = computed.stroke || el.getAttribute("stroke") || "none";
+          const fill = computed.fill || el.getAttribute("fill") || "none";
+          if (fill && fill !== "none") {
+            context.fillStyle = fill;
+            context.fill(path);
+          }
+          if (stroke && stroke !== "none") {
+            context.strokeStyle = stroke;
+            context.lineWidth =
+              parseFloat(computed.strokeWidth) ||
+              parseFloat(el.getAttribute("stroke-width") || "1");
+            context.stroke(path);
+          }
+        } catch {
+          // Fallback if Path2D is not supported
+        }
+      }
+    } else if (tag === "g" || tag === "svg") {
+      // Recurse into group / nested svg children
+      const sx = parseFloat(el.getAttribute("x") || "0");
+      const sy = parseFloat(el.getAttribute("y") || "0");
+      const hasOffset = tag === "svg" && (sx !== 0 || sy !== 0);
+      if (hasOffset) {
+        context.save();
+        context.translate(sx, sy);
+      }
+
       Array.from(el.children).forEach((child) => {
         if (child instanceof SVGElement) {
           drawElement(child);
         }
       });
+
+      if (hasOffset) {
+        context.restore();
+      }
     }
 
     context.globalAlpha = 1;
@@ -159,7 +193,7 @@ export function exportTimelineAsPng(
 }
 
 /**
- * Exports timeline events as a TXT file with 3 columns: Year, Title, Description
+ * Exports timeline events as a TSV/TXT file with full metadata: Date/Span, Layer, Title, Description
  */
 export function exportTimelineAsTxt(
   events: Array<{
@@ -167,8 +201,13 @@ export function exportTimelineAsTxt(
     isBce: boolean;
     title: string;
     description: string | null;
-    month: number | null;
-    day: number | null;
+    month?: number | null;
+    day?: number | null;
+    endYear?: number | null;
+    endIsBce?: boolean | null;
+    endMonth?: number | null;
+    endDay?: number | null;
+    layer?: string | null;
   }>,
   filename: string
 ) {
@@ -179,19 +218,37 @@ export function exportTimelineAsTxt(
     return ya - yb;
   });
 
-  const formatYear = (year: number, isBce: boolean, month?: number | null, day?: number | null) => {
+  const formatYear = (
+    year: number,
+    isBce: boolean,
+    month?: number | null,
+    day?: number | null
+  ) => {
     const era = isBce ? "BCE" : "CE";
-    const y = year.toLocaleString();
+    const y = Math.abs(year).toLocaleString();
     if (month && day) return `${y} ${month}/${day} ${era}`;
     if (month) return `${y} ${month} ${era}`;
     return `${y} ${era}`;
   };
 
-  const header = "Year\tTitle\tDescription";
-  const lines = sorted.map(
-    (e) =>
-      `${formatYear(e.year, e.isBce, e.month, e.day)}\t${e.title}\t${e.description || ""}`
-  );
+  const header = "Date / Period\tLayer\tTitle\tChronicle Notes";
+  const lines = sorted.map((e) => {
+    let dateCol = formatYear(e.year, e.isBce, e.month, e.day);
+    if (e.endYear !== undefined && e.endYear !== null) {
+      dateCol = `${dateCol} – ${formatYear(
+        e.endYear,
+        Boolean(e.endIsBce),
+        e.endMonth,
+        e.endDay
+      )}`;
+    }
+    const cleanDesc = (e.description || "")
+      .replace(/^<!--neeline-meta:[\s\S]*?-->/, "")
+      .replace(/^<!--layer:[^>]+-->/, "")
+      .trim();
+    const layer = e.layer || "General";
+    return `${dateCol}\t${layer}\t${e.title}\t${cleanDesc}`;
+  });
 
   const content = [header, ...lines].join("\n");
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });

@@ -94,17 +94,68 @@ export default function ImportModal({
           if (item.year === undefined || item.year === null) {
             throw new Error(`Item at index ${idx} is missing a required 'year' property.`);
           }
-          const hasSpan = item.endYear !== undefined && item.endYear !== null;
+          const rawYear = parseInt(String(item.year), 10);
+          if (isNaN(rawYear)) {
+            throw new Error(`Item at index ${idx} has an invalid numeric 'year'.`);
+          }
+          const isBce =
+            item.isBce !== undefined && item.isBce !== null
+              ? Boolean(item.isBce)
+              : rawYear < 0;
+
+          const rawMonth =
+            item.month !== undefined && item.month !== null && String(item.month).trim() !== ""
+              ? parseInt(String(item.month), 10)
+              : NaN;
+          const validMonth = !isNaN(rawMonth)
+            ? Math.min(12, Math.max(1, rawMonth))
+            : null;
+
+          const rawDay =
+            item.day !== undefined && item.day !== null && String(item.day).trim() !== ""
+              ? parseInt(String(item.day), 10)
+              : NaN;
+          const validDay = !isNaN(rawDay)
+            ? Math.min(31, Math.max(1, rawDay))
+            : null;
+
+          const rawEndYear =
+            item.endYear !== undefined && item.endYear !== null && String(item.endYear).trim() !== ""
+              ? parseInt(String(item.endYear), 10)
+              : NaN;
+          const hasSpan = !isNaN(rawEndYear);
+          const endIsBce = hasSpan
+            ? item.endIsBce !== undefined && item.endIsBce !== null
+              ? Boolean(item.endIsBce)
+              : rawEndYear < 0
+            : null;
+
+          const rawEndMonth =
+            hasSpan && item.endMonth !== undefined && item.endMonth !== null && String(item.endMonth).trim() !== ""
+              ? parseInt(String(item.endMonth), 10)
+              : NaN;
+          const validEndMonth = !isNaN(rawEndMonth)
+            ? Math.min(12, Math.max(1, rawEndMonth))
+            : null;
+
+          const rawEndDay =
+            hasSpan && item.endDay !== undefined && item.endDay !== null && String(item.endDay).trim() !== ""
+              ? parseInt(String(item.endDay), 10)
+              : NaN;
+          const validEndDay = !isNaN(rawEndDay)
+            ? Math.min(31, Math.max(1, rawEndDay))
+            : null;
+
           return {
             title: String(item.title || `Milestone ${idx + 1}`).trim(),
-            year: Math.abs(parseInt(String(item.year), 10)),
-            isBce: Boolean(item.isBce),
-            month: item.month ? parseInt(String(item.month), 10) : null,
-            day: item.day ? parseInt(String(item.day), 10) : null,
-            endYear: hasSpan ? Math.abs(parseInt(String(item.endYear), 10)) : null,
-            endIsBce: hasSpan ? Boolean(item.endIsBce) : null,
-            endMonth: item.endMonth ? parseInt(String(item.endMonth), 10) : null,
-            endDay: item.endDay ? parseInt(String(item.endDay), 10) : null,
+            year: Math.abs(rawYear),
+            isBce,
+            month: validMonth,
+            day: validDay,
+            endYear: hasSpan ? Math.abs(rawEndYear) : null,
+            endIsBce,
+            endMonth: validEndMonth,
+            endDay: validEndDay,
             color: typeof item.color === "string" && item.color.startsWith("#") ? item.color : "#c9a84c",
             layer: item.layer ? String(item.layer).trim() : null,
             description: item.description ? String(item.description) : null,

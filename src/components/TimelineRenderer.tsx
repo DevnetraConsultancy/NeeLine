@@ -269,17 +269,19 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     });
   }, [events, activeLayerNames, layerColorMap]);
 
-  // Unique chronological anchors across all visible point milestones and bracket span endpoints
+  // Unique chronological anchors across ALL timeline events (stable spatial reference)
+  // Computing from all timeline events ensures that toggling layers never distorts or jumps
+  // the coordinates of the remaining visible layers.
   const chronologicalAnchors = useMemo(() => {
     const yearSet = new Set<number>();
-    visibleEvents.forEach((e) => {
+    events.forEach((e) => {
       yearSet.add(e.isBce ? -Math.abs(e.year) : e.year);
       if (e.endYear !== undefined && e.endYear !== null) {
         yearSet.add(e.endIsBce ? -Math.abs(e.endYear) : e.endYear);
       }
     });
     return Array.from(yearSet).sort((a, b) => a - b);
-  }, [visibleEvents]);
+  }, [events]);
 
   // Even-space base positions for all chronological anchors
   const anchorBasePositions = useMemo(() => {
@@ -501,18 +503,18 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     return result;
   }, [visibleEvents, layoutItems, yearToX]);
 
-  // Compute spine extents strictly bounded by earliest and latest event points
-  const hasEvents = visibleEvents.length > 0;
+  // Compute spine extents strictly bounded by earliest and latest event points of the timeline
+  const hasEvents = events.length > 0;
   const [spineLeft, spineRight] = useMemo(() => {
-    if (!hasEvents || axisDateMarkers.length === 0) {
+    if (!hasEvents || chronologicalAnchors.length === 0) {
       const mid = dimensions.width / 2;
       return [mid - 150, mid + 150];
     }
-    const minAnchorX = axisDateMarkers[0].x;
-    const maxAnchorX = axisDateMarkers[axisDateMarkers.length - 1].x;
+    const minAnchorX = yearToX(chronologicalAnchors[0]);
+    const maxAnchorX = yearToX(chronologicalAnchors[chronologicalAnchors.length - 1]);
     const PADDING = 60; // Clean margin beyond extreme event anchors
-    return [minAnchorX - PADDING, maxAnchorX + PADDING];
-  }, [hasEvents, axisDateMarkers, dimensions.width]);
+    return [Math.min(minAnchorX, maxAnchorX) - PADDING, Math.max(minAnchorX, maxAnchorX) + PADDING];
+  }, [hasEvents, chronologicalAnchors, yearToX, dimensions.width]);
 
   const spineY = dimensions.height / 2;
   const originX = yearToX(0);
@@ -544,14 +546,25 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       setPanX(-centerX * BASE_PIXELS_PER_YEAR * clampedZoom);
       return;
     }
-    const SPACING = 220;
-    const totalSpan = Math.max(1, chronologicalAnchors.length - 1) * SPACING;
+    // Even Space mode: frame visible events based on their base anchor positions
+    const visibleYears = visibleEvents.map((e) => (e.isBce ? -Math.abs(e.year) : e.year));
+    visibleEvents.forEach((e) => {
+      if (e.endYear !== undefined && e.endYear !== null) {
+        visibleYears.push(e.endIsBce ? -Math.abs(e.endYear) : e.endYear);
+      }
+    });
+    const visibleBaseXs = visibleYears.map((y) => anchorBasePositions.get(y) ?? 0);
+    const minBaseX = Math.min(...visibleBaseXs);
+    const maxBaseX = Math.max(...visibleBaseXs);
+    const visibleSpan = Math.max(1, maxBaseX - minBaseX);
     const padding = 140;
     const availableWidth = dimensions.width - padding * 2;
-    const newZoom = chronologicalAnchors.length > 1 ? Math.min(1.25, availableWidth / totalSpan) : 1;
-    setZoom(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom)));
-    setPanX(0);
-  }, [visibleEvents, layoutMode, chronologicalAnchors, dimensions.width]);
+    const newZoom = visibleBaseXs.length > 1 ? Math.min(1.25, availableWidth / visibleSpan) : 1;
+    const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
+    setZoom(clampedZoom);
+    const centerBaseX = (minBaseX + maxBaseX) / 2;
+    setPanX(-centerBaseX * clampedZoom);
+  }, [visibleEvents, layoutMode, anchorBasePositions, dimensions.width]);
 
   // Export full timeline fitted as 2x Retina PNG
   const exportPng = useCallback(

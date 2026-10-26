@@ -501,49 +501,18 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     return result;
   }, [visibleEvents, layoutItems, yearToX]);
 
-  // Compute spine extents covering all anchors and full viewport
+  // Compute spine extents strictly bounded by earliest and latest event points
   const hasEvents = visibleEvents.length > 0;
-  const spineLeft = useMemo(() => {
-    const screenLeft = -dimensions.width * 2;
-    if (!hasEvents) return screenLeft;
-    if (layoutMode === "proportional") {
-      const years = visibleEvents.map((e) => (e.isBce ? -Math.abs(e.year) : e.year));
-      visibleEvents.forEach((e) => {
-        if (e.endYear !== undefined && e.endYear !== null) {
-          years.push(e.endIsBce ? -Math.abs(e.endYear) : e.endYear);
-        }
-      });
-      years.push(0);
-      const minYear = Math.min(...years);
-      return Math.min(screenLeft, yearToX(minYear) - 120);
+  const [spineLeft, spineRight] = useMemo(() => {
+    if (!hasEvents || axisDateMarkers.length === 0) {
+      const mid = dimensions.width / 2;
+      return [mid - 150, mid + 150];
     }
-    const positions = Array.from(anchorBasePositions.values()).map(
-      (bx) => dimensions.width / 2 + bx * zoom + panX
-    );
-    if (positions.length === 0) return screenLeft;
-    return Math.min(screenLeft, Math.min(...positions) - 120);
-  }, [hasEvents, anchorBasePositions, layoutMode, visibleEvents, zoom, panX, dimensions.width, yearToX]);
-
-  const spineRight = useMemo(() => {
-    const screenRight = dimensions.width * 3;
-    if (!hasEvents) return screenRight;
-    if (layoutMode === "proportional") {
-      const years = visibleEvents.map((e) => (e.isBce ? -Math.abs(e.year) : e.year));
-      visibleEvents.forEach((e) => {
-        if (e.endYear !== undefined && e.endYear !== null) {
-          years.push(e.endIsBce ? -Math.abs(e.endYear) : e.endYear);
-        }
-      });
-      years.push(0);
-      const maxYear = Math.max(...years);
-      return Math.max(screenRight, yearToX(maxYear) + 120);
-    }
-    const positions = Array.from(anchorBasePositions.values()).map(
-      (bx) => dimensions.width / 2 + bx * zoom + panX
-    );
-    if (positions.length === 0) return screenRight;
-    return Math.max(screenRight, Math.max(...positions) + 120);
-  }, [hasEvents, anchorBasePositions, layoutMode, visibleEvents, zoom, panX, dimensions.width, yearToX]);
+    const minAnchorX = axisDateMarkers[0].x;
+    const maxAnchorX = axisDateMarkers[axisDateMarkers.length - 1].x;
+    const PADDING = 60; // Clean margin beyond extreme event anchors
+    return [minAnchorX - PADDING, maxAnchorX + PADDING];
+  }, [hasEvents, axisDateMarkers, dimensions.width]);
 
   const spineY = dimensions.height / 2;
   const originX = yearToX(0);
@@ -558,7 +527,6 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
           years.push(e.endIsBce ? -Math.abs(e.endYear) : e.endYear);
         }
       });
-      years.push(0);
       const minYear = Math.min(...years);
       const maxYear = Math.max(...years);
       const range = maxYear - minYear;
@@ -860,7 +828,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
           </filter>
         </defs>
 
-        {/* The Golden Spine Axis line (always visible) */}
+        {/* The Golden Spine Axis line (strictly bounded to event points) */}
         <line
           x1={spineLeft}
           y1={spineY}
@@ -868,7 +836,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
           y2={spineY}
           stroke={spineColor}
           strokeWidth="2.5"
-          opacity="0.8"
+          opacity="0.85"
         />
         {/* Soft halo for spine line */}
         <line
@@ -880,9 +848,12 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
           strokeWidth="6"
           opacity="0.15"
         />
+        {/* Terminal endpoint caps on the spine axis */}
+        <circle cx={spineLeft} cy={spineY} r="3" fill={spineColor} opacity="0.85" />
+        <circle cx={spineRight} cy={spineY} r="3" fill={spineColor} opacity="0.85" />
 
-        {/* Origin "0 CE" Beacon */}
-        {!hasYearZero && (
+        {/* Origin "0 CE" Beacon - only display if 0 CE is within the events' bounded range */}
+        {!hasYearZero && originX >= spineLeft && originX <= spineRight && (
           <g className="origin-marker">
             {/* Vertical tick through axis */}
             <line

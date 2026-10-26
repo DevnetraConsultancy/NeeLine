@@ -140,7 +140,13 @@ export default function TimelinePage() {
     if (saved !== null) {
       setShowCanvasControls(saved !== "false");
     }
-  }, []);
+    // Clean up any legacy deleted layers blacklist in localStorage so imports and layers stay in sync
+    try {
+      localStorage.removeItem(`neeline_deleted_layers_${timelineId}`);
+    } catch {
+      // ignore
+    }
+  }, [timelineId]);
 
   const toggleCanvasControls = useCallback(() => {
     setShowCanvasControls((prev) => {
@@ -242,40 +248,27 @@ export default function TimelinePage() {
       setTimeline({ ...found, description: desc });
       setNameValue(found.name);
 
-      // Read deleted layers blacklist from localStorage to prevent resurrection of deleted layers
-      const deletedKey = `neeline_deleted_layers_${timelineId}`;
-      let deletedSet: string[] = [];
+      // Clean up legacy deleted layers blacklist from localStorage
       try {
-        const savedDeleted = localStorage.getItem(deletedKey);
-        if (savedDeleted) {
-          deletedSet = JSON.parse(savedDeleted);
-        }
+        localStorage.removeItem(`neeline_deleted_layers_${timelineId}`);
       } catch {
-        deletedSet = [];
+        // ignore
       }
 
-      const rawFetchedEvents: EventData[] = await eventsRes.json();
-      // Purge any events belonging to deleted layers
-      const fetchedEvents: EventData[] = rawFetchedEvents.filter((ev) => {
-        const lyr = ((ev.layer && ev.layer.trim()) || "General").toLowerCase();
-        return !deletedSet.includes(lyr);
-      });
+      const fetchedEvents: EventData[] = await eventsRes.json();
       setEvents(fetchedEvents);
 
-      // Process layers from server, excluding any deleted layers
+      // Process layers from server
       let fetchedLayers: LayerItem[] = [];
       if (layersRes.ok) {
         try {
-          const rawServerLayers: LayerItem[] = await layersRes.json();
-          fetchedLayers = rawServerLayers.filter(
-            (l) => !deletedSet.includes(l.name.trim().toLowerCase())
-          );
+          fetchedLayers = await layersRes.json();
         } catch {
           fetchedLayers = [];
         }
       }
 
-      // Check localStorage for offline/cached layers, excluding deleted layers
+      // Check localStorage for offline/cached layers
       const cachedLayersKey = `neeline_layers_${timelineId}`;
       const savedLayers = localStorage.getItem(cachedLayersKey);
       if (savedLayers) {
@@ -283,9 +276,7 @@ export default function TimelinePage() {
           const parsed = JSON.parse(savedLayers);
           if (Array.isArray(parsed) && parsed.length > 0) {
             const map = new Map<string, LayerItem>();
-            parsed
-              .filter((l: LayerItem) => !deletedSet.includes(l.name.trim().toLowerCase()))
-              .forEach((l: LayerItem) => map.set(l.name.trim().toLowerCase(), l));
+            parsed.forEach((l: LayerItem) => map.set(l.name.trim().toLowerCase(), l));
             fetchedLayers.forEach((l: LayerItem) => map.set(l.name.trim().toLowerCase(), l));
             fetchedLayers = Array.from(map.values());
           }
@@ -299,13 +290,11 @@ export default function TimelinePage() {
         fetchedLayers.unshift({ id: "layer-general", name: "General", color: "#c9a84c" });
       }
 
-      // Dynamically discover all distinct layers present across sanitized fetchedEvents
+      // Dynamically discover all distinct layers present across fetchedEvents
       const distinctEventLayers = new Set<string>();
       fetchedEvents.forEach((ev) => {
         const lyr = (ev.layer && ev.layer.trim()) || "General";
-        if (!deletedSet.includes(lyr.toLowerCase())) {
-          distinctEventLayers.add(lyr);
-        }
+        distinctEventLayers.add(lyr);
       });
 
       // Register any event layers in fetchedLayers if not already present
@@ -322,11 +311,6 @@ export default function TimelinePage() {
         }
       });
 
-      // Final filter to ensure no deleted layer slips through
-      fetchedLayers = fetchedLayers.filter(
-        (l) => !deletedSet.includes(l.name.trim().toLowerCase())
-      );
-
       // Persist clean sanitized layers back to localStorage
       localStorage.setItem(cachedLayersKey, JSON.stringify(fetchedLayers));
       setLayers(fetchedLayers);
@@ -337,11 +321,8 @@ export default function TimelinePage() {
       if (savedActive) {
         try {
           const parsed = JSON.parse(savedActive);
-          if (Array.isArray(parsed)) {
-            const validActive = parsed.filter(
-              (n: string) => !deletedSet.includes(n.trim().toLowerCase())
-            );
-            setActiveLayerNames(validActive.length > 0 ? validActive : ["General"]);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setActiveLayerNames(parsed);
           } else {
             setActiveLayerNames(fetchedLayers.map((l) => l.name));
           }
@@ -455,19 +436,6 @@ export default function TimelinePage() {
         color,
       };
 
-      // If re-creating a previously deleted layer, un-blacklist it
-      try {
-        const deletedKey = `neeline_deleted_layers_${timelineId}`;
-        const savedDeleted = localStorage.getItem(deletedKey);
-        if (savedDeleted) {
-          const arr: string[] = JSON.parse(savedDeleted);
-          const updated = arr.filter((n) => n.toLowerCase() !== name.trim().toLowerCase());
-          localStorage.setItem(deletedKey, JSON.stringify(updated));
-        }
-      } catch {
-        // ignore
-      }
-
       try {
         const res = await fetch("/api/layers", {
           method: "POST",
@@ -558,20 +526,7 @@ export default function TimelinePage() {
       return remaining;
     });
 
-    // 4. Blacklist deleted layer in localStorage to prevent stale cache resurrection
-    try {
-      const deletedKey = `neeline_deleted_layers_${timelineId}`;
-      const savedDeleted = localStorage.getItem(deletedKey);
-      const deletedArr: string[] = savedDeleted ? JSON.parse(savedDeleted) : [];
-      if (!deletedArr.includes(lowerName)) {
-        deletedArr.push(lowerName);
-        localStorage.setItem(deletedKey, JSON.stringify(deletedArr));
-      }
-    } catch {
-      // ignore
-    }
-
-    // 5. Purge any actions referring to this deleted layer from undo/redo stacks
+    // 4. Purge any actions referring to this deleted layer from undo/redo stacks
     setUndoStack((prev) =>
       prev.filter((act) => {
         if ("event" in act && act.event) {
@@ -650,23 +605,8 @@ export default function TimelinePage() {
         }
       }
 
-      // Ensure the layer is un-blacklisted and activated so user immediately sees their new event
+      // Ensure the layer is activated so user immediately sees their new event
       if (data.layer) {
-        try {
-          const deletedKey = `neeline_deleted_layers_${timelineId}`;
-          const savedDeleted = localStorage.getItem(deletedKey);
-          if (savedDeleted) {
-            const arr: string[] = JSON.parse(savedDeleted);
-            const target = data.layer.trim().toLowerCase();
-            if (arr.some((n) => n.toLowerCase() === target)) {
-              const updated = arr.filter((n) => n.toLowerCase() !== target);
-              localStorage.setItem(deletedKey, JSON.stringify(updated));
-            }
-          }
-        } catch {
-          // ignore
-        }
-
         if (!activeLayerNames.includes(data.layer)) {
           setActiveLayerNames((prev) => {
             const updated = [...prev, data.layer!];
@@ -1518,10 +1458,13 @@ export default function TimelinePage() {
         isOpen={showImportModal}
         timelineId={timelineId}
         availableLayers={layers}
-        onImportComplete={(count, newLayer, createdEvents) => {
-          if (newLayer) {
-            setLayers((prev) => [...prev, newLayer]);
-            setActiveLayerNames((prev) => [...prev, newLayer.name]);
+        onImportComplete={(count, targetLayerName, createdEvents) => {
+          if (targetLayerName && !activeLayerNames.includes(targetLayerName)) {
+            setActiveLayerNames((prev) => {
+              const updated = [...prev, targetLayerName];
+              localStorage.setItem(`neeline_active_layers_${timelineId}`, JSON.stringify(updated));
+              return updated;
+            });
           }
           if (createdEvents && createdEvents.length > 0) {
             pushAction({

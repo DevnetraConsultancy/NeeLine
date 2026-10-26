@@ -10,7 +10,7 @@ interface ImportModalProps {
   timelineId: string;
   availableLayers: LayerItem[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onImportComplete: (count: number, newLayer?: LayerItem, createdEvents?: any[]) => void;
+  onImportComplete: (count: number, targetLayerName?: string, createdEvents?: any[]) => void;
   onClose: () => void;
 }
 
@@ -29,8 +29,6 @@ interface ParsedEventItem {
   description?: string | null;
 }
 
-const PRESET_NEW_COLORS = ["#38bdf8", "#c9a84c", "#10b981", "#f43f5e", "#a855f7", "#f97316"];
-
 export default function ImportModal({
   isOpen,
   timelineId,
@@ -45,13 +43,12 @@ export default function ImportModal({
   const [isDragging, setIsDragging] = useState(false);
   const [importing, setImporting] = useState(false);
 
-  // Layer assignment option: "existing" | "new" | "preserve"
-  const [layerMode, setLayerMode] = useState<"existing" | "new" | "preserve">("existing");
+  // Layer assignment option: "existing" | "preserve"
+  // Note: New layers can ONLY be created from the Layers menu, not during JSON import.
+  const [layerMode, setLayerMode] = useState<"existing" | "preserve">("existing");
   const [selectedExistingLayer, setSelectedExistingLayer] = useState<string>(
     availableLayers[0]?.name || "General"
   );
-  const [newLayerName, setNewLayerName] = useState("");
-  const [newLayerColor, setNewLayerColor] = useState("#38bdf8");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -195,32 +192,30 @@ export default function ImportModal({
     setImporting(true);
 
     try {
-      let createdLayerObj: LayerItem | undefined;
-
-      // If creating a new layer
-      if (layerMode === "new") {
-        const cleanName = newLayerName.trim() || "Imported Period";
-        createdLayerObj = {
-          id: `layer-${Date.now()}`,
-          name: cleanName,
-          color: newLayerColor,
-        };
-      }
+      const selectedObj = availableLayers.find(
+        (l) => l.name.trim().toLowerCase() === selectedExistingLayer.trim().toLowerCase()
+      );
 
       // Map each event according to user layer selection
       const payloadEvents = parsedEvents.map((e) => {
-        let assignedLayer: string | null = null;
-        let assignedColor = e.color || "#c9a84c";
+        let assignedLayer: string = selectedExistingLayer;
+        let assignedColor = selectedObj?.color || e.color || "#c9a84c";
 
         if (layerMode === "existing") {
           assignedLayer = selectedExistingLayer;
-          const found = availableLayers.find((l) => l.name === selectedExistingLayer);
-          if (found) assignedColor = found.color;
-        } else if (layerMode === "new") {
-          assignedLayer = createdLayerObj?.name || "Imported Period";
-          assignedColor = newLayerColor;
+          if (selectedObj) assignedColor = selectedObj.color;
         } else if (layerMode === "preserve") {
-          assignedLayer = e.layer || "General";
+          const rawLyr = (e.layer || "").trim();
+          const matchExisting = availableLayers.find(
+            (l) => l.name.trim().toLowerCase() === rawLyr.toLowerCase()
+          );
+          if (matchExisting) {
+            assignedLayer = matchExisting.name;
+            assignedColor = matchExisting.color;
+          } else {
+            assignedLayer = selectedExistingLayer;
+            if (selectedObj) assignedColor = selectedObj.color;
+          }
         }
 
         return {
@@ -246,7 +241,7 @@ export default function ImportModal({
       const createdEvents = await res.json();
       onImportComplete(
         payloadEvents.length,
-        createdLayerObj,
+        selectedExistingLayer,
         Array.isArray(createdEvents) ? createdEvents : undefined
       );
       onClose();
@@ -389,6 +384,19 @@ export default function ImportModal({
                 </div>
               </div>
 
+              {/* Layer Creation Policy Card */}
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-400 text-xs font-sans flex items-start gap-3">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="font-semibold text-[11px] uppercase tracking-wider font-mono">
+                    Layer Creation Notice
+                  </div>
+                  <p className="text-[11.5px] leading-relaxed opacity-90">
+                    New layers can <strong>only</strong> be created from the <strong>Layers</strong> menu on the canvas header. In order to import events into a new layer, please create that layer first using the <strong>[Layers]</strong> button on the canvas, then select it below.
+                  </p>
+                </div>
+              </div>
+
               {/* Layer Selection / Routing Section */}
               <div className="space-y-3 pt-2">
                 <label className="text-[11px] font-mono theme-text-muted uppercase tracking-wider font-semibold flex items-center gap-1.5">
@@ -413,9 +421,14 @@ export default function ImportModal({
                       onChange={() => setLayerMode("existing")}
                       className="accent-[#c9a84c]"
                     />
-                    <span className="font-semibold text-xs theme-card-title font-sans">
-                      Assign to an existing layer
-                    </span>
+                    <div>
+                      <span className="font-semibold text-xs theme-card-title font-sans block">
+                        Assign all imported events to an existing layer
+                      </span>
+                      <span className="text-[10px] theme-text-muted font-sans font-light">
+                        Direct all milestones and spans in this file into a single designated layer.
+                      </span>
+                    </div>
                   </label>
 
                   {layerMode === "existing" && (
@@ -447,56 +460,7 @@ export default function ImportModal({
                   )}
                 </div>
 
-                {/* Option 2: New Custom Layer */}
-                <div
-                  onClick={() => setLayerMode("new")}
-                  className={`p-3 rounded-xl border transition-all cursor-pointer ${
-                    layerMode === "new"
-                      ? "border-[#c9a84c] bg-[#c9a84c]/10"
-                      : "border-black/10 dark:border-white/10 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
-                  }`}
-                >
-                  <label className="flex items-center gap-2.5 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="layerMode"
-                      checked={layerMode === "new"}
-                      onChange={() => setLayerMode("new")}
-                      className="accent-[#c9a84c]"
-                    />
-                    <span className="font-semibold text-xs theme-card-title font-sans">
-                      Create a new layer for all imported events
-                    </span>
-                  </label>
-
-                  {layerMode === "new" && (
-                    <div className="mt-2.5 pl-6 space-y-2">
-                      <input
-                        type="text"
-                        value={newLayerName}
-                        onChange={(e) => setNewLayerName(e.target.value)}
-                        placeholder="New Layer Name (e.g. Classical Antiquity, World War I)"
-                        className="w-full px-3 py-1.5 rounded-lg theme-input text-xs font-mono outline-none focus:ring-1 focus:ring-[#c9a84c]"
-                      />
-                      <div className="flex items-center gap-2 py-1.5 px-0.5">
-                        <span className="text-[10px] theme-text-muted">Color:</span>
-                        {PRESET_NEW_COLORS.map((c) => (
-                          <button
-                            key={c}
-                            type="button"
-                            onClick={() => setNewLayerColor(c)}
-                            className={`w-5 h-5 rounded-full transition-all shrink-0 ${
-                              newLayerColor === c ? "ring-2 ring-[#c9a84c] ring-offset-1 ring-offset-white dark:ring-offset-[#131c2e]" : "opacity-70 hover:opacity-100"
-                            }`}
-                            style={{ backgroundColor: c }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Option 3: Preserve JSON layers */}
+                {/* Option 2: Preserve JSON layers (routing to existing layers) */}
                 <div
                   onClick={() => setLayerMode("preserve")}
                   className={`p-3 rounded-xl border transition-all cursor-pointer ${
@@ -515,10 +479,10 @@ export default function ImportModal({
                     />
                     <div>
                       <span className="font-semibold text-xs theme-card-title font-sans block">
-                        Preserve layers specified inside JSON file
+                        Route matching layer tags from JSON
                       </span>
                       <span className="text-[10px] theme-text-muted font-sans font-light">
-                        Events will keep their individual layer tags. Missing layers default to General.
+                        Events with layer tags matching existing layers are placed accordingly. Any uncreated or untagged layer events will safely default to &quot;{selectedExistingLayer}&quot;.
                       </span>
                     </div>
                   </label>

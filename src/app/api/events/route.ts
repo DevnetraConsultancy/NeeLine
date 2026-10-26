@@ -30,10 +30,11 @@ export async function GET(req: NextRequest) {
 
     const rawEvents = await prisma.event.findMany({
       where: { timelineId },
+      orderBy: { createdAt: "asc" },
     });
 
     // Parse layer and span metadata out of description
-    const events = rawEvents.map((e) => {
+    const parsedRaw = rawEvents.map((e) => {
       const parsed = parseEventMetadata(e.description);
       return {
         ...e,
@@ -45,6 +46,45 @@ export async function GET(req: NextRequest) {
         endDay: parsed.endDay,
       };
     });
+
+    // Deduplicate exact matching events in the database (e.g. from repeated imports)
+    const seenEventKeys = new Set<string>();
+    const events: typeof parsedRaw = [];
+    const duplicateIdsToDelete: string[] = [];
+
+    for (const item of parsedRaw) {
+      const normTitle = item.title.trim().toLowerCase();
+      const normYear = item.year;
+      const normBce = Boolean(item.isBce);
+      const normMonth = item.month ?? "";
+      const normDay = item.day ?? "";
+      const normLayer = (item.layer?.trim() || "general").toLowerCase();
+      const normEndYear = item.endYear ?? "";
+      const normEndBce = item.endIsBce ? "1" : "0";
+      const normEndMonth = item.endMonth ?? "";
+      const normEndDay = item.endDay ?? "";
+      const normDesc = (item.description || "").trim().toLowerCase();
+
+      const key = `${normTitle}|${normYear}|${normBce}|${normMonth}|${normDay}|${normLayer}|${normEndYear}|${normEndBce}|${normEndMonth}|${normEndDay}|${normDesc}`;
+
+      if (seenEventKeys.has(key)) {
+        duplicateIdsToDelete.push(item.id);
+      } else {
+        seenEventKeys.add(key);
+        events.push(item);
+      }
+    }
+
+    // Permanently purge duplicate rows from database in background
+    if (duplicateIdsToDelete.length > 0) {
+      try {
+        await prisma.event.deleteMany({
+          where: { id: { in: duplicateIdsToDelete } },
+        });
+      } catch (delErr) {
+        console.warn("Failed to purge duplicate events:", delErr);
+      }
+    }
 
     // Sort chronologically from deepest antiquity to modern era
     events.sort((a, b) => {
@@ -175,14 +215,40 @@ export async function POST(req: NextRequest) {
         };
       });
 
-      const created = await prisma.event.createManyAndReturn({
-        data: createData,
+      // Query existing events in this timeline to avoid inserting duplicate rows
+      const existingDbEvents = await prisma.event.findMany({
+        where: { timelineId: body.timelineId },
       });
+      const existingKeySet = new Set<string>();
+      for (const ev of existingDbEvents) {
+        const meta = parseEventMetadata(ev.description);
+        const k = `${ev.title.trim().toLowerCase()}|${ev.year}|${Boolean(ev.isBce)}|${ev.month ?? ""}|${ev.day ?? ""}|${(meta.layer?.trim() || "general").toLowerCase()}|${meta.endYear ?? ""}|${meta.endIsBce ? "1" : "0"}|${meta.endMonth ?? ""}|${meta.endDay ?? ""}|${(meta.description || "").trim().toLowerCase()}`;
+        existingKeySet.add(k);
+      }
 
-      await prisma.timeline.update({
-        where: { id: body.timelineId },
-        data: { updatedAt: new Date() },
-      });
+      // Deduplicate batch items against existing events and within the batch itself
+      const uniqueCreateData = [];
+      for (const item of createData) {
+        const meta = parseEventMetadata(item.description);
+        const k = `${item.title.trim().toLowerCase()}|${item.year}|${Boolean(item.isBce)}|${item.month ?? ""}|${item.day ?? ""}|${(meta.layer?.trim() || "general").toLowerCase()}|${meta.endYear ?? ""}|${meta.endIsBce ? "1" : "0"}|${meta.endMonth ?? ""}|${meta.endDay ?? ""}|${(meta.description || "").trim().toLowerCase()}`;
+        if (!existingKeySet.has(k)) {
+          existingKeySet.add(k);
+          uniqueCreateData.push(item);
+        }
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let created: any[] = [];
+      if (uniqueCreateData.length > 0) {
+        created = await prisma.event.createManyAndReturn({
+          data: uniqueCreateData,
+        });
+
+        await prisma.timeline.update({
+          where: { id: body.timelineId },
+          data: { updatedAt: new Date() },
+        });
+      }
 
       const formatted = created.map((e) => {
         const parsed = parseEventMetadata(e.description);

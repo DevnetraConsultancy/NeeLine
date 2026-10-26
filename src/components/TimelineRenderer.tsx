@@ -112,7 +112,15 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     ref
   ) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 1200, height: 800 });
+  const [dimensions, setDimensions] = useState(() => {
+    if (typeof window !== "undefined") {
+      return {
+        width: window.innerWidth || 1200,
+        height: Math.max(400, (window.innerHeight || 900) - 100),
+      };
+    }
+    return { width: 1200, height: 800 };
+  });
 
   // Load saved viewport state from localStorage so canvas always remembers screen position
   const [zoom, setZoom] = useState<number>(() => {
@@ -198,7 +206,12 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     // Immediately measure client rect to establish dimensions synchronously
     const rect = el.getBoundingClientRect();
     if (rect.width > 0 && rect.height > 0) {
-      setDimensions({ width: rect.width, height: rect.height });
+      setDimensions((prev) => {
+        if (Math.abs(prev.width - rect.width) < 1 && Math.abs(prev.height - rect.height) < 1) {
+          return prev;
+        }
+        return { width: rect.width, height: rect.height };
+      });
     }
 
     const ro = new ResizeObserver((entries) => {
@@ -206,7 +219,12 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
         const { width, height } = entry.contentRect;
         // Never allow zero or negative measurements to collapse the canvas
         if (width > 0 && height > 0) {
-          setDimensions({ width, height });
+          setDimensions((prev) => {
+            if (Math.abs(prev.width - width) < 1 && Math.abs(prev.height - height) < 1) {
+              return prev;
+            }
+            return { width, height };
+          });
         }
       }
     });
@@ -555,38 +573,42 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     setPanX(0);
   }, [visibleEvents, layoutMode, chronologicalAnchors, dimensions.width]);
 
-  // Preserve focal anchor position across layer toggles in Even Space mode
-  // so remaining events stay exactly in place without disappearing or jumping off-screen
-  const prevAnchorsStateRef = useRef<{
+  // Stable tracking of layout geometry across renders for synchronous focal stability
+  const prevLayoutStateRef = useRef<{
     anchorBasePositions: Map<number, number>;
     panX: number;
     zoom: number;
     width: number;
     layoutMode: "even" | "proportional";
-  } | null>(null);
+    hasInitialized: boolean;
+  }>({
+    anchorBasePositions: new Map(),
+    panX,
+    zoom,
+    width: dimensions.width,
+    layoutMode,
+    hasInitialized: false,
+  });
 
+  // Keep ref synchronized with user interactive pan/zoom updates
   useEffect(() => {
-    const prevState = prevAnchorsStateRef.current;
-    const currentState = {
-      anchorBasePositions,
-      panX,
-      zoom,
-      width: dimensions.width,
-      layoutMode,
-    };
+    prevLayoutStateRef.current.panX = panX;
+    prevLayoutStateRef.current.zoom = zoom;
+    prevLayoutStateRef.current.width = dimensions.width;
+    prevLayoutStateRef.current.layoutMode = layoutMode;
+  }, [panX, zoom, dimensions.width, layoutMode]);
 
-    if (!prevState || layoutMode === "proportional" || prevState.layoutMode === "proportional") {
-      prevAnchorsStateRef.current = currentState;
-      return;
-    }
-
-    // Only adjust if the anchor mapping actually changed (layer toggled / added / removed)
-    if (prevState.anchorBasePositions === anchorBasePositions) {
-      prevAnchorsStateRef.current = currentState;
-      return;
-    }
-
-    // Find common years present in both old and new anchor base maps
+  // Synchronous Render-Phase Focal Alignment:
+  // When anchorBasePositions changes due to layer toggle, event add, or event delete,
+  // synchronously adjust panX in the render phase BEFORE browser paint.
+  // This eliminates 1-frame paint delays and completely eliminates flickering and jumping.
+  if (
+    prevLayoutStateRef.current.hasInitialized &&
+    layoutMode === "even" &&
+    prevLayoutStateRef.current.layoutMode === "even" &&
+    prevLayoutStateRef.current.anchorBasePositions !== anchorBasePositions
+  ) {
+    const prevState = prevLayoutStateRef.current;
     const commonYears: number[] = [];
     anchorBasePositions.forEach((_, year) => {
       if (prevState.anchorBasePositions.has(year)) {
@@ -618,15 +640,78 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
 
       if (Math.abs(targetPanX - panX) > 0.5) {
         setPanX(targetPanX);
-        currentState.panX = targetPanX;
+        prevLayoutStateRef.current.panX = targetPanX;
       }
     } else if (chronologicalAnchors.length > 0) {
       // Switched to a completely disjoint layer with 0 common events: center new layer
-      fitAll();
+      const SPACING = 220;
+      const totalSpan = Math.max(1, chronologicalAnchors.length - 1) * SPACING;
+      const padding = 140;
+      const availableWidth = dimensions.width - padding * 2;
+      const newZoom = chronologicalAnchors.length > 1 ? Math.min(1.25, availableWidth / totalSpan) : 1;
+      const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
+      setZoom(clampedZoom);
+      setPanX(0);
+      prevLayoutStateRef.current.panX = 0;
+      prevLayoutStateRef.current.zoom = clampedZoom;
     }
 
-    prevAnchorsStateRef.current = currentState;
-  }, [anchorBasePositions, chronologicalAnchors, dimensions.width, fitAll, layoutMode, panX, zoom]);
+    prevLayoutStateRef.current.anchorBasePositions = anchorBasePositions;
+    prevLayoutStateRef.current.width = dimensions.width;
+    prevLayoutStateRef.current.zoom = zoom;
+    prevLayoutStateRef.current.layoutMode = layoutMode;
+  } else if (!prevLayoutStateRef.current.hasInitialized && anchorBasePositions.size > 0) {
+    // Initial data load: lock initial anchor state without modifying panX or calling fitAll
+    prevLayoutStateRef.current = {
+      anchorBasePositions,
+      panX,
+      zoom,
+      width: dimensions.width,
+      layoutMode,
+      hasInitialized: true,
+    };
+  }
+
+  // Switch layout mode while preserving the user's focal year at screen center
+  const handleSetLayoutMode = useCallback(
+    (newMode: "even" | "proportional") => {
+      if (newMode === layoutMode) return;
+      const centerYear = xToYear(dimensions.width / 2);
+
+      setLayoutMode(newMode);
+
+      if (newMode === "proportional") {
+        const targetPanX = -centerYear * BASE_PIXELS_PER_YEAR * zoom;
+        setPanX(targetPanX);
+        prevLayoutStateRef.current.panX = targetPanX;
+        prevLayoutStateRef.current.layoutMode = newMode;
+      } else {
+        const exactBase = anchorBasePositions.get(centerYear);
+        if (exactBase !== undefined) {
+          const targetPanX = -exactBase * zoom;
+          setPanX(targetPanX);
+          prevLayoutStateRef.current.panX = targetPanX;
+          prevLayoutStateRef.current.layoutMode = newMode;
+        } else if (chronologicalAnchors.length > 0) {
+          let closestYear = chronologicalAnchors[0];
+          let minDiff = Math.abs(chronologicalAnchors[0] - centerYear);
+          chronologicalAnchors.forEach((y) => {
+            const diff = Math.abs(y - centerYear);
+            if (diff < minDiff) {
+              minDiff = diff;
+              closestYear = y;
+            }
+          });
+          const base = anchorBasePositions.get(closestYear) ?? 0;
+          const targetPanX = -base * zoom;
+          setPanX(targetPanX);
+          prevLayoutStateRef.current.panX = targetPanX;
+          prevLayoutStateRef.current.layoutMode = newMode;
+        }
+      }
+    },
+    [layoutMode, xToYear, dimensions.width, zoom, anchorBasePositions, chronologicalAnchors]
+  );
 
   // Export full timeline fitted as 2x Retina PNG
   const exportPng = useCallback(
@@ -1618,7 +1703,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
         {/* Layout Mode Segmented Toggle */}
         <div className="flex items-center p-1 rounded-xl theme-hud text-[11px] font-mono shadow-lg">
           <button
-            onClick={() => setLayoutMode("even")}
+            onClick={() => handleSetLayoutMode("even")}
             className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
               layoutMode === "even"
                 ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/40 font-semibold"
@@ -1629,7 +1714,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
             Even Space
           </button>
           <button
-            onClick={() => setLayoutMode("proportional")}
+            onClick={() => handleSetLayoutMode("proportional")}
             className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
               layoutMode === "proportional"
                 ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/40 font-semibold"

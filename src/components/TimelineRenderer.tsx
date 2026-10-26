@@ -269,19 +269,17 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     });
   }, [events, activeLayerNames, layerColorMap]);
 
-  // Unique chronological anchors across ALL timeline events (stable spatial reference)
-  // Computing from all timeline events ensures that toggling layers never distorts or jumps
-  // the coordinates of the remaining visible layers.
+  // Unique chronological anchors across all VISIBLE point milestones and bracket span endpoints
   const chronologicalAnchors = useMemo(() => {
     const yearSet = new Set<number>();
-    events.forEach((e) => {
+    visibleEvents.forEach((e) => {
       yearSet.add(e.isBce ? -Math.abs(e.year) : e.year);
       if (e.endYear !== undefined && e.endYear !== null) {
         yearSet.add(e.endIsBce ? -Math.abs(e.endYear) : e.endYear);
       }
     });
     return Array.from(yearSet).sort((a, b) => a - b);
-  }, [events]);
+  }, [visibleEvents]);
 
   // Even-space base positions for all chronological anchors
   const anchorBasePositions = useMemo(() => {
@@ -503,8 +501,8 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     return result;
   }, [visibleEvents, layoutItems, yearToX]);
 
-  // Compute spine extents strictly bounded by earliest and latest event points of the timeline
-  const hasEvents = events.length > 0;
+  // Compute spine extents strictly bounded by earliest and latest event points of active visible events
+  const hasEvents = visibleEvents.length > 0;
   const [spineLeft, spineRight] = useMemo(() => {
     if (!hasEvents || chronologicalAnchors.length === 0) {
       const mid = dimensions.width / 2;
@@ -519,7 +517,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
   const spineY = dimensions.height / 2;
   const originX = yearToX(0);
 
-  // Fit all visible events to viewport
+  // Fit all visible events to viewport (centers whichever layer is active)
   const fitAll = useCallback(() => {
     if (visibleEvents.length === 0) return;
     if (layoutMode === "proportional") {
@@ -546,25 +544,89 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       setPanX(-centerX * BASE_PIXELS_PER_YEAR * clampedZoom);
       return;
     }
-    // Even Space mode: frame visible events based on their base anchor positions
-    const visibleYears = visibleEvents.map((e) => (e.isBce ? -Math.abs(e.year) : e.year));
-    visibleEvents.forEach((e) => {
-      if (e.endYear !== undefined && e.endYear !== null) {
-        visibleYears.push(e.endIsBce ? -Math.abs(e.endYear) : e.endYear);
-      }
-    });
-    const visibleBaseXs = visibleYears.map((y) => anchorBasePositions.get(y) ?? 0);
-    const minBaseX = Math.min(...visibleBaseXs);
-    const maxBaseX = Math.max(...visibleBaseXs);
-    const visibleSpan = Math.max(1, maxBaseX - minBaseX);
+    // Even Space mode: perfectly center the active layer's span on screen
+    const SPACING = 220;
+    const totalSpan = Math.max(1, chronologicalAnchors.length - 1) * SPACING;
     const padding = 140;
     const availableWidth = dimensions.width - padding * 2;
-    const newZoom = visibleBaseXs.length > 1 ? Math.min(1.25, availableWidth / visibleSpan) : 1;
+    const newZoom = chronologicalAnchors.length > 1 ? Math.min(1.25, availableWidth / totalSpan) : 1;
     const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
     setZoom(clampedZoom);
-    const centerBaseX = (minBaseX + maxBaseX) / 2;
-    setPanX(-centerBaseX * clampedZoom);
-  }, [visibleEvents, layoutMode, anchorBasePositions, dimensions.width]);
+    setPanX(0);
+  }, [visibleEvents, layoutMode, chronologicalAnchors, dimensions.width]);
+
+  // Preserve focal anchor position across layer toggles in Even Space mode
+  // so remaining events stay exactly in place without disappearing or jumping off-screen
+  const prevAnchorsStateRef = useRef<{
+    anchorBasePositions: Map<number, number>;
+    panX: number;
+    zoom: number;
+    width: number;
+    layoutMode: "even" | "proportional";
+  } | null>(null);
+
+  useEffect(() => {
+    const prevState = prevAnchorsStateRef.current;
+    const currentState = {
+      anchorBasePositions,
+      panX,
+      zoom,
+      width: dimensions.width,
+      layoutMode,
+    };
+
+    if (!prevState || layoutMode === "proportional" || prevState.layoutMode === "proportional") {
+      prevAnchorsStateRef.current = currentState;
+      return;
+    }
+
+    // Only adjust if the anchor mapping actually changed (layer toggled / added / removed)
+    if (prevState.anchorBasePositions === anchorBasePositions) {
+      prevAnchorsStateRef.current = currentState;
+      return;
+    }
+
+    // Find common years present in both old and new anchor base maps
+    const commonYears: number[] = [];
+    anchorBasePositions.forEach((_, year) => {
+      if (prevState.anchorBasePositions.has(year)) {
+        commonYears.push(year);
+      }
+    });
+
+    if (commonYears.length > 0) {
+      const centerScreenX = prevState.width / 2;
+      let bestYear = commonYears[0];
+      let minDistanceToCenter = Infinity;
+
+      commonYears.forEach((y) => {
+        const prevBaseX = prevState.anchorBasePositions.get(y)!;
+        const prevScreenX = centerScreenX + prevBaseX * prevState.zoom + prevState.panX;
+        const dist = Math.abs(prevScreenX - centerScreenX);
+        if (dist < minDistanceToCenter) {
+          minDistanceToCenter = dist;
+          bestYear = y;
+        }
+      });
+
+      const prevBaseX = prevState.anchorBasePositions.get(bestYear)!;
+      const prevScreenX = centerScreenX + prevBaseX * prevState.zoom + prevState.panX;
+
+      const newBaseX = anchorBasePositions.get(bestYear)!;
+      const targetScreenX = dimensions.width / 2;
+      const targetPanX = prevScreenX - targetScreenX - newBaseX * zoom;
+
+      if (Math.abs(targetPanX - panX) > 0.5) {
+        setPanX(targetPanX);
+        currentState.panX = targetPanX;
+      }
+    } else if (chronologicalAnchors.length > 0) {
+      // Switched to a completely disjoint layer with 0 common events: center new layer
+      fitAll();
+    }
+
+    prevAnchorsStateRef.current = currentState;
+  }, [anchorBasePositions, chronologicalAnchors, dimensions.width, fitAll, layoutMode, panX, zoom]);
 
   // Export full timeline fitted as 2x Retina PNG
   const exportPng = useCallback(

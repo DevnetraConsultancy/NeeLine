@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { parseEventMetadata, serializeEventMetadata } from "@/lib/event-metadata";
+import { parseEventMetadata } from "@/lib/event-metadata";
 
 // GET /api/layers?timelineId=xxx - Discover layers from timeline events
 export async function GET(req: NextRequest) {
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// DELETE /api/layers?timelineId=xxx&name=xxx
+// DELETE /api/layers?timelineId=xxx&name=xxx - Permanently delete a layer and ALL of its events and periods
 export async function DELETE(req: NextRequest) {
   try {
     const session = await auth();
@@ -137,43 +137,39 @@ export async function DELETE(req: NextRequest) {
 
     // Find all events belonging to this timeline that are assigned to this layer (case-insensitive)
     const targetLayerLower = safeName.toLowerCase();
-    const eventsToUpdate: { id: string; description: string | null }[] = [];
+    const eventIdsToDelete: string[] = [];
 
     for (const ev of timeline.events) {
       const parsed = parseEventMetadata(ev.description);
       const evLayer = ((parsed.layer && parsed.layer.trim()) || "General").toLowerCase();
-      if (evLayer === targetLayerLower) {
-        // Re-serialize with layer reassigned to "General"
-        const updatedDesc = serializeEventMetadata(
-          {
-            layer: "General",
-            endYear: parsed.endYear,
-            endIsBce: parsed.endIsBce,
-            endMonth: parsed.endMonth,
-            endDay: parsed.endDay,
-          },
-          parsed.description
-        );
-        eventsToUpdate.push({ id: ev.id, description: updatedDesc });
+
+      const rawDesc = (ev.description || "").toLowerCase();
+      const matchesMetaTag =
+        rawDesc.includes(`"layer":"${targetLayerLower}"`) ||
+        rawDesc.includes(`"layer": "${targetLayerLower}"`);
+      const matchesLegacyTag = rawDesc.startsWith(`<!--layer:${targetLayerLower}-->`);
+
+      if (evLayer === targetLayerLower || matchesMetaTag || matchesLegacyTag) {
+        eventIdsToDelete.push(ev.id);
       }
     }
 
-    // Update all matching events in database atomically
-    if (eventsToUpdate.length > 0) {
-      await prisma.$transaction(
-        eventsToUpdate.map((item) =>
-          prisma.event.update({
-            where: { id: item.id },
-            data: { description: item.description },
-          })
-        )
-      );
+    // Permanently delete all matching events and periods from database
+    let deletedCount = 0;
+    if (eventIdsToDelete.length > 0) {
+      const deleteResult = await prisma.event.deleteMany({
+        where: {
+          id: { in: eventIdsToDelete },
+          timelineId: timeline.id,
+        },
+      });
+      deletedCount = deleteResult.count;
     }
 
     return NextResponse.json({
       success: true,
       deletedLayer: safeName,
-      migratedEventsCount: eventsToUpdate.length,
+      deletedEventsCount: deletedCount,
     });
   } catch (error) {
     console.error("DELETE /api/layers error:", error);

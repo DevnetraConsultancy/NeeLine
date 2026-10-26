@@ -63,6 +63,7 @@ interface TimelineRendererProps {
   showCanvasControls?: boolean;
   onToggleLayer?: (name: string) => void;
   onToggleAllLayers?: (all: boolean) => void;
+  onIsolateLayer?: (name: string) => void;
   onCreateLayer?: (name: string, color: string) => Promise<LayerItem>;
   onDeleteLayer?: (id: string, name: string) => Promise<void> | void;
   onEventClick: (event: EventData) => void;
@@ -101,6 +102,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       showCanvasControls = true,
       onToggleLayer,
       onToggleAllLayers,
+      onIsolateLayer,
       onCreateLayer,
       onDeleteLayer,
       onEventClick,
@@ -1606,7 +1608,22 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {/* 1-click Isolate Layer */}
+                        {onIsolateLayer && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onIsolateLayer(layer.name);
+                            }}
+                            className="text-[10px] font-mono px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-[#c9a84c]/20 text-[#c9a84c] transition-all cursor-pointer font-medium"
+                            title={`Isolate ${layer.name} layer (hide all other layers)`}
+                          >
+                            Only
+                          </button>
+                        )}
+
                         <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 opacity-70">
                           {count}
                         </span>
@@ -1619,7 +1636,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                               onDeleteLayer(layer.id, layer.name);
                             }}
                             className="p-1 opacity-0 group-hover:opacity-100 hover:text-rose-500 rounded transition-opacity cursor-pointer"
-                            title="Delete period"
+                            title={`Permanently delete ${layer.name} layer and all its events`}
                           >
                             <Trash2 className="w-3 h-3" />
                           </button>

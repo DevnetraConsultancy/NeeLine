@@ -242,20 +242,40 @@ export default function TimelinePage() {
       setTimeline({ ...found, description: desc });
       setNameValue(found.name);
 
-      const fetchedEvents: EventData[] = await eventsRes.json();
+      // Read deleted layers blacklist from localStorage to prevent resurrection of deleted layers
+      const deletedKey = `neeline_deleted_layers_${timelineId}`;
+      let deletedSet: string[] = [];
+      try {
+        const savedDeleted = localStorage.getItem(deletedKey);
+        if (savedDeleted) {
+          deletedSet = JSON.parse(savedDeleted);
+        }
+      } catch {
+        deletedSet = [];
+      }
+
+      const rawFetchedEvents: EventData[] = await eventsRes.json();
+      // Purge any events belonging to deleted layers
+      const fetchedEvents: EventData[] = rawFetchedEvents.filter((ev) => {
+        const lyr = ((ev.layer && ev.layer.trim()) || "General").toLowerCase();
+        return !deletedSet.includes(lyr);
+      });
       setEvents(fetchedEvents);
 
-      // Process layers
+      // Process layers from server, excluding any deleted layers
       let fetchedLayers: LayerItem[] = [];
       if (layersRes.ok) {
         try {
-          fetchedLayers = await layersRes.json();
+          const rawServerLayers: LayerItem[] = await layersRes.json();
+          fetchedLayers = rawServerLayers.filter(
+            (l) => !deletedSet.includes(l.name.trim().toLowerCase())
+          );
         } catch {
           fetchedLayers = [];
         }
       }
 
-      // Check localStorage for offline/cached layers
+      // Check localStorage for offline/cached layers, excluding deleted layers
       const cachedLayersKey = `neeline_layers_${timelineId}`;
       const savedLayers = localStorage.getItem(cachedLayersKey);
       if (savedLayers) {
@@ -263,8 +283,10 @@ export default function TimelinePage() {
           const parsed = JSON.parse(savedLayers);
           if (Array.isArray(parsed) && parsed.length > 0) {
             const map = new Map<string, LayerItem>();
-            parsed.forEach((l: LayerItem) => map.set(l.name, l));
-            fetchedLayers.forEach((l: LayerItem) => map.set(l.name, l));
+            parsed
+              .filter((l: LayerItem) => !deletedSet.includes(l.name.trim().toLowerCase()))
+              .forEach((l: LayerItem) => map.set(l.name.trim().toLowerCase(), l));
+            fetchedLayers.forEach((l: LayerItem) => map.set(l.name.trim().toLowerCase(), l));
             fetchedLayers = Array.from(map.values());
           }
         } catch {
@@ -273,15 +295,17 @@ export default function TimelinePage() {
       }
 
       // Fallback: ensure General layer exists
-      if (!fetchedLayers.some((l) => l.name === "General")) {
+      if (!fetchedLayers.some((l) => l.name.toLowerCase() === "general")) {
         fetchedLayers.unshift({ id: "layer-general", name: "General", color: "#c9a84c" });
       }
 
-      // Dynamically discover all distinct layers present across fetchedEvents
+      // Dynamically discover all distinct layers present across sanitized fetchedEvents
       const distinctEventLayers = new Set<string>();
       fetchedEvents.forEach((ev) => {
         const lyr = (ev.layer && ev.layer.trim()) || "General";
-        distinctEventLayers.add(lyr);
+        if (!deletedSet.includes(lyr.toLowerCase())) {
+          distinctEventLayers.add(lyr);
+        }
       });
 
       // Register any event layers in fetchedLayers if not already present
@@ -298,6 +322,13 @@ export default function TimelinePage() {
         }
       });
 
+      // Final filter to ensure no deleted layer slips through
+      fetchedLayers = fetchedLayers.filter(
+        (l) => !deletedSet.includes(l.name.trim().toLowerCase())
+      );
+
+      // Persist clean sanitized layers back to localStorage
+      localStorage.setItem(cachedLayersKey, JSON.stringify(fetchedLayers));
       setLayers(fetchedLayers);
 
       // Restore active layers preference
@@ -307,7 +338,10 @@ export default function TimelinePage() {
         try {
           const parsed = JSON.parse(savedActive);
           if (Array.isArray(parsed)) {
-            setActiveLayerNames(parsed);
+            const validActive = parsed.filter(
+              (n: string) => !deletedSet.includes(n.trim().toLowerCase())
+            );
+            setActiveLayerNames(validActive.length > 0 ? validActive : ["General"]);
           } else {
             setActiveLayerNames(fetchedLayers.map((l) => l.name));
           }
@@ -355,6 +389,16 @@ export default function TimelinePage() {
       localStorage.setItem(`neeline_active_layers_${timelineId}`, JSON.stringify(updated));
     },
     [layers, timelineId]
+  );
+
+  // 1-Click Isolate single layer (hide all other layers)
+  const handleIsolateLayer = useCallback(
+    (name: string) => {
+      const updated = [name];
+      setActiveLayerNames(updated);
+      localStorage.setItem(`neeline_active_layers_${timelineId}`, JSON.stringify(updated));
+    },
+    [timelineId]
   );
 
   // Canvas Colors synchronized with global theme unless explicitly customized
@@ -411,6 +455,19 @@ export default function TimelinePage() {
         color,
       };
 
+      // If re-creating a previously deleted layer, un-blacklist it
+      try {
+        const deletedKey = `neeline_deleted_layers_${timelineId}`;
+        const savedDeleted = localStorage.getItem(deletedKey);
+        if (savedDeleted) {
+          const arr: string[] = JSON.parse(savedDeleted);
+          const updated = arr.filter((n) => n.toLowerCase() !== name.trim().toLowerCase());
+          localStorage.setItem(deletedKey, JSON.stringify(updated));
+        }
+      } catch {
+        // ignore
+      }
+
       try {
         const res = await fetch("/api/layers", {
           method: "POST",
@@ -458,14 +515,17 @@ export default function TimelinePage() {
   const executeDeleteLayer = useCallback(async () => {
     if (!layerToDelete) return;
     const { name } = layerToDelete;
-    const lowerName = name.toLowerCase();
+    const lowerName = name.trim().toLowerCase();
     setDeletingLayer(true);
 
     try {
-      await fetch(
+      const res = await fetch(
         `/api/layers?timelineId=${timelineId}&name=${encodeURIComponent(name)}`,
         { method: "DELETE" }
       );
+      if (!res.ok) {
+        console.error("Failed to delete layer on backend, status:", res.status);
+      }
     } catch (err) {
       console.warn("Failed to delete layer on backend", err);
     } finally {
@@ -473,17 +533,11 @@ export default function TimelinePage() {
       setLayerToDelete(null);
     }
 
-    // 1. Reassign any events in local state that were on this layer to "General"
+    // 1. Permanently delete all events and periods belonging to this layer from client state
     setEvents((prev) =>
-      prev.map((e) => {
+      prev.filter((e) => {
         const currentLyr = ((e.layer && e.layer.trim()) || "General").toLowerCase();
-        if (currentLyr === lowerName) {
-          return {
-            ...e,
-            layer: "General",
-          };
-        }
-        return e;
+        return currentLyr !== lowerName;
       })
     );
 
@@ -503,6 +557,41 @@ export default function TimelinePage() {
       localStorage.setItem(`neeline_active_layers_${timelineId}`, JSON.stringify(remaining));
       return remaining;
     });
+
+    // 4. Blacklist deleted layer in localStorage to prevent stale cache resurrection
+    try {
+      const deletedKey = `neeline_deleted_layers_${timelineId}`;
+      const savedDeleted = localStorage.getItem(deletedKey);
+      const deletedArr: string[] = savedDeleted ? JSON.parse(savedDeleted) : [];
+      if (!deletedArr.includes(lowerName)) {
+        deletedArr.push(lowerName);
+        localStorage.setItem(deletedKey, JSON.stringify(deletedArr));
+      }
+    } catch {
+      // ignore
+    }
+
+    // 5. Purge any actions referring to this deleted layer from undo/redo stacks
+    setUndoStack((prev) =>
+      prev.filter((act) => {
+        if ("event" in act && act.event) {
+          const l = ((act.event.layer && act.event.layer.trim()) || "General").toLowerCase();
+          return l !== lowerName;
+        }
+        return true;
+      })
+    );
+    setRedoStack((prev) =>
+      prev.filter((act) => {
+        if ("event" in act && act.event) {
+          const l = ((act.event.layer && act.event.layer.trim()) || "General").toLowerCase();
+          return l !== lowerName;
+        }
+        return true;
+      })
+    );
+
+    setNoticeMessage(`Layer "${name}" and all associated events were permanently deleted.`);
   }, [layerToDelete, timelineId]);
 
   // Save event (create or update, supports point milestones and horizontal bracket periods)
@@ -561,13 +650,30 @@ export default function TimelinePage() {
         }
       }
 
-      // Ensure the layer is activated so user immediately sees their new event
-      if (data.layer && !activeLayerNames.includes(data.layer)) {
-        setActiveLayerNames((prev) => {
-          const updated = [...prev, data.layer!];
-          localStorage.setItem(`neeline_active_layers_${timelineId}`, JSON.stringify(updated));
-          return updated;
-        });
+      // Ensure the layer is un-blacklisted and activated so user immediately sees their new event
+      if (data.layer) {
+        try {
+          const deletedKey = `neeline_deleted_layers_${timelineId}`;
+          const savedDeleted = localStorage.getItem(deletedKey);
+          if (savedDeleted) {
+            const arr: string[] = JSON.parse(savedDeleted);
+            const target = data.layer.trim().toLowerCase();
+            if (arr.some((n) => n.toLowerCase() === target)) {
+              const updated = arr.filter((n) => n.toLowerCase() !== target);
+              localStorage.setItem(deletedKey, JSON.stringify(updated));
+            }
+          }
+        } catch {
+          // ignore
+        }
+
+        if (!activeLayerNames.includes(data.layer)) {
+          setActiveLayerNames((prev) => {
+            const updated = [...prev, data.layer!];
+            localStorage.setItem(`neeline_active_layers_${timelineId}`, JSON.stringify(updated));
+            return updated;
+          });
+        }
       }
 
       setShowEventForm(false);
@@ -1321,6 +1427,7 @@ export default function TimelinePage() {
           showCanvasControls={showCanvasControls}
           onToggleLayer={handleToggleLayer}
           onToggleAllLayers={handleToggleAllLayers}
+          onIsolateLayer={handleIsolateLayer}
           onCreateLayer={handleCreateLayer}
           onDeleteLayer={handleDeleteLayer}
           onEventClick={(event) => {
@@ -1437,13 +1544,13 @@ export default function TimelinePage() {
       {/* Confirmation Modal for Layer Deletion */}
       <ConfirmModal
         isOpen={layerToDelete !== null}
-        title="Delete Historical Period / Layer"
+        title="Delete Historical Period Layer"
         message={
           layerToDelete
-            ? `Are you sure you want to delete the "${layerToDelete.name}" period? Any milestones or bracket spans in this period will be reassigned to the "General" period.`
+            ? `Are you sure you want to delete the "${layerToDelete.name}" layer? All milestones and bracket span periods belonging to this layer will be permanently deleted from the database.`
             : ""
         }
-        confirmLabel="Delete Period"
+        confirmLabel="Delete Permanently"
         cancelLabel="Cancel"
         isDestructive={true}
         isLoading={deletingLayer}

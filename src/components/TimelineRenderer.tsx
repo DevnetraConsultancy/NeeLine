@@ -63,7 +63,7 @@ interface TimelineRendererProps {
   onToggleLayer?: (name: string) => void;
   onToggleAllLayers?: (all: boolean) => void;
   onCreateLayer?: (name: string, color: string) => Promise<LayerItem>;
-  onDeleteLayer?: (id: string, name: string) => Promise<void>;
+  onDeleteLayer?: (id: string, name: string) => Promise<void> | void;
   onEventClick: (event: EventData) => void;
   onBgClick?: (year: number, isBce: boolean) => void;
 }

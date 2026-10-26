@@ -421,33 +421,69 @@ export default function TimelinePage() {
     [timelineId]
   );
 
-  // Delete layer
+  // Delete layer state and execution
+  const [layerToDelete, setLayerToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [deletingLayer, setDeletingLayer] = useState(false);
+
+  // Triggered when user clicks trash icon in Layers dropdown
   const handleDeleteLayer = useCallback(
     async (id: string, name: string) => {
-      if (name === "General") return;
-
-      try {
-        if (id && !id.startsWith("layer-")) {
-          await fetch(`/api/layers?id=${id}`, { method: "DELETE" });
-        }
-      } catch (err) {
-        console.warn("Failed to delete layer on backend", err);
-      }
-
-      setLayers((prev) => {
-        const updated = prev.filter((l) => l.name !== name);
-        localStorage.setItem(`neeline_layers_${timelineId}`, JSON.stringify(updated));
-        return updated;
-      });
-
-      setActiveLayerNames((prev) => {
-        const updated = prev.filter((l) => l !== name);
-        localStorage.setItem(`neeline_active_layers_${timelineId}`, JSON.stringify(updated));
-        return updated;
-      });
+      const trimmed = name.trim();
+      if (!trimmed || trimmed.toLowerCase() === "general") return;
+      setLayerToDelete({ id, name: trimmed });
     },
-    [timelineId]
+    []
   );
+
+  const executeDeleteLayer = useCallback(async () => {
+    if (!layerToDelete) return;
+    const { name } = layerToDelete;
+    const lowerName = name.toLowerCase();
+    setDeletingLayer(true);
+
+    try {
+      await fetch(
+        `/api/layers?timelineId=${timelineId}&name=${encodeURIComponent(name)}`,
+        { method: "DELETE" }
+      );
+    } catch (err) {
+      console.warn("Failed to delete layer on backend", err);
+    } finally {
+      setDeletingLayer(false);
+      setLayerToDelete(null);
+    }
+
+    // 1. Reassign any events in local state that were on this layer to "General"
+    setEvents((prev) =>
+      prev.map((e) => {
+        const currentLyr = ((e.layer && e.layer.trim()) || "General").toLowerCase();
+        if (currentLyr === lowerName) {
+          return {
+            ...e,
+            layer: "General",
+          };
+        }
+        return e;
+      })
+    );
+
+    // 2. Remove from layers state and localStorage
+    setLayers((prev) => {
+      const updated = prev.filter((l) => l.name.trim().toLowerCase() !== lowerName);
+      localStorage.setItem(`neeline_layers_${timelineId}`, JSON.stringify(updated));
+      return updated;
+    });
+
+    // 3. Remove from activeLayerNames and localStorage, ensure "General" is present
+    setActiveLayerNames((prev) => {
+      const remaining = prev.filter((n) => n.trim().toLowerCase() !== lowerName);
+      if (!remaining.some((n) => n.toLowerCase() === "general")) {
+        remaining.unshift("General");
+      }
+      localStorage.setItem(`neeline_active_layers_${timelineId}`, JSON.stringify(remaining));
+      return remaining;
+    });
+  }, [layerToDelete, timelineId]);
 
   // Save event (create or update, supports point milestones and horizontal bracket periods)
   const handleSaveEvent = useCallback(
@@ -1341,6 +1377,25 @@ export default function TimelinePage() {
       <JsonSchemaModal
         isOpen={showJsonSchemaModal}
         onClose={() => setShowJsonSchemaModal(false)}
+      />
+
+      {/* Confirmation Modal for Layer Deletion */}
+      <ConfirmModal
+        isOpen={layerToDelete !== null}
+        title="Delete Historical Period / Layer"
+        message={
+          layerToDelete
+            ? `Are you sure you want to delete the "${layerToDelete.name}" period? Any milestones or bracket spans in this period will be reassigned to the "General" period.`
+            : ""
+        }
+        confirmLabel="Delete Period"
+        cancelLabel="Cancel"
+        isDestructive={true}
+        isLoading={deletingLayer}
+        onConfirm={executeDeleteLayer}
+        onClose={() => {
+          if (!deletingLayer) setLayerToDelete(null);
+        }}
       />
 
       {/* In-Viewport Notification / Error Modal */}

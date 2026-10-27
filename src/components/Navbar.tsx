@@ -68,17 +68,20 @@ export default function Navbar() {
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 h-14 flex items-center justify-between px-4 sm:px-8 theme-nav">
-      {/* Left: Brand logo & Navigation shortcuts (hidden on homepage) */}
+      {/* Left: Brand logo & Navigation shortcuts */}
       <div className="flex items-center gap-3 sm:gap-6">
-        <Link href="/" className="flex items-center gap-2.5 sm:gap-3 group" title="NeeLine Homepage">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#c9a84c] via-[#ebd48a] to-[#a3802c] p-[1.5px] shadow-[0_0_12px_rgba(201,168,76,0.3)] group-hover:shadow-[0_0_20px_rgba(201,168,76,0.5)] transition-all">
-            <div className="w-full h-full rounded-full bg-[#070c16] flex items-center justify-center">
+        <Link href="/" className="flex items-center gap-3 group" title="NeeLine Homepage">
+          {/* Prominent, enlarged brand emblem */}
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#c9a84c] via-[#ebd48a] to-[#a3802c] p-[1.5px] shadow-[0_0_16px_rgba(201,168,76,0.32)] group-hover:shadow-[0_0_24px_rgba(201,168,76,0.55)] transition-all">
+            <div className="w-full h-full rounded-[10px] bg-[#070c16] flex items-center justify-center">
               <svg
                 viewBox="0 0 24 24"
-                className="w-4 h-4 text-[#c9a84c] group-hover:scale-110 transition-transform"
+                className="w-5.5 h-5.5 text-[#c9a84c] group-hover:scale-110 transition-transform"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
                 <circle cx="12" cy="12" r="3" />
                 <line x1="2" y1="12" x2="22" y2="12" />
@@ -94,7 +97,7 @@ export default function Navbar() {
             >
               Nee<span className="text-[#c9a84c]">Line</span>
             </span>
-            <span className="text-[9px] font-mono opacity-50 tracking-wider uppercase mt-0.5 hidden sm:block">
+            <span className="text-[9px] font-mono opacity-60 tracking-wider uppercase mt-1 hidden sm:block">
               Number Line Visualizer
             </span>
           </div>
@@ -106,7 +109,7 @@ export default function Navbar() {
         {/* Global Light / Dark Mode Toggle */}
         <button
           onClick={toggleTheme}
-          className="w-8 h-8 rounded-xl theme-pill hover:border-[#c9a84c]/60 flex items-center justify-center cursor-pointer transition-all"
+          className="w-9 h-9 rounded-xl theme-pill hover:border-[#c9a84c]/60 flex items-center justify-center cursor-pointer transition-all"
           title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode (Canvas colors set in Canvas Settings)`}
           aria-label="Toggle Theme"
         >

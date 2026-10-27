@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import TimelineCard from "@/components/TimelineCard";
 import CreateTimelineModal from "@/components/CreateTimelineModal";
 import ConfirmModal from "@/components/ConfirmModal";
@@ -136,6 +137,9 @@ export default function DashboardPage() {
       <div className="ambient-glow w-[450px] h-[450px] bg-[#4361ee] bottom-[15%] left-[5%] opacity-15" />
       <div className="ambient-glow w-[380px] h-[380px] bg-[#e056fd] top-[40%] left-[20%] opacity-10" />
 
+      {/* Large Translucent Archival Grid Pattern (Light Parchment / Dark Obsidian) */}
+      <div className="hero-grid absolute inset-0 pointer-events-none" />
+
       {/* Content wrapper */}
       <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-8 pt-24 pb-16 relative z-10 flex flex-col">
         {/* Dashboard Header Bar */}
@@ -146,7 +150,7 @@ export default function DashboardPage() {
               <span>Workspace Dashboard</span>
             </div>
             <h1
-              className="text-3xl sm:text-4xl font-bold tracking-tight"
+              className="text-3xl sm:text-4xl font-bold tracking-tight theme-card-title"
               style={{ fontFamily: "var(--font-display)" }}
             >
               Your Timelines
@@ -161,7 +165,7 @@ export default function DashboardPage() {
             <button
               onClick={() => setShowCreateModal(true)}
               disabled={creating}
-              className="btn-gold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 cursor-pointer disabled:opacity-60 font-mono tracking-wide"
+              className="btn-gold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 cursor-pointer disabled:opacity-60 font-mono tracking-wide shadow-md"
             >
               <Plus className="w-4 h-4 stroke-[2.5]" />
               <span>Create Timeline</span>
@@ -177,7 +181,7 @@ export default function DashboardPage() {
               onClick={() => setTab("all")}
               className={`flex items-center gap-2 px-4 py-1.5 rounded-lg transition-all cursor-pointer ${
                 tab === "all"
-                  ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/40 font-semibold shadow-sm"
+                  ? "bg-[#c9a84c]/20 text-[#c9a84c] border border-[#c9a84c]/40 font-semibold shadow-xs"
                   : "theme-text-muted hover:opacity-100"
               }`}
             >
@@ -192,7 +196,7 @@ export default function DashboardPage() {
               onClick={() => setTab("trash")}
               className={`flex items-center gap-2 px-4 py-1.5 rounded-lg transition-all cursor-pointer ${
                 tab === "trash"
-                  ? "bg-rose-500/20 text-rose-500 border border-rose-500/40 font-semibold shadow-sm"
+                  ? "bg-rose-500/20 text-rose-500 border border-rose-500/40 font-semibold shadow-xs"
                   : "theme-text-muted hover:opacity-100"
               }`}
             >
@@ -226,12 +230,12 @@ export default function DashboardPage() {
             <p className="text-xs font-mono theme-text-muted">Loading timelines...</p>
           </div>
         ) : filteredTimelines.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center py-20 px-4 text-center rounded-2xl glass-panel border border-dashed border-black/10 dark:border-white/[0.08] my-4">
+          <div className="flex-1 flex flex-col items-center justify-center py-20 px-4 text-center rounded-3xl liquid-glass border border-dashed border-black/10 dark:border-white/[0.08] my-4">
             <div className="w-16 h-16 rounded-2xl bg-[#c9a84c]/15 border border-[#c9a84c]/30 flex items-center justify-center mb-5 text-[#c9a84c]">
               <Layers className="w-8 h-8 opacity-75" />
             </div>
             <h3
-              className="text-xl font-bold mb-2"
+              className="text-xl font-bold mb-2 theme-card-title"
               style={{ fontFamily: "var(--font-display)" }}
             >
               {searchQuery
@@ -271,14 +275,10 @@ export default function DashboardPage() {
             ))}
           </div>
         )}
-
-        {/* Footer */}
-        <div className="mt-16 pt-6 border-t border-black/[0.06] dark:border-white/[0.06] text-center">
-          <p className="text-xs font-mono theme-text-muted">
-            Developed in Collaboration with Academia | Devnetra Consultancy
-          </p>
-        </div>
       </div>
+
+      {/* Locked Unified Premium Footer */}
+      <Footer />
 
       {/* In-Viewport Create Timeline Modal */}
       <CreateTimelineModal

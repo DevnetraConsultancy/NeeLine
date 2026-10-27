@@ -322,22 +322,30 @@ export default function TimelinePage() {
       localStorage.setItem(cachedLayersKey, JSON.stringify(fetchedLayers));
       setLayers(fetchedLayers);
 
-      // Restore active layers preference
+      // Restore active layers preference (or default to all layers checked on first visit)
       const savedActiveKey = `neeline_active_layers_${timelineId}`;
       const savedActive = localStorage.getItem(savedActiveKey);
+      const allLayerNames = fetchedLayers.map((l) => l.name);
       if (savedActive) {
         try {
           const parsed = JSON.parse(savedActive);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setActiveLayerNames(parsed);
+          if (Array.isArray(parsed)) {
+            const validNames = allLayerNames.filter((name) =>
+              parsed.some((p) => String(p).trim().toLowerCase() === name.trim().toLowerCase())
+            );
+            if (validNames.length > 0) {
+              setActiveLayerNames(validNames);
+            } else {
+              setActiveLayerNames(allLayerNames);
+            }
           } else {
-            setActiveLayerNames(fetchedLayers.map((l) => l.name));
+            setActiveLayerNames(allLayerNames);
           }
         } catch {
-          setActiveLayerNames(fetchedLayers.map((l) => l.name));
+          setActiveLayerNames(allLayerNames);
         }
       } else {
-        setActiveLayerNames(fetchedLayers.map((l) => l.name));
+        setActiveLayerNames(allLayerNames);
       }
     } catch {
       router.push("/dashboard");

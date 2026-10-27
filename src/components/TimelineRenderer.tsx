@@ -286,8 +286,20 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     });
   }, [events, activeLayerNames, layerColorMap]);
 
-  // Unique chronological anchors across all VISIBLE point milestones and bracket span endpoints
+  // Unique chronological anchors across ALL timeline events (stable spatial coordinate system across all layers)
   const chronologicalAnchors = useMemo(() => {
+    const yearSet = new Set<number>();
+    events.forEach((e) => {
+      yearSet.add(e.isBce ? -Math.abs(e.year) : e.year);
+      if (e.endYear !== undefined && e.endYear !== null) {
+        yearSet.add(e.endIsBce ? -Math.abs(e.endYear) : e.endYear);
+      }
+    });
+    return Array.from(yearSet).sort((a, b) => a - b);
+  }, [events]);
+
+  // Unique chronological anchors across currently VISIBLE events (for bounding spine & fitting active layers)
+  const visibleChronologicalAnchors = useMemo(() => {
     const yearSet = new Set<number>();
     visibleEvents.forEach((e) => {
       yearSet.add(e.isBce ? -Math.abs(e.year) : e.year);
@@ -298,7 +310,9 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     return Array.from(yearSet).sort((a, b) => a - b);
   }, [visibleEvents]);
 
-  // Even-space base positions for all chronological anchors
+  // Even-space base positions for all chronological anchors across the timeline.
+  // Derived from all timeline events so toggling layer checkboxes never deletes coordinate
+  // slots or shifts the positions of other layers on the canvas.
   const anchorBasePositions = useMemo(() => {
     const map = new Map<number, number>();
     if (chronologicalAnchors.length === 0) return map;
@@ -515,15 +529,17 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
   // Compute spine extents strictly bounded by earliest and latest event points of active visible events
   const hasEvents = visibleEvents.length > 0;
   const [spineLeft, spineRight] = useMemo(() => {
-    if (!hasEvents || chronologicalAnchors.length === 0) {
+    if (!hasEvents || visibleChronologicalAnchors.length === 0) {
       const mid = dimensions.width / 2;
       return [mid - 150, mid + 150];
     }
-    const minAnchorX = yearToX(chronologicalAnchors[0]);
-    const maxAnchorX = yearToX(chronologicalAnchors[chronologicalAnchors.length - 1]);
+    const minAnchorX = yearToX(visibleChronologicalAnchors[0]);
+    const maxAnchorX = yearToX(
+      visibleChronologicalAnchors[visibleChronologicalAnchors.length - 1]
+    );
     const PADDING = 60; // Clean margin beyond extreme event anchors
     return [Math.min(minAnchorX, maxAnchorX) - PADDING, Math.max(minAnchorX, maxAnchorX) + PADDING];
-  }, [hasEvents, chronologicalAnchors, yearToX, dimensions.width]);
+  }, [hasEvents, visibleChronologicalAnchors, yearToX, dimensions.width]);
 
   const spineY = dimensions.height / 2;
   const originX = yearToX(0);
@@ -570,20 +586,36 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
         return;
       }
 
-      // Even Space mode: frame all active anchors evenly spaced
-      const SPACING = 220;
-      const count = Math.max(1, chronologicalAnchors.length);
-      const totalSpan = Math.max(1, count - 1) * SPACING;
+      // Even Space mode: frame all active visible anchors based on their stable base positions
+      if (visibleChronologicalAnchors.length === 0) return;
+      const minBaseX = anchorBasePositions.get(visibleChronologicalAnchors[0]) ?? 0;
+      const maxBaseX =
+        anchorBasePositions.get(
+          visibleChronologicalAnchors[visibleChronologicalAnchors.length - 1]
+        ) ?? 0;
+      const visibleSpan = Math.abs(maxBaseX - minBaseX);
       const padding = 140;
       const availableWidth = Math.max(200, dimensions.width - padding * 2);
-      const calculatedZoom = count > 1 ? Math.min(1.25, availableWidth / totalSpan) : 1;
+
+      if (visibleSpan <= 0) {
+        setZoom(1);
+        setPanX(-minBaseX);
+        prevLayoutStateRef.current.panX = -minBaseX;
+        prevLayoutStateRef.current.zoom = 1;
+        return;
+      }
+
+      const calculatedZoom = Math.min(1.25, availableWidth / visibleSpan);
       const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, calculatedZoom));
+      const centerBaseX = (minBaseX + maxBaseX) / 2;
+      const targetPan = -centerBaseX * clampedZoom;
+
       setZoom(clampedZoom);
-      setPanX(0);
-      prevLayoutStateRef.current.panX = 0;
+      setPanX(targetPan);
+      prevLayoutStateRef.current.panX = targetPan;
       prevLayoutStateRef.current.zoom = clampedZoom;
     },
-    [visibleEvents, chronologicalAnchors, dimensions.width]
+    [visibleEvents, visibleChronologicalAnchors, anchorBasePositions, dimensions.width]
   );
 
   const fitAll = useCallback(() => {
@@ -608,6 +640,17 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
   });
 
   const hasCheckedInitialFit = useRef(false);
+  const hadSavedViewportRef = useRef<boolean | null>(null);
+  if (hadSavedViewportRef.current === null && typeof window !== "undefined" && timelineId) {
+    try {
+      hadSavedViewportRef.current = Boolean(
+        localStorage.getItem(`neeline_viewport_${timelineId}`)
+      );
+    } catch {
+      hadSavedViewportRef.current = false;
+    }
+  }
+
   const lastTimelineIdRef = useRef<string | null>(timelineId || null);
 
   // If active timeline changes (SPA navigation between timelines), reset initialization flags
@@ -616,6 +659,17 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     hasCheckedInitialFit.current = false;
     prevLayoutStateRef.current.hasInitialized = false;
     prevLayoutStateRef.current.anchorBasePositions = new Map();
+    if (typeof window !== "undefined" && timelineId) {
+      try {
+        hadSavedViewportRef.current = Boolean(
+          localStorage.getItem(`neeline_viewport_${timelineId}`)
+        );
+      } catch {
+        hadSavedViewportRef.current = false;
+      }
+    } else {
+      hadSavedViewportRef.current = null;
+    }
   }
 
   // Keep ref synchronized with user interactive pan/zoom updates
@@ -626,9 +680,10 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     prevLayoutStateRef.current.layoutMode = layoutMode;
   }, [panX, zoom, dimensions.width, layoutMode]);
 
-  // Synchronous Render-Phase Focal Alignment on layer toggle / milestone add or delete:
-  // Preserves the reading position of the milestone nearest to screen center with ZERO flicker.
-  // CRUCIAL: Layer add/remove NEVER triggers fit view!
+  // Synchronous Render-Phase Focal Alignment when a new event is added or deleted:
+  // Because anchorBasePositions is derived from all timeline events, toggling layer checkboxes
+  // NEVER alters anchorBasePositions, so layer check/uncheck leaves every event at its exact
+  // canvas position with zero movement.
   if (
     prevLayoutStateRef.current.hasInitialized &&
     layoutMode === "even" &&
@@ -669,18 +724,6 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
         setPanX(targetPanX);
         prevLayoutStateRef.current.panX = targetPanX;
       }
-    } else if (chronologicalAnchors.length > 0) {
-      // Switched to a completely disjoint layer with 0 common events: center new layer
-      const SPACING = 220;
-      const totalSpan = Math.max(1, chronologicalAnchors.length - 1) * SPACING;
-      const padding = 140;
-      const availableWidth = dimensions.width - padding * 2;
-      const newZoom = chronologicalAnchors.length > 1 ? Math.min(1.25, availableWidth / totalSpan) : 1;
-      const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
-      setZoom(clampedZoom);
-      setPanX(0);
-      prevLayoutStateRef.current.panX = 0;
-      prevLayoutStateRef.current.zoom = clampedZoom;
     }
 
     prevLayoutStateRef.current.anchorBasePositions = anchorBasePositions;
@@ -762,6 +805,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
   // Persist user's viewport (zoom, pan, layoutMode) to localStorage on every change
   useEffect(() => {
     if (!timelineId || typeof window === "undefined") return;
+    if (!hasCheckedInitialFit.current && !hadSavedViewportRef.current) return;
     try {
       localStorage.setItem(
         `neeline_viewport_${timelineId}`,
@@ -778,13 +822,8 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     if (visibleEvents.length === 0) return;
 
     hasCheckedInitialFit.current = true;
-    try {
-      const saved = localStorage.getItem(`neeline_viewport_${timelineId}`);
-      if (!saved) {
-        fitViewForMode(layoutMode);
-      }
-    } catch {
-      // ignore
+    if (!hadSavedViewportRef.current) {
+      fitViewForMode(layoutMode);
     }
   }, [timelineId, visibleEvents.length, fitViewForMode, layoutMode]);
 

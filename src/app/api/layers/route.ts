@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parseEventMetadata } from "@/lib/event-metadata";
+import { CANVAS_COLOR_PRESETS } from "@/types";
 
 // GET /api/layers?timelineId=xxx - Discover layers from timeline events
 export async function GET(req: NextRequest) {
@@ -35,17 +36,30 @@ export async function GET(req: NextRequest) {
     }
 
     const layerMap = new Map<string, { id: string; name: string; color: string }>();
+    const usedColors = new Set<string>();
 
-    // Extract layers from existing events
+    // Extract layers from existing events, assigning distinct colors from CANVAS_COLOR_PRESETS
     for (const ev of timeline.events) {
       const { layer } = parseEventMetadata(ev.description);
       const cleanLayer = (layer && layer.trim()) || "General";
       const key = cleanLayer.toLowerCase();
       if (!layerMap.has(key)) {
+        let assignedColor = "";
+        const isPreset = CANVAS_COLOR_PRESETS.some((p) => p.hex.toLowerCase() === (ev.color || "").toLowerCase());
+        if (ev.color && isPreset && !usedColors.has(ev.color.toLowerCase())) {
+          assignedColor = ev.color;
+        } else {
+          const free = CANVAS_COLOR_PRESETS.find((p) => !usedColors.has(p.hex.toLowerCase()));
+          assignedColor = free
+            ? free.hex
+            : CANVAS_COLOR_PRESETS[layerMap.size % CANVAS_COLOR_PRESETS.length].hex;
+        }
+        usedColors.add(assignedColor.toLowerCase());
+
         layerMap.set(key, {
           id: `layer-${cleanLayer.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
           name: cleanLayer,
-          color: ev.color && ev.color.startsWith("#") ? ev.color : "#5a9bd5",
+          color: assignedColor,
         });
       }
     }
@@ -55,7 +69,7 @@ export async function GET(req: NextRequest) {
       layerMap.set("general", {
         id: "layer-general",
         name: "General",
-        color: "#c9a84c",
+        color: CANVAS_COLOR_PRESETS[0].hex,
       });
     }
 
@@ -84,16 +98,39 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify ownership
+    // Verify ownership and fetch existing events to check used layer colors
     const timeline = await prisma.timeline.findFirst({
       where: { id: timelineId, userId: session.user.id },
+      include: {
+        events: {
+          select: {
+            description: true,
+            color: true,
+          },
+        },
+      },
     });
     if (!timeline) {
       return NextResponse.json({ error: "Timeline not found" }, { status: 404 });
     }
 
     const safeName = String(name).trim();
-    const safeColor = typeof color === "string" && color.startsWith("#") ? color : "#c9a84c";
+
+    // Check existing layer colors
+    const existingUsedColors = new Set<string>();
+    for (const ev of timeline.events) {
+      const { layer } = parseEventMetadata(ev.description);
+      if (layer && ev.color && ev.color.startsWith("#")) {
+        existingUsedColors.add(ev.color.toLowerCase());
+      }
+    }
+
+    let safeColor = typeof color === "string" && color.startsWith("#") ? color : "";
+    const isValidPreset = CANVAS_COLOR_PRESETS.some((p) => p.hex.toLowerCase() === safeColor.toLowerCase());
+    if (!isValidPreset || existingUsedColors.has(safeColor.toLowerCase())) {
+      const free = CANVAS_COLOR_PRESETS.find((p) => !existingUsedColors.has(p.hex.toLowerCase()));
+      safeColor = free ? free.hex : CANVAS_COLOR_PRESETS[0].hex;
+    }
 
     const layer = {
       id: `layer-${safeName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,

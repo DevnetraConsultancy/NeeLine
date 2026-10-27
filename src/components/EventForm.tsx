@@ -13,6 +13,7 @@ import {
   Check,
 } from "lucide-react";
 import ConfirmModal from "@/components/ConfirmModal";
+import { CANVAS_COLOR_PRESETS } from "@/types";
 
 export interface LayerItem {
   id: string;
@@ -56,21 +57,6 @@ interface EventFormProps {
   onDelete?: () => Promise<void>;
   onClose: () => void;
 }
-
-const COLOR_PALETTE = [
-  { hex: "#c9a84c", label: "Imperial Gold" },
-  { hex: "#e8d5a3", label: "Parchment" },
-  { hex: "#7ab8a0", label: "Sage" },
-  { hex: "#5a9bd5", label: "Azure" },
-  { hex: "#d4786c", label: "Terracotta" },
-  { hex: "#b07cc6", label: "Amethyst" },
-  { hex: "#e8a87c", label: "Coral" },
-  { hex: "#7cc6d4", label: "Cyan" },
-  { hex: "#d4a5c9", label: "Rose" },
-  { hex: "#a8b87a", label: "Olive" },
-  { hex: "#f43f5e", label: "Crimson" },
-  { hex: "#10b981", label: "Emerald" },
-];
 
 export default function EventForm({
   initialData,
@@ -164,7 +150,9 @@ export default function EventForm({
   // Quick inline new layer creation
   const [showNewLayerInput, setShowNewLayerInput] = useState(false);
   const [newLayerName, setNewLayerName] = useState("");
-  const [newLayerColor, setNewLayerColor] = useState("#5a9bd5");
+  const [newLayerColor, setNewLayerColor] = useState("#38bdf8");
+
+  const usedLayerColors = new Set(availableLayers.map((l) => l.color.trim().toLowerCase()));
 
   const [saving, setSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -181,6 +169,7 @@ export default function EventForm({
   async function handleQuickCreateLayer() {
     const trimmed = newLayerName.trim();
     if (!trimmed) return;
+    if (usedLayerColors.has(newLayerColor.trim().toLowerCase())) return;
     if (onCreateLayer) {
       const created = await onCreateLayer(trimmed, newLayerColor);
       setSelectedLayer(created.name);
@@ -485,7 +474,17 @@ export default function EventForm({
               </label>
               <button
                 type="button"
-                onClick={() => setShowNewLayerInput((prev) => !prev)}
+                onClick={() => {
+                  setShowNewLayerInput((prev) => {
+                    if (!prev) {
+                      const free = CANVAS_COLOR_PRESETS.find(
+                        (p) => !usedLayerColors.has(p.hex.toLowerCase())
+                      );
+                      setNewLayerColor(free ? free.hex : CANVAS_COLOR_PRESETS[0].hex);
+                    }
+                    return !prev;
+                  });
+                }}
                 className="text-[10px] font-mono text-[#c9a84c] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <Plus className="w-3 h-3" />
@@ -502,22 +501,51 @@ export default function EventForm({
                     onChange={(e) => setNewLayerName(e.target.value)}
                     placeholder="Period Name (e.g. Bronze Age, Classical)"
                     className="flex-1 px-3 py-1.5 rounded-lg theme-input text-xs font-mono outline-none focus:ring-1 focus:ring-[#c9a84c]"
-                  />
-                  <input
-                    type="color"
-                    value={newLayerColor}
-                    onChange={(e) => setNewLayerColor(e.target.value)}
-                    className="w-8 h-8 rounded-lg cursor-pointer p-0.5 bg-transparent border border-black/15 dark:border-white/15"
-                    title="Choose Period Color"
+                    autoFocus
                   />
                   <button
                     type="button"
                     onClick={handleQuickCreateLayer}
-                    disabled={!newLayerName.trim()}
+                    disabled={!newLayerName.trim() || usedLayerColors.has(newLayerColor.toLowerCase())}
                     className="btn-gold px-3 py-1.5 rounded-lg text-xs font-mono font-semibold cursor-pointer disabled:opacity-50"
                   >
                     Add
                   </button>
+                </div>
+
+                {/* 16 Preset Swatches for New Layer (Duplicate layers disallowed) */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[10px] font-mono theme-text-muted">
+                    <span>Period Color (16 Presets)</span>
+                    <span className="text-[9px] opacity-60">Distinct layer colors only</span>
+                  </div>
+                  <div className="grid grid-cols-8 gap-1.5 p-1.5 rounded-lg bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10">
+                    {CANVAS_COLOR_PRESETS.map((c) => {
+                      const isUsed = usedLayerColors.has(c.hex.toLowerCase());
+                      const isSelected = newLayerColor.toLowerCase() === c.hex.toLowerCase();
+                      return (
+                        <button
+                          key={c.hex}
+                          type="button"
+                          disabled={isUsed}
+                          onClick={() => setNewLayerColor(c.hex)}
+                          title={isUsed ? `${c.label} (Already used by another layer)` : c.label}
+                          className={`w-5 h-5 rounded-full transition-all relative flex items-center justify-center ${
+                            isUsed
+                              ? "opacity-20 cursor-not-allowed grayscale"
+                              : isSelected
+                              ? "ring-2 ring-[#c9a84c] ring-offset-1 ring-offset-white dark:ring-offset-[#131c2e] scale-110 shadow-sm cursor-pointer"
+                              : "hover:scale-110 opacity-80 hover:opacity-100 cursor-pointer"
+                          }`}
+                          style={{ backgroundColor: c.hex }}
+                        >
+                          {isUsed && (
+                            <span className="text-[7px] text-white font-bold leading-none select-none">✕</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             ) : (
@@ -870,13 +898,16 @@ export default function EventForm({
             />
           </div>
 
-          {/* Color Palette Selection */}
+          {/* Box Border Color Selection (16 Presets, No Custom Colors) */}
           <div>
-            <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider mb-1.5 font-medium">
-              Milestone & Bracket Line Color
-            </label>
-            <div className="flex items-center gap-2 overflow-x-auto py-2.5 px-1 scrollbar-thin">
-              {COLOR_PALETTE.map((c) => {
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-[11px] font-mono theme-text-muted uppercase tracking-wider font-medium">
+                Box Border Color
+              </label>
+              <span className="text-[10px] font-mono opacity-60">Customizes milestone box border</span>
+            </div>
+            <div className="grid grid-cols-8 gap-1.5 p-2 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10">
+              {CANVAS_COLOR_PRESETS.map((c) => {
                 const isSelected = color.toLowerCase() === c.hex.toLowerCase();
                 return (
                   <button
@@ -886,7 +917,7 @@ export default function EventForm({
                     title={c.label}
                     className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center transition-all cursor-pointer ${
                       isSelected
-                        ? "ring-2 ring-offset-2 ring-[#c9a84c] ring-offset-white dark:ring-offset-[#131c2e] shadow-sm"
+                        ? "ring-2 ring-offset-2 ring-[#c9a84c] ring-offset-white dark:ring-offset-[#131c2e] scale-105 shadow-sm"
                         : "opacity-80 hover:opacity-100 hover:ring-1 hover:ring-black/20 dark:hover:ring-white/30"
                     }`}
                     style={{ backgroundColor: c.hex }}
@@ -897,15 +928,6 @@ export default function EventForm({
                   </button>
                 );
               })}
-              <div className="relative shrink-0 flex items-center justify-center ml-0.5">
-                <input
-                  type="color"
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  className="w-6 h-6 rounded-full cursor-pointer p-0.5 bg-transparent border border-black/20 dark:border-white/20 transition-all hover:border-[#c9a84c]"
-                  title="Custom Color"
-                />
-              </div>
             </div>
           </div>
 

@@ -11,6 +11,7 @@ import {
 } from "react";
 import { layoutLabels, formatDateLabel, formatSpanLabel, TIER_SPACING, LayoutItem } from "@/lib/timeline-layout";
 import { exportTimelineAsPng } from "@/components/PngExport";
+import { CANVAS_COLOR_PRESETS } from "@/types";
 import {
   ZoomIn,
   ZoomOut,
@@ -43,6 +44,7 @@ export interface EventData {
   title: string;
   description: string | null;
   color: string;
+  borderColor?: string;
   layer?: string | null;
 }
 
@@ -77,17 +79,6 @@ const MAX_ZOOM = 200;
 
 const TICK_HEIGHT = 14;
 const DOT_RADIUS = 5;
-
-const PRESET_LAYER_COLORS = [
-  "#c9a84c", // Imperial Gold
-  "#38bdf8", // Sky Azure
-  "#10b981", // Emerald
-  "#f43f5e", // Crimson Rose
-  "#a855f7", // Royal Purple
-  "#f97316", // Amber Orange
-  "#06b6d4", // Cyan
-  "#f472b6", // Rose Quartz
-];
 
 const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProps>(
   function TimelineRenderer(
@@ -253,6 +244,11 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     return map;
   }, [layers]);
 
+  // Set of lowercase colors currently taken by existing layers
+  const usedLayerColors = useMemo(() => {
+    return new Set(layers.map((l) => l.color.trim().toLowerCase()));
+  }, [layers]);
+
   // Count events per layer (normalized case-insensitive)
   const layerEventCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -263,7 +259,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
     return counts;
   }, [events]);
 
-  // Filter visible events based on active layers selection & assign layer colors
+  // Filter visible events based on active layers selection & assign layer colors vs box border colors
   const visibleEvents = useMemo(() => {
     if (events.length === 0) return [];
     const activeSet = new Set(activeLayerNames.map((n) => n.trim().toLowerCase()));
@@ -275,13 +271,19 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
 
     return filtered.map((e) => {
       const rawLyr = (e.layer && e.layer.trim()) || "General";
-      const customColor =
+      const layerColor =
         layerColorMap.get(rawLyr) ||
         layerColorMap.get(rawLyr.toLowerCase()) ||
-        e.color;
+        "#c9a84c";
+      
+      // Box border color: custom borderColor or event's stored color (if hex string), otherwise layer color
+      const customBorderColor =
+        e.borderColor || (e.color && e.color.startsWith("#") ? e.color : layerColor);
+
       return {
         ...e,
-        color: customColor,
+        color: layerColor, // structural line & stem & tick & bracket color
+        borderColor: customBorderColor, // milestone card / bracket center label box border
       };
     });
   }, [events, activeLayerNames, layerColorMap]);
@@ -966,6 +968,10 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
   async function handleCreatePeriod() {
     const trimmed = newPeriodName.trim();
     if (!trimmed || !onCreateLayer) return;
+    // Disallow duplicate layer color
+    if (usedLayerColors.has(newPeriodColor.trim().toLowerCase())) {
+      return;
+    }
     setCreatingLayer(true);
     try {
       await onCreateLayer(trimmed, newPeriodColor);
@@ -1293,7 +1299,8 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                             endDay: item.endDay,
                             title: item.title,
                             description: item.description,
-                            color: item.color,
+                            color: item.borderColor || item.color,
+                            borderColor: item.borderColor || item.color,
                             layer: item.layer,
                           });
                         }
@@ -1306,7 +1313,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                         height="26"
                         rx="6"
                         fill={bgColor}
-                        stroke={item.year === 0 || item.endYear === 0 ? "#ef4444" : item.color}
+                        stroke={item.year === 0 || item.endYear === 0 ? "#ef4444" : (item.borderColor || item.color)}
                         strokeWidth={item.year === 0 || item.endYear === 0 ? "3" : "1.8"}
                         opacity="0.98"
                       />
@@ -1390,7 +1397,8 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                             endDay: null,
                             title: item.title,
                             description: item.description,
-                            color: item.color,
+                            color: item.borderColor || item.color,
+                            borderColor: item.borderColor || item.color,
                             layer: item.layer,
                           });
                         }
@@ -1412,14 +1420,14 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                         cx={item.x}
                         cy={spineY - TICK_HEIGHT / 2 - DOT_RADIUS - 6 - item.tier * TIER_SPACING}
                         r={DOT_RADIUS}
-                        fill={item.color}
+                        fill={item.borderColor || item.color}
                         stroke={bgColor}
                         strokeWidth="1.5"
                         opacity="0.95"
                       />
                     </g>
                   ) : (
-                    // Full Label Card with Layer's Unique Line & Border Color
+                    // Full Label Card with Layer's Unique Line & Customized Box Border Color
                     <g
                       style={{ cursor: "pointer" }}
                       onClick={(e) => {
@@ -1437,7 +1445,8 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                             endDay: null,
                             title: item.title,
                             description: item.description,
-                            color: item.color,
+                            color: item.borderColor || item.color,
+                            borderColor: item.borderColor || item.color,
                             layer: item.layer,
                           });
                         }
@@ -1454,7 +1463,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                         opacity="0.9"
                       />
 
-                      {/* Card background with layer's unique border color (thick solid red if Year 0) */}
+                      {/* Card background with custom box border color (thick solid red if Year 0) */}
                       <rect
                         x={item.x - item.labelWidth / 2}
                         y={spineY - TICK_HEIGHT / 2 - 26 - item.tier * TIER_SPACING}
@@ -1462,7 +1471,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                         height="24"
                         rx="6"
                         fill={bgColor}
-                        stroke={item.year === 0 ? "#ef4444" : item.color}
+                        stroke={item.year === 0 ? "#ef4444" : (item.borderColor || item.color)}
                         strokeWidth={item.year === 0 ? "3" : "1.8"}
                         opacity="0.98"
                       />
@@ -1921,37 +1930,48 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
               <div className="mt-2.5 pt-2.5 border-t border-black/[0.08] dark:border-white/[0.08]">
                 {showAddPeriodInput ? (
                   <div className="space-y-2">
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="text"
-                        value={newPeriodName}
-                        onChange={(e) => setNewPeriodName(e.target.value)}
-                        placeholder="Period name (e.g. Bronze Age)"
-                        className="flex-1 px-2.5 py-1.5 rounded-lg theme-input text-xs font-mono outline-none focus:ring-1 focus:ring-[#c9a84c]"
-                        autoFocus
-                      />
-                      <input
-                        type="color"
-                        value={newPeriodColor}
-                        onChange={(e) => setNewPeriodColor(e.target.value)}
-                        className="w-7 h-7 rounded-lg cursor-pointer p-0.5 bg-transparent border border-black/15 dark:border-white/15 shrink-0"
-                        title="Period Color"
-                      />
-                    </div>
+                    <input
+                      type="text"
+                      value={newPeriodName}
+                      onChange={(e) => setNewPeriodName(e.target.value)}
+                      placeholder="Period name (e.g. Bronze Age)"
+                      className="w-full px-2.5 py-1.5 rounded-lg theme-input text-xs font-mono outline-none focus:ring-1 focus:ring-[#c9a84c]"
+                      autoFocus
+                    />
 
-                    {/* Quick color preset swatches */}
-                    <div className="flex items-center gap-1.5 py-1.5 px-0.5 overflow-x-auto">
-                      {PRESET_LAYER_COLORS.map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => setNewPeriodColor(c)}
-                          className={`w-4 h-4 rounded-full shrink-0 transition-all cursor-pointer ${
-                            newPeriodColor === c ? "ring-2 ring-[#c9a84c] ring-offset-1 ring-offset-white dark:ring-offset-[#131c2e]" : "hover:opacity-100 opacity-70"
-                          }`}
-                          style={{ backgroundColor: c }}
-                        />
-                      ))}
+                    {/* 16 Curated Color Presets (Unique colors enforced, no custom colors) */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-[10px] font-mono theme-text-muted">
+                        <span>Layer Color (16 Presets)</span>
+                        <span className="text-[9px] opacity-60">Distinct only</span>
+                      </div>
+                      <div className="grid grid-cols-8 gap-1.5 p-1.5 rounded-lg bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10">
+                        {CANVAS_COLOR_PRESETS.map((c) => {
+                          const isUsed = usedLayerColors.has(c.hex.toLowerCase());
+                          const isSelected = newPeriodColor.toLowerCase() === c.hex.toLowerCase();
+                          return (
+                            <button
+                              key={c.hex}
+                              type="button"
+                              disabled={isUsed}
+                              onClick={() => setNewPeriodColor(c.hex)}
+                              title={isUsed ? `${c.label} (Already used by another layer)` : c.label}
+                              className={`w-4 h-4 rounded-full transition-all relative flex items-center justify-center ${
+                                isUsed
+                                  ? "opacity-20 cursor-not-allowed grayscale"
+                                  : isSelected
+                                  ? "ring-2 ring-[#c9a84c] ring-offset-1 ring-offset-white dark:ring-offset-[#131c2e] scale-110 shadow-sm cursor-pointer"
+                                  : "hover:scale-110 opacity-80 hover:opacity-100 cursor-pointer"
+                              }`}
+                              style={{ backgroundColor: c.hex }}
+                            >
+                              {isUsed && (
+                                <span className="text-[7px] text-white font-bold leading-none select-none">✕</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-1.5 justify-end">
@@ -1963,7 +1983,11 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                       </button>
                       <button
                         onClick={handleCreatePeriod}
-                        disabled={creatingLayer || !newPeriodName.trim()}
+                        disabled={
+                          creatingLayer ||
+                          !newPeriodName.trim() ||
+                          usedLayerColors.has(newPeriodColor.toLowerCase())
+                        }
                         className="btn-gold px-3 py-1 rounded-lg text-[11px] font-mono font-semibold cursor-pointer disabled:opacity-50"
                       >
                         {creatingLayer ? "Adding..." : "Add Layer"}
@@ -1972,7 +1996,13 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                   </div>
                 ) : (
                   <button
-                    onClick={() => setShowAddPeriodInput(true)}
+                    onClick={() => {
+                      const firstFree = CANVAS_COLOR_PRESETS.find(
+                        (p) => !usedLayerColors.has(p.hex.toLowerCase())
+                      );
+                      setNewPeriodColor(firstFree ? firstFree.hex : CANVAS_COLOR_PRESETS[0].hex);
+                      setShowAddPeriodInput(true);
+                    }}
                     className="w-full py-1.5 px-2 rounded-xl text-xs font-mono text-[#c9a84c] hover:bg-[#c9a84c]/10 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />

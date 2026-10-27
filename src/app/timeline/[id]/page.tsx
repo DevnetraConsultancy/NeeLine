@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import TimelineRenderer, { LayerItem, TimelineRendererHandle } from "@/components/TimelineRenderer";
+import { CANVAS_COLOR_PRESETS } from "@/types";
 import EventForm, { EventFormData } from "@/components/EventForm";
 import TimelineSettings from "@/components/TimelineSettings";
 import ConfirmModal from "@/components/ConfirmModal";
@@ -294,8 +295,26 @@ export default function TimelinePage() {
 
       // Fallback: if no layers at all and no events exist, initialize with General
       if (fetchedLayers.length === 0 && fetchedEvents.length === 0) {
-        fetchedLayers.unshift({ id: "layer-general", name: "General", color: "#c9a84c" });
+        fetchedLayers.unshift({ id: "layer-general", name: "General", color: CANVAS_COLOR_PRESETS[0].hex });
       }
+
+      // Guarantee each existing layer has a distinct, unique color scheme from CANVAS_COLOR_PRESETS
+      const usedLayerColors = new Set<string>();
+      fetchedLayers = fetchedLayers.map((layer, idx) => {
+        const cleanColor = layer.color?.toLowerCase();
+        const isValidPreset = CANVAS_COLOR_PRESETS.some((p) => p.hex.toLowerCase() === cleanColor);
+        if (isValidPreset && !usedLayerColors.has(cleanColor)) {
+          usedLayerColors.add(cleanColor);
+          return layer;
+        }
+        const freePreset = CANVAS_COLOR_PRESETS.find((p) => !usedLayerColors.has(p.hex.toLowerCase()));
+        const assignedColor = freePreset ? freePreset.hex : CANVAS_COLOR_PRESETS[idx % CANVAS_COLOR_PRESETS.length].hex;
+        usedLayerColors.add(assignedColor.toLowerCase());
+        return {
+          ...layer,
+          color: assignedColor,
+        };
+      });
 
       // Dynamically discover all distinct layers present across fetchedEvents
       const distinctEventLayers = new Set<string>();
@@ -307,13 +326,15 @@ export default function TimelinePage() {
       // Register any event layers in fetchedLayers if not already present
       distinctEventLayers.forEach((layerName) => {
         if (!fetchedLayers.some((l) => l.name.toLowerCase() === layerName.toLowerCase())) {
-          const sampleEvent = fetchedEvents.find(
-            (ev) => ((ev.layer && ev.layer.trim()) || "General").toLowerCase() === layerName.toLowerCase()
-          );
+          const freePreset = CANVAS_COLOR_PRESETS.find((p) => !usedLayerColors.has(p.hex.toLowerCase()));
+          const assignedColor = freePreset
+            ? freePreset.hex
+            : CANVAS_COLOR_PRESETS[fetchedLayers.length % CANVAS_COLOR_PRESETS.length].hex;
+          usedLayerColors.add(assignedColor.toLowerCase());
           fetchedLayers.push({
             id: `layer-${layerName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
             name: layerName,
-            color: (sampleEvent && sampleEvent.color && sampleEvent.color.startsWith("#")) ? sampleEvent.color : "#38bdf8",
+            color: assignedColor,
           });
         }
       });
@@ -445,17 +466,29 @@ export default function TimelinePage() {
   // Create new layer/period
   const handleCreateLayer = useCallback(
     async (name: string, color: string): Promise<LayerItem> => {
+      // Guarantee unique layer color
+      let finalColor = color;
+      const isDuplicate = layers.some((l) => l.color.toLowerCase() === finalColor.toLowerCase());
+      if (isDuplicate) {
+        const free = CANVAS_COLOR_PRESETS.find(
+          (p) => !layers.some((l) => l.color.toLowerCase() === p.hex.toLowerCase())
+        );
+        if (free) {
+          finalColor = free.hex;
+        }
+      }
+
       let createdLayer: LayerItem = {
         id: `layer-${Date.now()}`,
         name,
-        color,
+        color: finalColor,
       };
 
       try {
         const res = await fetch("/api/layers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ timelineId, name, color }),
+          body: JSON.stringify({ timelineId, name, color: finalColor }),
         });
         if (res.ok) {
           createdLayer = await res.json();
@@ -478,7 +511,7 @@ export default function TimelinePage() {
 
       return createdLayer;
     },
-    [timelineId]
+    [timelineId, layers]
   );
 
   // Delete layer state and execution

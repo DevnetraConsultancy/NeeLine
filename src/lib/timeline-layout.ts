@@ -20,6 +20,7 @@ export interface LayoutItem {
   title: string;
   description: string | null;
   color: string;
+  borderColor?: string;
   layer?: string | null;
   x: number;
   tier: number;
@@ -60,6 +61,7 @@ export function layoutLabels(
     title: string;
     description: string | null;
     color: string;
+    borderColor?: string;
     layer?: string | null;
     endYear?: number | null;
     endIsBce?: boolean | null;
@@ -98,6 +100,7 @@ export function layoutLabels(
         title: e.title,
         description: e.description,
         color: e.color,
+        borderColor: e.borderColor || e.color,
         layer: e.layer,
         x: yearToX(effectiveYear),
         tier: 0,
@@ -160,6 +163,7 @@ export function layoutLabels(
       title: e.title,
       description: e.description,
       color: e.color,
+      borderColor: e.borderColor || e.color,
       layer: e.layer,
       x: centerX,
       tier: 0,

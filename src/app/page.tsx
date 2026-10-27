@@ -43,7 +43,7 @@ const CANVAS_PREVIEW_EVENTS: CanvasPreviewEvent[] = [
     yearLabel: "3200 BCE",
     title: "Indus & Sumer Script",
     layer: "General",
-    color: "#d4786c",
+    color: "#c9a84c",
     tier: 0,
     x: 65,
     notes: "Earliest pictographic cuneiform and Harappan scripts marking the dawn of recorded civilization.",
@@ -56,7 +56,7 @@ const CANVAS_PREVIEW_EVENTS: CanvasPreviewEvent[] = [
     endYearLabel: "500 BCE",
     title: "Vedic Period",
     layer: "General",
-    color: "#e8a87c",
+    color: "#c9a84c",
     tier: 0,
     isSpan: true,
     startX: 170,
@@ -119,7 +119,7 @@ const CANVAS_PREVIEW_EVENTS: CanvasPreviewEvent[] = [
     yearLabel: "1969 CE",
     title: "Apollo 11 Landing",
     layer: "Modern",
-    color: "#3b82f6",
+    color: "#8b5cf6",
     tier: 1,
     x: 655,
     notes: "Humanity's first crewed lunar landing on the Sea of Tranquility, expanding civilization beyond Earth.",
@@ -334,7 +334,7 @@ export default function LandingPage() {
                   y1="34"
                   x2="170"
                   y2="140"
-                  stroke="#e8a87c"
+                  stroke="#c9a84c"
                   strokeWidth="1.2"
                   strokeDasharray="3 3"
                   opacity="0.45"
@@ -344,7 +344,7 @@ export default function LandingPage() {
                   y1="34"
                   x2="320"
                   y2="140"
-                  stroke="#e8a87c"
+                  stroke="#c9a84c"
                   strokeWidth="1.2"
                   strokeDasharray="3 3"
                   opacity="0.45"
@@ -356,7 +356,7 @@ export default function LandingPage() {
                   y1="24"
                   x2="320"
                   y2="24"
-                  stroke="#e8a87c"
+                  stroke="#c9a84c"
                   strokeWidth="2.5"
                   opacity="0.95"
                 />
@@ -366,7 +366,7 @@ export default function LandingPage() {
                   y1="24"
                   x2="170"
                   y2="34"
-                  stroke="#e8a87c"
+                  stroke="#c9a84c"
                   strokeWidth="2.5"
                   strokeLinecap="round"
                 />
@@ -376,7 +376,7 @@ export default function LandingPage() {
                   y1="24"
                   x2="320"
                   y2="34"
-                  stroke="#e8a87c"
+                  stroke="#c9a84c"
                   strokeWidth="2.5"
                   strokeLinecap="round"
                 />
@@ -389,10 +389,10 @@ export default function LandingPage() {
                   height="24"
                   rx="6"
                   className={selectedEventId === "ev-2" ? "fill-amber-500/20" : "fill-[#070c16]"}
-                  stroke="#e8a87c"
+                  stroke="#c9a84c"
                   strokeWidth={selectedEventId === "ev-2" ? "2.5" : "1.8"}
                   style={{
-                    filter: selectedEventId === "ev-2" ? "drop-shadow(0 0 8px #e8a87c)" : "none",
+                    filter: selectedEventId === "ev-2" ? "drop-shadow(0 0 8px #c9a84c)" : "none",
                   }}
                 />
                 <text

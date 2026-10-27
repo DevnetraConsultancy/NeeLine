@@ -11,18 +11,16 @@ import {
 } from "react";
 import { layoutLabels, formatDateLabel, formatSpanLabel, TIER_SPACING, LayoutItem } from "@/lib/timeline-layout";
 import { exportTimelineAsPng } from "@/components/PngExport";
-import { CANVAS_COLOR_PRESETS } from "@/types";
 import {
   ZoomIn,
   ZoomOut,
   Maximize2,
   Layers,
-  Plus,
-  Trash2,
   CheckSquare,
   Square,
   X,
   Sparkles,
+  SlidersHorizontal,
 } from "lucide-react";
 
 export interface LayerItem {
@@ -67,8 +65,7 @@ interface TimelineRendererProps {
   onToggleLayer?: (name: string) => void;
   onToggleAllLayers?: (all: boolean) => void;
   onIsolateLayer?: (name: string) => void;
-  onCreateLayer?: (name: string, color: string) => Promise<LayerItem>;
-  onDeleteLayer?: (id: string, name: string) => Promise<void> | void;
+  onOpenLayerSettings?: () => void;
   onEventClick: (event: EventData) => void;
   onBgClick?: (year: number, isBce: boolean) => void;
 }
@@ -95,8 +92,7 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       onToggleLayer,
       onToggleAllLayers,
       onIsolateLayer,
-      onCreateLayer,
-      onDeleteLayer,
+      onOpenLayerSettings,
       onEventClick,
     },
     ref
@@ -173,10 +169,6 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
 
   // Layers Popover Menu state
   const [showLayersMenu, setShowLayersMenu] = useState(false);
-  const [newPeriodName, setNewPeriodName] = useState("");
-  const [newPeriodColor, setNewPeriodColor] = useState("#38bdf8");
-  const [showAddPeriodInput, setShowAddPeriodInput] = useState(false);
-  const [creatingLayer, setCreatingLayer] = useState(false);
   const layersMenuRef = useRef<HTMLDivElement>(null);
 
   // Drag state
@@ -245,10 +237,6 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
   }, [layers]);
 
   // Set of lowercase colors currently taken by existing layers
-  const usedLayerColors = useMemo(() => {
-    return new Set(layers.map((l) => l.color.trim().toLowerCase()));
-  }, [layers]);
-
   // Count events per layer (normalized case-insensitive)
   const layerEventCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -963,24 +951,6 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
       return next;
     });
   }, []);
-
-  // Quick Layer Creation inside popover
-  async function handleCreatePeriod() {
-    const trimmed = newPeriodName.trim();
-    if (!trimmed || !onCreateLayer) return;
-    // Disallow duplicate layer color
-    if (usedLayerColors.has(newPeriodColor.trim().toLowerCase())) {
-      return;
-    }
-    setCreatingLayer(true);
-    try {
-      await onCreateLayer(trimmed, newPeriodColor);
-      setNewPeriodName("");
-      setShowAddPeriodInput(false);
-    } finally {
-      setCreatingLayer(false);
-    }
-  }
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -1906,110 +1876,29 @@ const TimelineRenderer = forwardRef<TimelineRendererHandle, TimelineRendererProp
                         <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 opacity-70">
                           {count}
                         </span>
-
-                        {onDeleteLayer && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDeleteLayer(layer.id, layer.name);
-                            }}
-                            className="p-1 opacity-0 group-hover:opacity-100 hover:text-rose-500 rounded transition-opacity cursor-pointer"
-                            title={`Permanently delete ${layer.name} layer and all its events`}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        )}
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Add New Period Section */}
-              <div className="mt-2.5 pt-2.5 border-t border-black/[0.08] dark:border-white/[0.08]">
-                {showAddPeriodInput ? (
-                  <div className="space-y-2">
-                    <input
-                      type="text"
-                      value={newPeriodName}
-                      onChange={(e) => setNewPeriodName(e.target.value)}
-                      placeholder="Period name (e.g. Bronze Age)"
-                      className="w-full px-2.5 py-1.5 rounded-lg theme-input text-xs font-mono outline-none focus:ring-1 focus:ring-[#c9a84c]"
-                      autoFocus
-                    />
-
-                    {/* 16 Curated Color Presets (Unique colors enforced, no custom colors) */}
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-[10px] font-mono theme-text-muted">
-                        <span>Layer Color (16 Presets)</span>
-                        <span className="text-[9px] opacity-60">Distinct only</span>
-                      </div>
-                      <div className="grid grid-cols-8 gap-1.5 p-1.5 rounded-lg bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10">
-                        {CANVAS_COLOR_PRESETS.map((c) => {
-                          const isUsed = usedLayerColors.has(c.hex.toLowerCase());
-                          const isSelected = newPeriodColor.toLowerCase() === c.hex.toLowerCase();
-                          return (
-                            <button
-                              key={c.hex}
-                              type="button"
-                              disabled={isUsed}
-                              onClick={() => setNewPeriodColor(c.hex)}
-                              title={isUsed ? `${c.label} (Already used by another layer)` : c.label}
-                              className={`w-4 h-4 rounded-full transition-all relative flex items-center justify-center ${
-                                isUsed
-                                  ? "opacity-20 cursor-not-allowed grayscale"
-                                  : isSelected
-                                  ? "ring-2 ring-[#c9a84c] ring-offset-1 ring-offset-white dark:ring-offset-[#131c2e] scale-110 shadow-sm cursor-pointer"
-                                  : "hover:scale-110 opacity-80 hover:opacity-100 cursor-pointer"
-                              }`}
-                              style={{ backgroundColor: c.hex }}
-                            >
-                              {isUsed && (
-                                <span className="text-[7px] text-white font-bold leading-none select-none">✕</span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 justify-end">
-                      <button
-                        onClick={() => setShowAddPeriodInput(false)}
-                        className="px-2.5 py-1 rounded-lg theme-pill text-[11px] font-mono cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleCreatePeriod}
-                        disabled={
-                          creatingLayer ||
-                          !newPeriodName.trim() ||
-                          usedLayerColors.has(newPeriodColor.toLowerCase())
-                        }
-                        className="btn-gold px-3 py-1 rounded-lg text-[11px] font-mono font-semibold cursor-pointer disabled:opacity-50"
-                      >
-                        {creatingLayer ? "Adding..." : "Add Layer"}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
+              {/* Manage Layers & Settings Hub */}
+              {onOpenLayerSettings && (
+                <div className="mt-2.5 pt-2 border-t border-black/[0.08] dark:border-white/[0.08]">
                   <button
+                    type="button"
                     onClick={() => {
-                      const firstFree = CANVAS_COLOR_PRESETS.find(
-                        (p) => !usedLayerColors.has(p.hex.toLowerCase())
-                      );
-                      setNewPeriodColor(firstFree ? firstFree.hex : CANVAS_COLOR_PRESETS[0].hex);
-                      setShowAddPeriodInput(true);
+                      setShowLayersMenu(false);
+                      onOpenLayerSettings();
                     }}
-                    className="w-full py-1.5 px-2 rounded-xl text-xs font-mono text-[#c9a84c] hover:bg-[#c9a84c]/10 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    className="w-full py-1.5 px-2 rounded-xl text-xs font-mono text-[#c9a84c] hover:bg-[#c9a84c]/10 flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-[#c9a84c]/30 font-medium"
+                    title="Open Layer Settings (Add, Reorder, Rename, Color Schemes)"
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>New Period / Layer</span>
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                    <span>Manage Layers & Settings</span>
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           )}
         </div>

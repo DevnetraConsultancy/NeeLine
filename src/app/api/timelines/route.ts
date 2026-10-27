@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
             year: 0,
             isBce: false,
             title: "Year Zero",
-            description: description || null,
+            description: serializeEventMetadata({ layer: "General" }, description || null),
             color: "#c9a84c",
           },
         },

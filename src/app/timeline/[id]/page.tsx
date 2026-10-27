@@ -7,7 +7,7 @@ import Navbar from "@/components/Navbar";
 import TimelineRenderer, { LayerItem, TimelineRendererHandle } from "@/components/TimelineRenderer";
 import { CANVAS_COLOR_PRESETS } from "@/types";
 import EventForm, { EventFormData } from "@/components/EventForm";
-import TimelineSettings from "@/components/TimelineSettings";
+import LayerSettingsModal from "@/components/LayerSettingsModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import ImportModal from "@/components/ImportModal";
 import ExportJsonModal from "@/components/ExportJsonModal";
@@ -17,7 +17,7 @@ import { exportTimelineAsPng, exportTimelineAsTxt } from "@/components/PngExport
 import {
   ChevronLeft,
   Plus,
-  Settings2,
+  SlidersHorizontal,
   Download,
   Upload,
   Image as ImageIcon,
@@ -293,8 +293,8 @@ export default function TimelinePage() {
         }
       }
 
-      // Fallback: if no layers at all and no events exist, initialize with General
-      if (fetchedLayers.length === 0 && fetchedEvents.length === 0) {
+      // Ensure "General" is always present as the default foundational layer
+      if (!fetchedLayers.some((l) => l.name.toLowerCase() === "general")) {
         fetchedLayers.unshift({ id: "layer-general", name: "General", color: CANVAS_COLOR_PRESETS[0].hex });
       }
 
@@ -514,85 +514,190 @@ export default function TimelinePage() {
     [timelineId, layers]
   );
 
-  // Delete layer state and execution
-  const [layerToDelete, setLayerToDelete] = useState<{ id: string; name: string } | null>(null);
-  const [deletingLayer, setDeletingLayer] = useState(false);
-
-  // Triggered when user clicks trash icon in Layers dropdown
-  const handleDeleteLayer = useCallback(
-    async (id: string, name: string) => {
-      const trimmed = name.trim();
-      if (!trimmed) return;
-      setLayerToDelete({ id, name: trimmed });
+  // Reorder layers (Layer up / down)
+  const handleMoveLayer = useCallback(
+    (index: number, direction: "up" | "down") => {
+      setLayers((prev) => {
+        const targetIndex = direction === "up" ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= prev.length) return prev;
+        const next = [...prev];
+        const [moved] = next.splice(index, 1);
+        next.splice(targetIndex, 0, moved);
+        localStorage.setItem(`neeline_layers_${timelineId}`, JSON.stringify(next));
+        return next;
+      });
     },
-    []
+    [timelineId]
   );
 
-  const executeDeleteLayer = useCallback(async () => {
-    if (!layerToDelete) return;
-    const { name } = layerToDelete;
-    const lowerName = name.trim().toLowerCase();
-    setDeletingLayer(true);
-
-    try {
-      const res = await fetch(
-        `/api/layers?timelineId=${timelineId}&name=${encodeURIComponent(name)}`,
-        { method: "DELETE" }
-      );
-      if (!res.ok) {
-        console.error("Failed to delete layer on backend, status:", res.status);
+  // Rename layer across timeline and events
+  const handleRenameLayer = useCallback(
+    async (oldName: string, newName: string) => {
+      const trimmed = newName.trim();
+      if (!trimmed || trimmed.toLowerCase() === oldName.trim().toLowerCase()) return;
+      if (layers.some((l) => l.name.toLowerCase() === trimmed.toLowerCase())) {
+        throw new Error(`A layer named "${trimmed}" already exists.`);
       }
-    } catch (err) {
-      console.warn("Failed to delete layer on backend", err);
-    } finally {
-      setDeletingLayer(false);
-      setLayerToDelete(null);
-    }
 
-    // 1. Permanently delete all events and periods belonging to this layer from client state
-    setEvents((prev) =>
-      prev.filter((e) => {
-        const currentLyr = ((e.layer && e.layer.trim()) || "General").toLowerCase();
-        return currentLyr !== lowerName;
-      })
-    );
+      // 1. Update layers state and cache
+      setLayers((prev) => {
+        const next = prev.map((l) =>
+          l.name.toLowerCase() === oldName.trim().toLowerCase() ? { ...l, name: trimmed } : l
+        );
+        localStorage.setItem(`neeline_layers_${timelineId}`, JSON.stringify(next));
+        return next;
+      });
 
-    // 2. Remove from layers state and localStorage
-    setLayers((prev) => {
-      const updated = prev.filter((l) => l.name.trim().toLowerCase() !== lowerName);
-      localStorage.setItem(`neeline_layers_${timelineId}`, JSON.stringify(updated));
-      return updated;
-    });
+      // 2. Update activeLayerNames
+      setActiveLayerNames((prev) => {
+        const next = prev.map((n) =>
+          n.toLowerCase() === oldName.trim().toLowerCase() ? trimmed : n
+        );
+        localStorage.setItem(`neeline_active_layers_${timelineId}`, JSON.stringify(next));
+        return next;
+      });
 
-    // 3. Remove from activeLayerNames and localStorage
-    setActiveLayerNames((prev) => {
-      const remaining = prev.filter((n) => n.trim().toLowerCase() !== lowerName);
-      localStorage.setItem(`neeline_active_layers_${timelineId}`, JSON.stringify(remaining));
-      return remaining;
-    });
+      // 3. Update events in memory
+      setEvents((prev) =>
+        prev.map((ev) => {
+          const currentLyr = ((ev.layer && ev.layer.trim()) || "General").toLowerCase();
+          if (currentLyr === oldName.trim().toLowerCase()) {
+            return { ...ev, layer: trimmed };
+          }
+          return ev;
+        })
+      );
 
-    // 4. Purge any actions referring to this deleted layer from undo/redo stacks
-    setUndoStack((prev) =>
-      prev.filter((act) => {
-        if ("event" in act && act.event) {
-          const l = ((act.event.layer && act.event.layer.trim()) || "General").toLowerCase();
-          return l !== lowerName;
-        }
-        return true;
-      })
-    );
-    setRedoStack((prev) =>
-      prev.filter((act) => {
-        if ("event" in act && act.event) {
-          const l = ((act.event.layer && act.event.layer.trim()) || "General").toLowerCase();
-          return l !== lowerName;
-        }
-        return true;
-      })
-    );
+      // 4. Update on backend API
+      try {
+        await fetch("/api/layers", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            timelineId,
+            oldName: oldName.trim(),
+            newName: trimmed,
+          }),
+        });
+        setNoticeMessage(`Layer successfully renamed to "${trimmed}".`);
+      } catch (err) {
+        console.warn("Failed to persist layer rename to backend", err);
+      }
+    },
+    [timelineId, layers]
+  );
 
-    setNoticeMessage(`Layer "${name}" and all associated events were permanently deleted.`);
-  }, [layerToDelete, timelineId]);
+  // Change layer color scheme
+  const handleChangeLayerColor = useCallback(
+    async (layerName: string, newColor: string) => {
+      setLayers((prev) => {
+        const next = prev.map((l) =>
+          l.name.toLowerCase() === layerName.toLowerCase() ? { ...l, color: newColor } : l
+        );
+        localStorage.setItem(`neeline_layers_${timelineId}`, JSON.stringify(next));
+        return next;
+      });
+
+      try {
+        await fetch("/api/layers", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            timelineId,
+            oldName: layerName.trim(),
+            color: newColor,
+          }),
+        });
+      } catch (err) {
+        console.warn("Failed to persist layer color change to backend", err);
+      }
+    },
+    [timelineId]
+  );
+
+  // Delete layer with choice: Delete all events OR keep events (move to General)
+  const handleDeleteLayerWithOption = useCallback(
+    async (layerName: string, deleteEvents: boolean) => {
+      const trimmed = layerName.trim();
+      const lowerName = trimmed.toLowerCase();
+      if (!trimmed || lowerName === "general") {
+        throw new Error("The default 'General' layer cannot be deleted.");
+      }
+
+      // 1. Send DELETE to backend
+      try {
+        await fetch(
+          `/api/layers?timelineId=${timelineId}&name=${encodeURIComponent(trimmed)}&deleteEvents=${deleteEvents}`,
+          { method: "DELETE" }
+        );
+      } catch (err) {
+        console.warn("Failed to delete layer on backend", err);
+      }
+
+      // 2. Update events in memory
+      if (deleteEvents) {
+        setEvents((prev) =>
+          prev.filter((e) => {
+            const currentLyr = ((e.layer && e.layer.trim()) || "General").toLowerCase();
+            return currentLyr !== lowerName;
+          })
+        );
+      } else {
+        setEvents((prev) =>
+          prev.map((e) => {
+            const currentLyr = ((e.layer && e.layer.trim()) || "General").toLowerCase();
+            if (currentLyr === lowerName) {
+              return { ...e, layer: "General" };
+            }
+            return e;
+          })
+        );
+      }
+
+      // 3. Remove from layers state and cache
+      setLayers((prev) => {
+        const next = prev.filter((l) => l.name.trim().toLowerCase() !== lowerName);
+        localStorage.setItem(`neeline_layers_${timelineId}`, JSON.stringify(next));
+        return next;
+      });
+
+      // 4. Remove from activeLayerNames
+      setActiveLayerNames((prev) => {
+        const next = prev.filter((n) => n.trim().toLowerCase() !== lowerName);
+        localStorage.setItem(`neeline_active_layers_${timelineId}`, JSON.stringify(next));
+        return next;
+      });
+
+      // 5. Purge undo/redo
+      if (deleteEvents) {
+        setUndoStack((prev) =>
+          prev.filter((act) => {
+            if ("event" in act && act.event) {
+              const l = ((act.event.layer && act.event.layer.trim()) || "General").toLowerCase();
+              return l !== lowerName;
+            }
+            return true;
+          })
+        );
+        setRedoStack((prev) =>
+          prev.filter((act) => {
+            if ("event" in act && act.event) {
+              const l = ((act.event.layer && act.event.layer.trim()) || "General").toLowerCase();
+              return l !== lowerName;
+            }
+            return true;
+          })
+        );
+      }
+
+      setNoticeMessage(
+        deleteEvents
+          ? `Layer "${trimmed}" and all its events were permanently deleted.`
+          : `Layer "${trimmed}" was deleted. All associated events were safely moved to "General".`
+      );
+    },
+    [timelineId]
+  );
 
   // Save event (create or update, supports point milestones and horizontal bracket periods)
   const handleSaveEvent = useCallback(
@@ -683,38 +788,6 @@ export default function TimelinePage() {
     setEditingEvent(null);
     fetchData();
   }, [editingEvent, pushAction, fetchData]);
-
-  // Save colors
-  const handleSaveColors = useCallback(
-    async (colors: {
-      bgColor: string;
-      spineColor: string;
-      tickColor: string;
-      textColor: string;
-    }) => {
-      if (!timeline) return;
-      const before = {
-        bgColor: timeline.bgColor,
-        spineColor: timeline.spineColor,
-        tickColor: timeline.tickColor,
-        textColor: timeline.textColor,
-      };
-      await fetch(`/api/timelines?id=${timelineId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(colors),
-      });
-      pushAction({
-        type: "SETTINGS",
-        description: "Updated canvas colors",
-        before,
-        after: colors,
-      });
-      setTimeline((prev) => (prev ? { ...prev, ...colors } : null));
-      fetchData();
-    },
-    [timeline, timelineId, pushAction, fetchData]
-  );
 
   // Rename timeline
   const handleRename = useCallback(async () => {
@@ -1299,18 +1372,14 @@ export default function TimelinePage() {
             )}
           </div>
 
-          {/* 2. Canvas Settings Small Icon Button (Beside Import/Export on the right) */}
+          {/* 2. Layer Settings Button */}
           <button
             onClick={() => setShowSettings(true)}
-            className="w-8 h-8 rounded-lg theme-pill hover:border-[#c9a84c]/50 flex items-center justify-center cursor-pointer relative transition-all"
-            title="Canvas Settings (Colors, Theme & Gap Year Borders)"
-            aria-label="Canvas Settings"
+            className="w-8 h-8 rounded-lg theme-pill hover:border-[#c9a84c]/50 flex items-center justify-center cursor-pointer relative transition-all text-[#c9a84c]"
+            title="Layer Settings (Add, Reorder, Rename, Color Schemes)"
+            aria-label="Layer Settings"
           >
-            <Settings2 className="w-3.5 h-3.5 text-[#c9a84c]" />
-            <div
-              className="w-1.5 h-1.5 rounded-full absolute bottom-1.5 right-1.5 ring-1 ring-black/20 dark:ring-[#070c16]"
-              style={{ backgroundColor: timeline.spineColor }}
-            />
+            <SlidersHorizontal className="w-3.5 h-3.5" />
           </button>
 
           {/* 3. Eye Toggle: Vanish / Show all buttons above canvas area */}
@@ -1372,8 +1441,7 @@ export default function TimelinePage() {
           onToggleLayer={handleToggleLayer}
           onToggleAllLayers={handleToggleAllLayers}
           onIsolateLayer={handleIsolateLayer}
-          onCreateLayer={handleCreateLayer}
-          onDeleteLayer={handleDeleteLayer}
+          onOpenLayerSettings={() => setShowSettings(true)}
           onEventClick={(event) => {
             setEditingEvent(event);
             setShowEventForm(true);
@@ -1426,16 +1494,21 @@ export default function TimelinePage() {
         />
       )}
 
-      {/* Canvas Settings Modal */}
+      {/* Layer Settings & Management Hub */}
       {showSettings && (
-        <TimelineSettings
-          bgColor={canvasColors.bg}
-          spineColor={canvasColors.spine}
-          tickColor={canvasColors.tick}
-          textColor={canvasColors.text}
+        <LayerSettingsModal
+          layers={layers}
+          events={events}
+          activeLayerNames={activeLayerNames}
+          onToggleLayer={handleToggleLayer}
+          onToggleAllLayers={handleToggleAllLayers}
+          onMoveLayer={handleMoveLayer}
+          onRenameLayer={handleRenameLayer}
+          onChangeLayerColor={handleChangeLayerColor}
+          onCreateLayer={handleCreateLayer}
+          onDeleteLayerWithOption={handleDeleteLayerWithOption}
           showGapBorder={showGapBorder}
           onToggleGapBorder={handleToggleGapBorder}
-          onSave={handleSaveColors}
           onClose={() => setShowSettings(false)}
         />
       )}
@@ -1495,25 +1568,6 @@ export default function TimelinePage() {
       <JsonSchemaModal
         isOpen={showJsonSchemaModal}
         onClose={() => setShowJsonSchemaModal(false)}
-      />
-
-      {/* Confirmation Modal for Layer Deletion */}
-      <ConfirmModal
-        isOpen={layerToDelete !== null}
-        title="Delete Historical Period Layer"
-        message={
-          layerToDelete
-            ? `Are you sure you want to delete the "${layerToDelete.name}" layer? All milestones and bracket span periods belonging to this layer will be permanently deleted from the database.`
-            : ""
-        }
-        confirmLabel="Delete Permanently"
-        cancelLabel="Cancel"
-        isDestructive={true}
-        isLoading={deletingLayer}
-        onConfirm={executeDeleteLayer}
-        onClose={() => {
-          if (!deletingLayer) setLayerToDelete(null);
-        }}
       />
 
       {/* In-Viewport Notification / Error Modal */}

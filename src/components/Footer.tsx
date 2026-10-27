@@ -34,7 +34,7 @@ export default function Footer() {
           );
         }
       } catch {
-        // fallback to empty
+        // fallback
       }
     }
   }, []);
@@ -229,9 +229,9 @@ export default function Footer() {
         </div>
 
         {/* Compact Status & Copyright Row */}
-        <div className="pt-6 flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-mono theme-text-muted">
+        <div className="pt-6 flex flex-col lg:flex-row items-center justify-between gap-4 text-xs font-mono theme-text-muted">
           {/* Left: Copyright & Academic Partner */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-center md:text-left">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-center lg:text-left">
             <span>© {currentYear} NeeLine · Number Line Visualizer</span>
             <span className="opacity-40 hidden sm:inline">|</span>
             <span className="font-medium text-slate-700 dark:text-slate-300">
@@ -239,24 +239,22 @@ export default function Footer() {
             </span>
           </div>
 
-          {/* Right: Release status badge & build update */}
-          <div className="flex items-center gap-3 flex-wrap justify-center">
-            <span className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md theme-pill text-[11px]">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />
+          {/* Right: Release status badge & build update in a clean, professional unified block/box */}
+          <div className="flex items-center">
+            <div className="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-xl liquid-glass border border-emerald-500/25 shadow-sm text-xs font-mono">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse shrink-0" />
               <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                 Production Release
               </span>
-            </span>
-
-            {buildTime && (
-              <span className="text-[11px] opacity-75 hidden lg:inline">
-                Build: {buildTime}
+              <span className="opacity-30">·</span>
+              <span className="theme-text-muted">
+                Build: {buildTime || "Oct 27, 2026, 11:45 AM GMT+5:30"}
               </span>
-            )}
-
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.06] text-slate-500 dark:text-slate-400">
-              v0.1.0
-            </span>
+              <span className="opacity-30">·</span>
+              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">
+                v0.1.0
+              </span>
+            </div>
           </div>
         </div>
       </div>

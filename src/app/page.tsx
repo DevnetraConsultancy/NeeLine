@@ -15,7 +15,6 @@ import {
   User,
   Clock,
   ChevronRight,
-  Film,
   Landmark,
 } from "lucide-react";
 
@@ -144,28 +143,6 @@ export default function LandingPage() {
   const router = useRouter();
   const [guestLoading, setGuestLoading] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string>("ev-3"); // Default to Bhagwan Mahavira
-  const [hasVideoSource, setHasVideoSource] = useState(false);
-
-  // Check for promotional video presence from environment or static public file
-  useEffect(() => {
-    const customUrl = process.env.NEXT_PUBLIC_PROMO_VIDEO_URL;
-    if (customUrl) {
-      setHasVideoSource(true);
-      return;
-    }
-
-    fetch("/videos/promo.mp4", { method: "HEAD" })
-      .then((res) => {
-        if (res.ok && res.headers.get("content-type")?.includes("video")) {
-          setHasVideoSource(true);
-        } else {
-          setHasVideoSource(false);
-        }
-      })
-      .catch(() => {
-        setHasVideoSource(false);
-      });
-  }, []);
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -225,54 +202,11 @@ export default function LandingPage() {
 
         {/* Subtitle */}
         <p
-          className="text-base sm:text-lg md:text-xl theme-text-muted text-center max-w-2xl leading-relaxed mb-8 font-light"
+          className="text-base sm:text-lg md:text-xl theme-text-muted text-center max-w-2xl leading-relaxed mb-10 font-light"
           style={{ fontFamily: "var(--font-body)" }}
         >
           An algorithmic, horizontal time canvas designed for scholars, researchers, and curious minds. Map deep time from ancient antiquity to the modern era with mathematical precision.
         </p>
-
-        {/* ========================================================
-            LARGE PROMOTIONAL VIDEO VIEWPORT (Under Hero Title)
-            ======================================================== */}
-        <div className="w-full max-w-5xl rounded-2xl sm:rounded-3xl overflow-hidden liquid-glass p-2 sm:p-2.5 mb-10 shadow-2xl relative">
-          {hasVideoSource ? (
-            <video
-              src={process.env.NEXT_PUBLIC_PROMO_VIDEO_URL || "/videos/promo.mp4"}
-              controls
-              playsInline
-              preload="metadata"
-              className="w-full aspect-[16/9] sm:aspect-[21/9] object-cover rounded-xl sm:rounded-2xl bg-black"
-            />
-          ) : (
-            /* Clean, elegant placeholder frame ready for /public/videos/promo.mp4 */
-            <div className="w-full aspect-[16/9] sm:aspect-[21/9] rounded-xl sm:rounded-2xl bg-gradient-to-tr from-[#0a1122] via-[#070c16] to-[#0d182e] border border-black/10 dark:border-white/[0.08] flex flex-col items-center justify-center p-6 text-center relative overflow-hidden select-none">
-              <div
-                className="absolute inset-0 pointer-events-none opacity-20"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(to right, rgba(201, 168, 76, 0.15) 1px, transparent 1px), linear-gradient(to bottom, rgba(201, 168, 76, 0.15) 1px, transparent 1px)",
-                  backgroundSize: "36px 36px",
-                }}
-              />
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#c9a84c]/15 border border-[#c9a84c]/30 flex items-center justify-center text-[#c9a84c] mb-3 shadow-[0_0_24px_rgba(201,168,76,0.3)] z-10">
-                <Film className="w-7 h-7 sm:w-8 sm:h-8" />
-              </div>
-              <h4
-                className="text-base sm:text-lg font-bold text-white mb-1 z-10"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                Promotional Video Viewport
-              </h4>
-              <p className="text-xs text-slate-400 font-mono max-w-md z-10">
-                Place your video in{" "}
-                <code className="text-[#c9a84c] bg-[#c9a84c]/15 px-1.5 py-0.5 rounded font-semibold">
-                  /public/videos/promo.mp4
-                </code>{" "}
-                or set <code className="text-[#c9a84c] bg-[#c9a84c]/15 px-1.5 py-0.5 rounded font-semibold">NEXT_PUBLIC_PROMO_VIDEO_URL</code>
-              </p>
-            </div>
-          )}
-        </div>
 
         {/* Auth CTA Card - Liquid Glass */}
         <div className="w-full max-w-md p-6 sm:p-8 rounded-3xl liquid-glass relative mb-16 shadow-2xl">
@@ -655,7 +589,7 @@ export default function LandingPage() {
         </div>
 
         {/* ========================================================
-            CLOSING CTA BANNER (FIXED: Liquid Glass in Light & Dark)
+            CLOSING CTA BANNER (Liquid Glass in Light & Dark)
             ======================================================== */}
         <div className="w-full max-w-5xl p-8 sm:p-12 rounded-3xl liquid-glass relative text-center mb-16 overflow-hidden shadow-2xl border border-black/10 dark:border-[#c9a84c]/25">
           <div className="relative z-10 max-w-2xl mx-auto space-y-4">

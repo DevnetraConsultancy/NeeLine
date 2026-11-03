@@ -13,7 +13,8 @@
     "db:migrate": "prisma migrate deploy",
     "db:backfill": "tsx prisma/scripts/backfill-metadata.ts",
     "typecheck": "tsc --noEmit",
-    "test:e2e": "next build && playwright test"
+    "test:e2e": "next build && playwright test",
+    "db:deploy": "tsx prisma/scripts/deploy-migrate.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",

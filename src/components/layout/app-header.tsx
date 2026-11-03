@@ -13,7 +13,7 @@ import { cn } from "@/lib/cn";
 
 export function AppHeader({ children, className }: { children?: ReactNode; className?: string }) {
   return (
-    <header className={cn("glass sticky top-0 z-40 rounded-none border-x-0 border-t-0", className)}>
+    <header className={cn("glass glass-blur sticky top-0 z-40 rounded-none border-x-0 border-t-0", className)}>
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-2 px-4 sm:px-6">
         <BrandLink />
         <div className="flex-1">{children}</div>

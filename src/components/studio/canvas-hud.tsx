@@ -37,7 +37,7 @@ export function CanvasHud(props: HudProps) {
         <Segmented<LayoutMode>
           label="Spacing"
           size="sm"
-          className="glass"
+          className="glass glass-blur"
           value={mode}
           onChange={onModeChange}
           options={[
@@ -51,7 +51,7 @@ export function CanvasHud(props: HudProps) {
         <LayersPopover {...props} />
       </div>
 
-      <div className={cn("glass absolute bottom-3 right-3 z-10 flex items-center gap-1 rounded-lg p-1 transition-opacity duration-200", hiddenClass)} inert={!visible}>
+      <div className={cn("glass glass-blur absolute bottom-3 right-3 z-10 flex items-center gap-1 rounded-lg p-1 transition-opacity duration-200", hiddenClass)} inert={!visible}>
         <IconButton icon={ZoomOut} label="Zoom out (-)" size="sm" onClick={onZoomOut} />
         <IconButton icon={ZoomIn} label="Zoom in (+)" size="sm" onClick={onZoomIn} />
         <span className="mx-1 h-4 w-px bg-line" aria-hidden />
@@ -61,7 +61,7 @@ export function CanvasHud(props: HudProps) {
       </div>
 
       <div
-        className={cn("glass pointer-events-none absolute bottom-3 left-3 z-10 flex items-center gap-3 rounded-lg px-3 py-1.5 text-xs font-medium tabular-nums text-fg-muted transition-opacity duration-200", hiddenClass)}
+        className={cn("glass glass-blur pointer-events-none absolute bottom-3 left-3 z-10 flex items-center gap-3 rounded-lg px-3 py-1.5 text-xs font-medium tabular-nums text-fg-muted transition-opacity duration-200", hiddenClass)}
         aria-hidden
       >
         <span>Zoom {zoomPercent.toLocaleString("en-US")}%</span>

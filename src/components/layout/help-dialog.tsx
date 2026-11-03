@@ -53,6 +53,7 @@ export function HelpDialog() {
       >
         <Tabs<HelpTab>
           label="Guide sections"
+          panelId="help-panel"
           value={tab}
           onChange={setTab}
           items={[
@@ -61,7 +62,7 @@ export function HelpDialog() {
             { value: "about", label: "About" },
           ]}
         />
-        <TabPanel className="mt-5">
+        <TabPanel id="help-panel" className="mt-5 outline-none">
           {tab === "shortcuts" && (
             <div className="grid gap-6">
               <ShortcutList title="Keyboard and mouse" rows={SHORTCUTS} />

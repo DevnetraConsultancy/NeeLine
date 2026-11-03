@@ -180,7 +180,7 @@ export function Studio({ timelineId }: { timelineId: string }) {
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
       <AppHeader />
-      <div className="glass z-30 rounded-none border-x-0 border-t-0">
+      <div className="glass glass-blur z-30 rounded-none border-x-0 border-t-0">
         <div className="flex min-h-14 flex-wrap items-center gap-2 px-3 py-2 sm:px-4">
           <Link href="/dashboard" aria-label="Back to dashboard" className="flex size-10 items-center justify-center rounded-md text-fg-muted hover:bg-surface-hover hover:text-fg">
             <ArrowLeft className="size-4" aria-hidden />
@@ -303,9 +303,9 @@ function SaveIndicator({ state }: { state: SaveState }) {
   }[state];
   const Icon = content.icon ?? CircleDashed;
   return (
-    <span role="status" className={`hidden items-center gap-1.5 text-xs font-medium sm:inline-flex ${content.className}`}>
+    <span role="status" title={content.text} className={`inline-flex items-center gap-1.5 text-xs font-medium ${content.className}`}>
       <Icon className="size-3.5" aria-hidden />
-      {content.text}
+      <span className="sr-only sm:not-sr-only">{content.text}</span>
     </span>
   );
 }

@@ -45,7 +45,7 @@ export function LandingPreview() {
           <line x1={30} x2={770} y1={SPINE_Y} y2={SPINE_Y} stroke="var(--canvas-spine)" strokeWidth={2.5} />
           {EVENTS.map((e) => {
             const active = e.id === selectedId;
-            const choose = { role: "button", tabIndex: 0, "aria-pressed": active, "aria-label": `${e.title}, ${e.span?.label ?? e.label}`, onClick: () => setSelectedId(e.id), onKeyDown: (k: React.KeyboardEvent) => (k.key === "Enter" || k.key === " ") && (k.preventDefault(), setSelectedId(e.id)), style: { cursor: "pointer", outline: "none" }, className: "[&:focus-visible_.ring]:opacity-100" } as const;
+            const choose = { role: "button", tabIndex: 0, "aria-pressed": active, onClick: () => setSelectedId(e.id), onKeyDown: (k: React.KeyboardEvent) => (k.key === "Enter" || k.key === " ") && (k.preventDefault(), setSelectedId(e.id)), style: { cursor: "pointer", outline: "none" }, className: "[&:focus-visible_.ring]:opacity-100" } as const;
             if (e.span) {
               const y = 24;
               const w = 110;

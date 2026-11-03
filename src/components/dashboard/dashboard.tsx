@@ -91,6 +91,7 @@ export function Dashboard() {
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Tabs<Tab>
             label="Timeline lists"
+            panelId="timeline-list"
             value={tab}
             onChange={setTab}
             items={[
@@ -104,7 +105,7 @@ export function Dashboard() {
           </div>
         </div>
 
-        <TabPanel className="mt-6">
+        <TabPanel id="timeline-list" className="mt-6 outline-none">
           {loadError ? (
             <ErrorState title="Your timelines could not be loaded" description={loadError} action={<Button variant="primary" onClick={load}>Try again</Button>} />
           ) : filtered === null ? (

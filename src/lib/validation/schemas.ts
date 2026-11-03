@@ -2,6 +2,9 @@ import { z } from "zod";
 import { MAX_YEAR, compareDates, validateDate, type HistoricalDate } from "@/lib/domain/dates";
 import { MAX_LAYER_NAME_LENGTH } from "@/lib/domain/layers";
 
+// The CSP forbids eval; stop zod from probing for it (which logs a violation).
+z.config({ jitless: true });
+
 /**
  * One set of rules for the browser forms and the API. The API re-validates
  * everything; client checks exist only to give faster, friendlier feedback.

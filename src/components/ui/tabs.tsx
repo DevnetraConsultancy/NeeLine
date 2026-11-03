@@ -16,11 +16,13 @@ interface TabsProps<T extends string> {
   value: T;
   items: ReadonlyArray<TabItem<T>>;
   onChange: (value: T) => void;
+  /** id of the TabPanel these tabs control. */
+  panelId: string;
   className?: string;
 }
 
 /** WAI-ARIA tabs: arrow keys move between tabs, Home/End jump to the ends. */
-export function Tabs<T extends string>({ label, value, items, onChange, className }: TabsProps<T>) {
+export function Tabs<T extends string>({ label, value, items, onChange, panelId, className }: TabsProps<T>) {
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
   const baseId = useId();
 
@@ -52,7 +54,7 @@ export function Tabs<T extends string>({ label, value, items, onChange, classNam
             type="button"
             role="tab"
             aria-selected={selected}
-            aria-controls={`${baseId}-panel`}
+            aria-controls={panelId}
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(item.value)}
             onKeyDown={(e) => onKeyDown(e, index)}
@@ -75,9 +77,9 @@ export function Tabs<T extends string>({ label, value, items, onChange, classNam
   );
 }
 
-export function TabPanel({ children, className }: { children: ReactNode; className?: string }) {
+export function TabPanel({ id, labelledBy, children, className }: { id: string; labelledBy?: string; children: ReactNode; className?: string }) {
   return (
-    <div role="tabpanel" className={className}>
+    <div id={id} role="tabpanel" aria-labelledby={labelledBy} tabIndex={0} className={className}>
       {children}
     </div>
   );

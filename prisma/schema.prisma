@@ -17,8 +17,14 @@ model User {
   accounts      Account[]
   sessions      Session[]
   timelines     Timeline[]
+  /// Guest accounts are deleted after 30 days without activity.
+  isGuest       Boolean   @default(false)
+  /// Updated at most once a day while the user is active.
+  lastActiveAt  DateTime  @default(now())
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+
+  @@index([isGuest, lastActiveAt])
 }
 
 model Account {
@@ -61,44 +67,92 @@ model VerificationToken {
 // ─── NeeLine custom models ───────────────────────────────────────
 
 model Timeline {
-  id         String    @id @default(cuid())
-  userId     String
-  name       String
-  deletedAt  DateTime?
+  id          String    @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  deletedAt   DateTime?
 
-  // Per-timeline color customization (hex colors)
-  bgColor    String    @default("#0a1628")
-  spineColor String    @default("#c9a84c")
-  tickColor  String    @default("#c9a84c")
-  textColor  String    @default("#f5f0e8")
+  /// Canvas colours. Null means "follow the app theme"; the app always writes
+  /// these explicitly. The column defaults are the old values, kept so the
+  /// previous release keeps working while the migration rolls out.
+  bgColor     String?   @default("#0a1628")
+  spineColor  String?   @default("#c9a84c")
+  tickColor   String?   @default("#c9a84c")
+  textColor   String?   @default("#f5f0e8")
 
-  events     Event[]
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events      Event[]
+  layers      Layer[]
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([userId])
   @@index([userId, deletedAt])
 }
 
+model Layer {
+  id         String   @id @default(cuid())
+  timelineId String
+  name       String
+  /// Lower-cased, trimmed name; layer names are unique per timeline ignoring case.
+  nameKey    String
+  color      String
+  position   Int
+  visible    Boolean  @default(true)
+  /// The "General" layer every timeline has; it cannot be renamed or deleted.
+  isDefault  Boolean  @default(false)
+
+  timeline   Timeline @relation(fields: [timelineId], references: [id], onDelete: Cascade)
+  events     Event[]
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([timelineId, nameKey])
+  @@index([timelineId, position])
+}
+
 model Event {
-  id          String   @id @default(cuid())
-  timelineId  String
-  year        Int
-  isBce       Boolean  @default(false)
-  month       Int?
-  day         Int?
-  title       String
-  description String?
-  color       String   @default("#c9a84c")
+  id                String   @id @default(cuid())
+  timelineId        String
+  /// Null is treated as the timeline's default layer.
+  layerId           String?
+  year              Int
+  isBce             Boolean  @default(false)
+  month             Int?
+  day               Int?
+  /// Present only for periods (spans).
+  endYear           Int?
+  endIsBce          Boolean?
+  endMonth          Int?
+  endDay            Int?
+  title             String
+  /// Plain-text notes.
+  description       String?
+  /// The original description with its embedded metadata tag, kept until the
+  /// metadata migration is confirmed. Never written by the app.
+  legacyDescription String?
+  color             String   @default("#c9a84c")
 
-  timeline    Timeline @relation(fields: [timelineId], references: [id], onDelete: Cascade)
+  timeline          Timeline @relation(fields: [timelineId], references: [id], onDelete: Cascade)
+  layer             Layer?   @relation(fields: [layerId], references: [id], onDelete: SetNull)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@index([timelineId])
   @@index([timelineId, year])
   @@index([timelineId, createdAt])
+  @@index([layerId])
+}
+
+/// Fixed-window request counters for rate limiting.
+model RateLimit {
+  key         String   @id
+  count       Int
+  windowStart DateTime
+
+  @@index([windowStart])
 }

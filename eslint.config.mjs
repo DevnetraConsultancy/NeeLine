@@ -12,12 +12,25 @@ const compat = new FlatCompat({
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
+    rules: {
+      // Leading underscore marks a value that is intentionally unused (e.g. omitted by destructuring).
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", destructuredArrayIgnorePattern: "^_" },
+      ],
+      "@typescript-eslint/no-explicit-any": "error",
+    },
+  },
+  {
     ignores: [
       "node_modules/**",
       ".next/**",
       "out/**",
       "build/**",
       "next-env.d.ts",
+      ".pglite/**",
+      "playwright-report/**",
+      "test-results/**",
     ],
   },
 ];

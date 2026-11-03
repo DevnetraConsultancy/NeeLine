@@ -32,6 +32,13 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# local database (PGlite) and test output
+/.pglite/
+/test-results/
+/playwright-report/
+*.tsbuildinfo
 
 # database
 dev.db
@@ -51,3 +58,4 @@ public/uploads/*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+/tests/e2e/.auth/

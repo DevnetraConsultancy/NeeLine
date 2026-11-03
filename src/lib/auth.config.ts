@@ -1,18 +1,17 @@
 import type { NextAuthConfig } from "next-auth";
 
+/**
+ * Edge-safe part of the auth setup (no database), shared by the middleware
+ * and the full configuration in auth.ts.
+ */
 export const authConfig: NextAuthConfig = {
-  pages: {
-    signIn: "/",
-  },
-  providers: [], // Providers aren't needed here — this config is only used
-                  // by middleware to check session validity, not to log people in.
+  pages: { signIn: "/" },
+  providers: [],
   callbacks: {
     session({ session, token }) {
-      if (session.user && token) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (session.user as any).id = token.id as string;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (session.user as any).isGuest = token.isGuest as boolean;
+      if (session.user) {
+        session.user.id = typeof token.id === "string" ? token.id : "";
+        session.user.isGuest = token.isGuest === true;
       }
       return session;
     },

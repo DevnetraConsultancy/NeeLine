@@ -14,6 +14,8 @@ export interface BackfillOutcome {
   applied: boolean;
 }
 
+const BULK_SIZE = 500;
+
 async function applyPlan(prisma: PrismaClient, plan: TimelinePlan): Promise<void> {
   await prisma.$transaction(async (tx) => {
     for (const layer of plan.newLayers) {
@@ -22,21 +24,35 @@ async function applyPlan(prisma: PrismaClient, plan: TimelinePlan): Promise<void
     const layers = await tx.layer.findMany({ where: { timelineId: plan.timelineId }, select: { id: true, nameKey: true } });
     const idByKey = new Map(layers.map((l) => [l.nameKey, l.id]));
 
-    for (const update of plan.eventUpdates) {
+    // One bulk UPDATE per timeline: a query per event is far too slow when
+    // the build machine is far from the database.
+    const rows = plan.eventUpdates.map((update) => {
       const layerId = idByKey.get(update.layerKey);
       if (!layerId) throw new Error(`Layer "${update.layerKey}" missing for event ${update.id}`);
-      await tx.event.updateMany({
-        where: { id: update.id, layerId: null },
-        data: {
-          layerId,
-          description: update.description,
-          legacyDescription: update.legacyDescription,
-          endYear: update.endYear,
-          endIsBce: update.endIsBce,
-          endMonth: update.endMonth,
-          endDay: update.endDay,
-        },
-      });
+      return { ...update, layerId };
+    });
+    for (let start = 0; start < rows.length; start += BULK_SIZE) {
+      const chunk = rows.slice(start, start + BULK_SIZE);
+      await tx.$executeRaw`
+        UPDATE "Event" AS e SET
+          "layerId" = v.layer_id,
+          "description" = v.description,
+          "legacyDescription" = v.legacy,
+          "endYear" = v.end_year,
+          "endIsBce" = v.end_is_bce,
+          "endMonth" = v.end_month,
+          "endDay" = v.end_day
+        FROM unnest(
+          ${chunk.map((r) => r.id)}::text[],
+          ${chunk.map((r) => r.layerId)}::text[],
+          ${chunk.map((r) => r.description)}::text[],
+          ${chunk.map((r) => r.legacyDescription)}::text[],
+          ${chunk.map((r) => r.endYear)}::int[],
+          ${chunk.map((r) => r.endIsBce)}::boolean[],
+          ${chunk.map((r) => r.endMonth)}::int[],
+          ${chunk.map((r) => r.endDay)}::int[]
+        ) AS v(id, layer_id, description, legacy, end_year, end_is_bce, end_month, end_day)
+        WHERE e."id" = v.id AND e."layerId" IS NULL`;
     }
 
     if (plan.timelineUpdate) {
@@ -49,7 +65,7 @@ async function applyPlan(prisma: PrismaClient, plan: TimelinePlan): Promise<void
         },
       });
     }
-  });
+  }, { timeout: 120_000, maxWait: 30_000 });
 }
 
 export async function backfillTimeline(prisma: PrismaClient, timelineId: string, dryRun = false): Promise<BackfillOutcome> {

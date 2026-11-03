@@ -13,6 +13,7 @@ import { execFileSync } from "node:child_process";
 import pg from "pg";
 
 const STEP_TIMEOUT_MS = 5 * 60_000;
+const BACKFILL_TIMEOUT_MS = 15 * 60_000;
 
 /**
  * Prisma Migrate needs a session connection. Transaction-mode poolers (such
@@ -30,12 +31,12 @@ export function migrationUrl(databaseUrl: string, directUrl?: string): string {
   return url.toString();
 }
 
-function run(args: string[], databaseUrl: string): void {
+function run(args: string[], databaseUrl: string, timeout = STEP_TIMEOUT_MS): void {
   console.log(`> ${args.join(" ")}`);
   execFileSync("npx", args, {
     stdio: "inherit",
     shell: process.platform === "win32",
-    timeout: STEP_TIMEOUT_MS,
+    timeout,
     env: { ...process.env, DATABASE_URL: databaseUrl },
   });
 }
@@ -69,7 +70,7 @@ async function main(): Promise<void> {
     run(["prisma", "migrate", "resolve", "--applied", "0_init"], url);
   }
   run(["prisma", "migrate", "deploy"], url);
-  run(["tsx", "prisma/scripts/backfill-metadata.ts"], url);
+  run(["tsx", "prisma/scripts/backfill-metadata.ts"], url, BACKFILL_TIMEOUT_MS);
 }
 
 if (process.argv[1]?.endsWith("deploy-migrate.ts")) {

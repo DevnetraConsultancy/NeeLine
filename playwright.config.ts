@@ -7,7 +7,9 @@ import { defineConfig, devices } from "@playwright/test";
  */
 const PORT = 3210;
 const DB_PORT = 5434;
-const BASE_URL = `http://localhost:${PORT}`;
+/** Set E2E_BASE_URL to test a deployed site instead of a local build. */
+const REMOTE_URL = process.env.E2E_BASE_URL;
+const BASE_URL = REMOTE_URL ?? `http://localhost:${PORT}`;
 const DATABASE_URL = `postgresql://postgres:postgres@127.0.0.1:${DB_PORT}/postgres?sslmode=disable`;
 
 export default defineConfig({
@@ -16,6 +18,9 @@ export default defineConfig({
   workers: 1,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "github" : "list",
+  // Deployed sites are slower than a local build.
+  expect: { timeout: REMOTE_URL ? 20_000 : 5_000 },
+  timeout: REMOTE_URL ? 120_000 : 30_000,
   use: { baseURL: BASE_URL, trace: "retain-on-failure" },
   projects: [
     { name: "setup", testMatch: /auth\.setup\.ts/ },
@@ -31,7 +36,7 @@ export default defineConfig({
       dependencies: ["setup"],
     },
   ],
-  webServer: [
+  webServer: REMOTE_URL ? undefined : [
     {
       command: `npx pglite-server --db=memory:// --port=${DB_PORT} --max-connections=10`,
       port: DB_PORT,

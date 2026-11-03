@@ -14,17 +14,24 @@ export class ApiRequestError extends Error {
 
 type Method = "GET" | "POST" | "PATCH" | "DELETE";
 
+/** A request that takes longer than this is abandoned with a clear message. */
+const REQUEST_TIMEOUT_MS = 20_000;
+
 export async function apiRequest<T>(method: Method, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   let res: Response;
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
   try {
     res = await fetch(path, {
       method,
-      signal,
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       headers: body === undefined ? undefined : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
       cache: "no-store",
     });
   } catch (error) {
+    if (timeout.aborted) {
+      throw new ApiRequestError(0, "The server took too long to answer. Your change may not have been saved; please try again.");
+    }
     if (error instanceof DOMException && error.name === "AbortError") throw error;
     throw new ApiRequestError(0, "Could not reach the server. Check your connection and try again.");
   }

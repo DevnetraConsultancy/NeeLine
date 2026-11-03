@@ -17,6 +17,7 @@ for (const theme of ["dark", "light"] as const) {
       const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
       const page = await context.newPage();
       await page.addInitScript((t) => localStorage.setItem("neeline_theme", t), theme);
+      if (process.env.E2E_VERCEL_SHARE) await page.goto(`/?_vercel_share=${process.env.E2E_VERCEL_SHARE}`);
       await page.goto("/");
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       await expectNoViolations(page);

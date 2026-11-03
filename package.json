@@ -8,7 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
-    "test": "tsx --test tests/**/*.test.ts"
+    "test": "tsx --test tests/**/*.test.ts",
+    "db:local": "pglite-server --db=./.pglite --port=5433 --max-connections=10",
+    "db:migrate": "prisma migrate deploy",
+    "db:backfill": "tsx prisma/scripts/backfill-metadata.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",

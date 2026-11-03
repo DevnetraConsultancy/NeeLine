@@ -5,7 +5,7 @@
  *   2. Apply pending migrations (additive only: nothing is dropped).
  *   3. Run the metadata backfill (safe to repeat).
  * If any step fails or takes too long the build fails, so the previous
- * deployment stays live. Outside Vercel it does nothing unless
+ * deployment stays live. Runs only for production builds unless
  * RUN_DEPLOY_MIGRATIONS=1.
  */
 import "dotenv/config";
@@ -41,8 +41,11 @@ function run(args: string[], databaseUrl: string): void {
 }
 
 async function main(): Promise<void> {
-  if (!process.env.VERCEL && process.env.RUN_DEPLOY_MIGRATIONS !== "1") {
-    console.log("deploy-migrate: not on Vercel, skipping.");
+  // Preview deployments usually share the production database, so only
+  // production builds migrate unless RUN_DEPLOY_MIGRATIONS=1 is set (for
+  // example on a preview branch that has its own database).
+  if (process.env.VERCEL_ENV !== "production" && process.env.RUN_DEPLOY_MIGRATIONS !== "1") {
+    console.log(`deploy-migrate: skipping (VERCEL_ENV=${process.env.VERCEL_ENV ?? "unset"}).`);
     return;
   }
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not set for this environment.");

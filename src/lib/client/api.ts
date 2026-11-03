@@ -17,13 +17,34 @@ type Method = "GET" | "POST" | "PATCH" | "DELETE";
 /** A request that takes longer than this is abandoned with a clear message. */
 const REQUEST_TIMEOUT_MS = 20_000;
 
+/** Aborts when any of the signals aborts. AbortSignal.any is missing before Safari 17.4. */
+function anySignal(signals: AbortSignal[]): AbortSignal {
+  if (typeof AbortSignal.any === "function") return AbortSignal.any(signals);
+  const controller = new AbortController();
+  for (const signal of signals) {
+    if (signal.aborted) {
+      controller.abort(signal.reason);
+      break;
+    }
+    signal.addEventListener("abort", () => controller.abort(signal.reason), { once: true });
+  }
+  return controller.signal;
+}
+
+function timeoutSignal(ms: number): AbortSignal {
+  if (typeof AbortSignal.timeout === "function") return AbortSignal.timeout(ms);
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(new DOMException("Timed out", "TimeoutError")), ms);
+  return controller.signal;
+}
+
 export async function apiRequest<T>(method: Method, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   let res: Response;
-  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const timeout = timeoutSignal(REQUEST_TIMEOUT_MS);
   try {
     res = await fetch(path, {
       method,
-      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+      signal: signal ? anySignal([signal, timeout]) : timeout,
       headers: body === undefined ? undefined : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
       cache: "no-store",

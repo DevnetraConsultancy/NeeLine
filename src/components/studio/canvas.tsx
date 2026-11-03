@@ -7,7 +7,7 @@ import { dateValue, formatDateLabel, formatSpanLabel } from "@/lib/domain/dates"
 import { endDate, startDate, type TimelineEvent } from "@/lib/domain/events";
 import {
   axisMarkers, baseX, buildScale, fitView, gapBadges, inView, layoutItems, panPreservingFocus, valueAtBaseX, zoomAt,
-  BRACKET_TIER_SPACING, TIER_SPACING, type ItemLayout, type LayoutInput, type LayoutMode, type Scale, type Viewport,
+  collapsedDotY, pointCardTop, spinePosition, stackGeometry, TICK, type ItemLayout, type LayoutInput, type LayoutMode, type Scale, type Viewport,
 } from "@/lib/domain/layout";
 import type { Layer } from "@/types/api";
 import { CanvasHud } from "@/components/studio/canvas-hud";
@@ -35,6 +35,7 @@ interface CanvasProps {
   onEditEvent: (event: TimelineEvent) => void;
   onSetVisibleLayers: (ids: string[]) => void;
   onManageLayers: () => void;
+  toolbarSlot: HTMLElement | null;
   ref?: Ref<CanvasHandle>;
 }
 
@@ -44,7 +45,6 @@ interface CanvasEvent extends LayoutInput {
   layerName: string;
 }
 
-const TICK = 14;
 const DOT_RADIUS = 5;
 const PAN_STEP = 80;
 const viewportKey = (id: string) => `neeline_viewport_${id}`;
@@ -72,7 +72,7 @@ function describe(e: CanvasEvent): string {
 
 export function TimelineCanvas({
   timelineId, events, layers, colors, zeroColor, showControls, showGapBorder,
-  onEditEvent, onSetVisibleLayers, onManageLayers, ref,
+  onEditEvent, onSetVisibleLayers, onManageLayers, toolbarSlot, ref,
 }: CanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -126,10 +126,17 @@ export function TimelineCanvas({
 
   // ─── Viewport ───────────────────────────────────────────────────────
 
+  // Leave room at both ends for the widest card, so labels are never cut off.
+  const labelPadding = useMemo(
+    () => visible.reduce((max, e) => Math.max(max, (measureText(e.title, 12.5) + 36) / 2 + 16), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [visible, fontsReady],
+  );
+
   const fit = useCallback(() => {
-    const next = fitView(scale, visibleValues, size.width);
+    const next = fitView(scale, visibleValues, size.width, labelPadding);
     if (next) setView(next);
-  }, [scale, visibleValues, size.width]);
+  }, [scale, visibleValues, size.width, labelPadding]);
 
   const zoomBy = useCallback((factor: number, focusX = size.width / 2) => {
     setView((v) => zoomAt(mode, v, factor, focusX, size.width));
@@ -145,6 +152,9 @@ export function TimelineCanvas({
   useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    // Measure now, so the first fit uses the real width rather than the default.
+    const rect = el.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) setSize({ width: rect.width, height: rect.height });
     const ro = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
       if (width > 0 && height > 0) setSize((s) => (Math.abs(s.width - width) < 1 && Math.abs(s.height - height) < 1 ? s : { width, height }));
@@ -197,9 +207,9 @@ export function TimelineCanvas({
   const switchMode = useCallback((next: LayoutMode) => {
     setMode(next);
     const nextScale = buildScale(next, allValues);
-    const fitted = fitView(nextScale, visibleValues, size.width);
+    const fitted = fitView(nextScale, visibleValues, size.width, labelPadding);
     if (fitted) setView(fitted);
-  }, [allValues, visibleValues, size.width]);
+  }, [allValues, visibleValues, size.width, labelPadding]);
 
   useImperativeHandle(ref, () => ({
     fit,
@@ -236,7 +246,8 @@ export function TimelineCanvas({
     line.setAttribute("x1", String(x));
     line.setAttribute("x2", String(x));
     line.setAttribute("visibility", "visible");
-    const year = Math.round(valueAtBaseX(scale, (x - offsetX) / view.zoom));
+    // A year spans [y, y + 1) on the axis, so round down.
+    const year = Math.floor(valueAtBaseX(scale, (x - offsetX) / view.zoom));
     label.textContent = year === 0 ? "0" : `${Math.abs(year) < 10_000 ? Math.abs(year) : Math.abs(year).toLocaleString("en-US")} ${year < 0 ? "BCE" : "CE"}`;
   };
 
@@ -268,7 +279,14 @@ export function TimelineCanvas({
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
-    if (e.pointerType === "mouse") updateCursor(e.clientX);
+    if (e.pointerType === "mouse") {
+      updateCursor(e.clientX);
+      // The button was released outside the canvas: stop treating this as a drag.
+      if (e.buttons === 0) {
+        pointers.current.delete(e.pointerId);
+        return;
+      }
+    }
     const prev = pointers.current.get(e.pointerId);
     if (!prev) return;
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -308,7 +326,8 @@ export function TimelineCanvas({
 
   // ─── Geometry for rendering ─────────────────────────────────────────
 
-  const spineY = Math.round(size.height * 0.58);
+  const geometry = stackGeometry(items);
+  const spineY = spinePosition(size.height, geometry.above);
   const viewLeft = -offsetX;
   const viewRight = size.width - offsetX;
   const [spineLeft, spineRight] = visibleValues.length
@@ -317,9 +336,19 @@ export function TimelineCanvas({
   const zeroX = worldX(0);
   const showZero = visibleValues.length > 0 && zeroX >= spineLeft && zeroX <= spineRight;
 
-  const culled = items.filter((item) =>
-    item.kind === "point" ? inView(item.x - item.width / 2, item.x + item.width / 2, viewLeft, viewRight) : inView(Math.min(item.x1, item.x - item.width / 2), Math.max(item.x2, item.x + item.width / 2), viewLeft, viewRight),
-  );
+  const isOnScreen = (item: ItemLayout<CanvasEvent>) =>
+    item.kind === "point"
+      ? inView(item.x - item.width / 2, item.x + item.width / 2, viewLeft, viewRight)
+      : inView(Math.min(item.x1, item.x - item.width / 2), Math.max(item.x2, item.x + item.width / 2), viewLeft, viewRight);
+  // Every event stays in the DOM in date order so Tab can reach it; off-screen
+  // ones render nothing visible, and focusing one pans it into view.
+  const ordered = [...items].sort((a, b) => (a.kind === "point" ? a.x : a.x1) - (b.kind === "point" ? b.x : b.x1));
+  const onEventFocus = (id: string | null) => {
+    setFocusId(id);
+    const item = id ? items.find((i) => i.event.id === id) : undefined;
+    if (!item || isOnScreen(item)) return;
+    setView((v) => ({ ...v, panX: v.panX + size.width / 2 - (offsetX + item.x) }));
+  };
   const focused = focusId ? items.find((i) => i.event.id === focusId) : undefined;
 
   return (
@@ -345,7 +374,7 @@ export function TimelineCanvas({
           <line ref={cursorLineRef} y1={0} y2={size.height} stroke={colors.spine} strokeWidth={0.8} strokeDasharray="3 3" opacity={0.3} visibility="hidden" />
           <g transform={`translate(${offsetX} 0)`}>
             {visible.length === 0 ? (
-              <EmptyCanvas left={viewLeft} width={size.width} y={spineY} colors={colors} hasEvents={events.length > 0} />
+              <EmptyCanvas cx={viewLeft + size.width / 2} cy={size.height / 2} colors={colors} hasEvents={events.length > 0} />
             ) : (
               <>
                 <line x1={spineLeft} x2={spineRight} y1={spineY} y2={spineY} stroke={colors.spine} strokeWidth={6} opacity={0.15} />
@@ -369,7 +398,7 @@ export function TimelineCanvas({
                   <g key={m.key}>
                     <line x1={m.x} x2={m.x} y1={spineY - TICK / 2} y2={spineY + TICK / 2} stroke={m.isZero ? zeroColor : m.colorFrom} strokeWidth={m.isZero ? 3 : 2.5} />
                     <circle cx={m.x} cy={spineY} r={m.isZero ? 4.5 : 3.5} fill={m.isZero ? zeroColor : m.colorFrom} stroke={colors.bg} strokeWidth={1.5} />
-                    {m.showLabel && !m.isZero && (
+                    {m.showLabel && !m.isZero && !(showZero && Math.abs(m.x - zeroX) < 44) && (
                       <text x={m.x} y={spineY + TICK / 2 + 16} textAnchor="middle" fill={colors.text} fontSize={11} fontWeight={600}>{m.label}</text>
                     )}
                   </g>
@@ -384,15 +413,17 @@ export function TimelineCanvas({
                   </g>
                 )}
 
-                {culled.map((item) => (
+                {ordered.map((item) => (
                   <EventMark
                     key={item.event.id}
                     item={item}
+                    offscreen={!isOnScreen(item)}
                     spineY={spineY}
+                    bracketY={geometry.bracketY}
                     colors={colors}
                     zeroColor={zeroColor}
                     onActivate={activate}
-                    onFocusChange={setFocusId}
+                    onFocusChange={onEventFocus}
                   />
                 ))}
               </>
@@ -400,7 +431,7 @@ export function TimelineCanvas({
           </g>
         </svg>
 
-        {focused && <EventTooltip item={focused} offsetX={offsetX} spineY={spineY} width={size.width} />}
+        {focused && <EventTooltip item={focused} offsetX={offsetX} spineY={spineY} width={size.width} height={size.height} />}
       </div>
 
       <CanvasHud
@@ -418,21 +449,20 @@ export function TimelineCanvas({
         onZoomOut={() => zoomBy(1 / 1.25)}
         onFit={fit}
         cursorLabelRef={cursorLabelRef}
+        toolbarSlot={toolbarSlot}
       />
     </div>
   );
 }
 
-function EmptyCanvas({ left, width, y, colors, hasEvents }: { left: number; width: number; y: number; colors: CanvasColors; hasEvents: boolean }) {
-  const cx = left + width / 2;
+/** Message centred in the canvas. No axis is drawn, because without events there is no scale. */
+function EmptyCanvas({ cx, cy, colors, hasEvents }: { cx: number; cy: number; colors: CanvasColors; hasEvents: boolean }) {
   return (
     <g>
-      <line x1={left + width * 0.15} x2={left + width * 0.85} y1={y} y2={y} stroke={colors.spine} strokeWidth={2} strokeDasharray="6 6" opacity={0.3} />
-      <circle cx={cx} cy={y} r={6} fill={colors.spine} opacity={0.4} />
-      <text x={cx} y={y - 28} textAnchor="middle" fill={colors.text} fontSize={16} fontWeight={600}>
+      <text x={cx} y={cy - 4} textAnchor="middle" fill={colors.text} fontSize={16} fontWeight={600}>
         {hasEvents ? "No events in the visible layers" : "This timeline has no events yet"}
       </text>
-      <text x={cx} y={y + 36} textAnchor="middle" fill={colors.text} fontSize={13} opacity={0.7}>
+      <text x={cx} y={cy + 20} textAnchor="middle" fill={colors.text} fontSize={13} opacity={0.7}>
         {hasEvents ? "Turn layers on from the Layers menu." : "Use Add event to place your first date."}
       </text>
     </g>
@@ -442,6 +472,8 @@ function EmptyCanvas({ left, width, y, colors, hasEvents }: { left: number; widt
 interface MarkProps {
   item: ItemLayout<CanvasEvent>;
   spineY: number;
+  offscreen: boolean;
+  bracketY: (tier: number) => number;
   colors: CanvasColors;
   zeroColor: string;
   onActivate: (event: TimelineEvent) => void;
@@ -449,7 +481,7 @@ interface MarkProps {
 }
 
 /** One event as a focusable SVG button: a card on a stem, a collapsed dot, or a bracket. */
-function EventMark({ item, spineY, colors, zeroColor, onActivate, onFocusChange }: MarkProps) {
+function EventMark({ item, spineY, offscreen, bracketY, colors, zeroColor, onActivate, onFocusChange }: MarkProps) {
   const e = item.event;
   const isZero = e.start.year === 0 || e.end?.year === 0;
   const border = isZero ? zeroColor : e.source.color;
@@ -472,8 +504,10 @@ function EventMark({ item, spineY, colors, zeroColor, onActivate, onFocusChange 
     className: "[&:focus-visible>.focus-ring]:opacity-100",
   } as const;
 
+  if (offscreen) return <g {...a11y} />;
+
   if (item.kind === "span") {
-    const y = spineY - 142 - item.tier * BRACKET_TIER_SPACING;
+    const y = spineY + bracketY(item.tier);
     return (
       <g {...a11y}>
         <line x1={item.x1} x2={item.x1} y1={y + 12} y2={spineY} stroke={e.layerColor} strokeWidth={1.2} strokeDasharray="3 3" opacity={0.5} />
@@ -489,23 +523,23 @@ function EventMark({ item, spineY, colors, zeroColor, onActivate, onFocusChange 
     );
   }
 
-  const top = spineY - TICK / 2 - 8 - item.tier * TIER_SPACING;
   if (item.collapsed) {
+    const dotY = spineY + collapsedDotY;
     return (
       <g {...a11y}>
-        <line x1={item.x} x2={item.x} y1={spineY - TICK / 2} y2={top} stroke={e.layerColor} strokeDasharray="2 2" opacity={0.5} />
-        <circle className="focus-ring" cx={item.x} cy={top - DOT_RADIUS - 2} r={DOT_RADIUS + 4} fill="none" stroke={colors.spine} strokeWidth={2} opacity={0} />
-        <circle cx={item.x} cy={top - DOT_RADIUS - 2} r={DOT_RADIUS} fill={border} stroke={colors.bg} strokeWidth={1.5} />
+        <circle className="focus-ring" cx={item.x} cy={dotY} r={DOT_RADIUS + 4} fill="none" stroke={colors.spine} strokeWidth={2} opacity={0} />
+        <circle cx={item.x} cy={dotY} r={DOT_RADIUS} fill={border} stroke={colors.bg} strokeWidth={1.5} />
       </g>
     );
   }
+  const top = spineY + pointCardTop(item.tier);
   return (
     <g {...a11y}>
-      <line x1={item.x} x2={item.x} y1={spineY - TICK / 2} y2={top} stroke={isZero ? zeroColor : e.layerColor} strokeWidth={isZero ? 2.5 : 1.5} />
-      <rect className="focus-ring" x={item.x - item.width / 2 - 4} y={top - 22} width={item.width + 8} height={32} rx={9} fill="none" stroke={colors.spine} strokeWidth={2} opacity={0} />
-      <rect x={item.x - item.width / 2} y={top - 18} width={item.width} height={24} rx={6} fill={colors.bg} stroke={border} strokeWidth={isZero ? 3 : 1.8} />
-      <text x={e.hasNotes ? item.x - 6 : item.x} y={top - 2} textAnchor="middle" fill={colors.text} fontSize={12.5} fontWeight={600}>{e.title}</text>
-      {e.hasNotes && <NotesDot x={item.x + item.width / 2 - 12} y={top - 6} color={e.layerColor} />}
+      <line x1={item.x} x2={item.x} y1={spineY - TICK / 2} y2={top + 24} stroke={isZero ? zeroColor : e.layerColor} strokeWidth={isZero ? 2.5 : 1.5} />
+      <rect className="focus-ring" x={item.x - item.width / 2 - 4} y={top - 4} width={item.width + 8} height={32} rx={9} fill="none" stroke={colors.spine} strokeWidth={2} opacity={0} />
+      <rect x={item.x - item.width / 2} y={top} width={item.width} height={24} rx={6} fill={colors.bg} stroke={border} strokeWidth={isZero ? 3 : 1.8} />
+      <text x={e.hasNotes ? item.x - 6 : item.x} y={top + 16} textAnchor="middle" fill={colors.text} fontSize={12.5} fontWeight={600}>{e.title}</text>
+      {e.hasNotes && <NotesDot x={item.x + item.width / 2 - 12} y={top + 12} color={e.layerColor} />}
     </g>
   );
 }
@@ -521,15 +555,17 @@ function NotesDot({ x, y, color }: { x: number; y: number; color: string }) {
   );
 }
 
-function EventTooltip({ item, offsetX, spineY, width }: { item: ItemLayout<CanvasEvent>; offsetX: number; spineY: number; width: number }) {
+function EventTooltip({ item, offsetX, spineY, width, height }: { item: ItemLayout<CanvasEvent>; offsetX: number; spineY: number; width: number; height: number }) {
   const e = item.event;
   const end = endDate(e.source);
-  const left = Math.min(Math.max(16, offsetX + item.x - 140), width - 296);
+  const left = Math.max(8, Math.min(offsetX + item.x - 140, width - 296));
+  // Below the axis labels when there is room, otherwise pinned to the bottom edge.
+  const top = Math.max(8, Math.min(spineY + 60, height - 168));
   return (
     <div
       role="tooltip"
       className="glass-strong pointer-events-none absolute z-20 w-72 rounded-lg p-3 text-sm"
-      style={{ left, top: spineY + 64 }}
+      style={{ left, top }}
     >
       <div className="flex items-center gap-2 text-xs font-medium text-fg-muted">
         <span className="size-2.5 rounded-full" style={{ backgroundColor: e.layerColor }} aria-hidden />

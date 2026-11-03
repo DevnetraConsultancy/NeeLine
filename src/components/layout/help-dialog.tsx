@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { CircleHelp, ExternalLink, Mail } from "lucide-react";
-import { IconButton, Button } from "@/components/ui/button";
+import { ExternalLink, Mail } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { TabPanel, Tabs } from "@/components/ui/tabs";
 import { CONTACT_EMAIL, CREDIT_LINE, INSTAGRAM_HANDLE, INSTAGRAM_URL } from "@/lib/site";
@@ -15,7 +15,7 @@ const SHORTCUTS: Array<[string, string]> = [
   ["Pan along the line", "Drag, or Left / Right arrow"],
   ["Move between events", "Tab, then Enter to edit"],
   ["Add an event", "N"],
-  ["Show or hide canvas controls", "V"],
+  ["Show or hide zoom controls", "V"],
   ["Undo", "Ctrl+Z  (Cmd+Z on Mac)"],
   ["Redo", "Ctrl+Y  or  Ctrl+Shift+Z"],
   ["Close a dialog", "Esc"],
@@ -32,24 +32,22 @@ const TOOLS: Array<[string, string]> = [
   ["Layers", "Group events into layers such as Bronze Age or Classical Rome. Each layer has its own colour; show, hide or isolate layers to compare them."],
   ["Even / Proportional", "Even gives every date the same spacing for readability. Proportional places dates at their true distance in time and lets you zoom down to individual days."],
   ["Gaps", "Shows the number of years between neighbouring events. Crossing from BCE to CE counts no year 0, so 10 BCE to 10 CE is 19 years."],
-  ["Timeline settings", "Edit the timeline description and choose canvas colours, or let the canvas follow the light/dark theme."],
-  ["Import and export", "Import events from a JSON file, export layers as JSON, the visible chart as a 2x PNG, or every event as tab-separated TXT."],
+  ["More menu", "Import JSON, export JSON, PNG (visible layers, 2x) or TXT, manage layers, and timeline settings: description and canvas colours."],
 ];
 
-export function HelpDialog() {
-  const [open, setOpen] = useState(false);
+/** The guide. Loaded on demand by HelpProvider, so it costs nothing until opened. */
+export default function HelpDialog({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<HelpTab>("shortcuts");
 
   return (
     <>
-      <IconButton icon={CircleHelp} label="Help and keyboard shortcuts" onClick={() => setOpen(true)} />
       <Modal
-        open={open}
-        onClose={() => setOpen(false)}
+        open
+        onClose={onClose}
         title="NeeLine guide"
         description="History on a number line"
         size="md"
-        footer={<Button variant="primary" onClick={() => setOpen(false)}>Got it</Button>}
+        footer={<Button variant="primary" onClick={onClose}>Got it</Button>}
       >
         <Tabs<HelpTab>
           label="Guide sections"

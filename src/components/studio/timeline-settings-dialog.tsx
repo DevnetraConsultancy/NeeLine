@@ -9,7 +9,7 @@ import { errorMessage } from "@/lib/client/api";
 import { contrastRatio } from "@/lib/domain/colors";
 import { compareDates, formatDateLabel, type HistoricalDate } from "@/lib/domain/dates";
 import { endDate, startDate, type TimelineEvent } from "@/lib/domain/events";
-import { LIMITS } from "@/lib/validation/schemas";
+import { LIMITS } from "@/lib/validation/limits";
 import type { Layer, TimelineDetail } from "@/types/api";
 import type { CanvasColors } from "@/components/studio/canvas";
 
@@ -81,7 +81,7 @@ export function TimelineSettingsDialog({ open, onClose, timeline, events, layers
         </>
       }
     >
-      <form id="timeline-settings" className="grid gap-6" onSubmit={submit}>
+      <form id="timeline-settings" className="grid gap-4" onSubmit={submit}>
         {error && <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm font-medium text-danger">{error}</p>}
 
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">

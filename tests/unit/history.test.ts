@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  afterRedo, afterUndo, discardLatest, emptyHistory, forgetEvents, moveLayer, record, redoOperation,
+  afterRedo, afterUndo, discard, emptyHistory, forgetEvents, moveLayer, record, redoOperation,
   undoOperation, MAX_HISTORY, type HistoryAction,
 } from "../../src/lib/domain/history";
 import type { TimelineEvent } from "../../src/lib/domain/events";
@@ -27,11 +27,21 @@ test("history: update undo writes the before snapshot", () => {
 test("history: stacks move only when told the server succeeded", () => {
   let h = record(emptyHistory, { kind: "rename", label: "Rename", before: "a", after: "b" });
   assert.equal(h.undo.length, 1);
-  h = afterUndo(h);
+  const action = h.undo[0];
+  h = afterUndo(h, action);
   assert.deepEqual([h.undo.length, h.redo.length], [0, 1]);
-  h = afterRedo(h);
+  h = afterRedo(h, action);
   assert.deepEqual([h.undo.length, h.redo.length], [1, 0]);
-  assert.equal(discardLatest(h, "undo").undo.length, 0);
+  assert.equal(discard(h, action).undo.length, 0);
+});
+
+test("history: an undo that finishes after a newer change moves the right entry", () => {
+  let h = record(emptyHistory, { kind: "rename", label: "first", before: "a", after: "b" });
+  const undoing = h.undo[0];
+  h = record(h, { kind: "rename", label: "second", before: "b", after: "c" });
+  h = afterUndo(h, undoing);
+  assert.deepEqual(h.undo.map((a) => a.label), ["second"]);
+  assert.deepEqual(h.redo.map((a) => a.label), ["first"]);
 });
 
 test("history: recording clears redo and keeps at most 50 entries", () => {
@@ -39,7 +49,7 @@ test("history: recording clears redo and keeps at most 50 entries", () => {
   for (let i = 0; i < 60; i++) h = record(h, { kind: "rename", label: String(i), before: "", after: "" });
   assert.equal(h.undo.length, MAX_HISTORY);
   assert.equal(h.undo[0].label, "10");
-  h = afterUndo(h);
+  h = afterUndo(h, h.undo.at(-1)!);
   h = record(h, { kind: "rename", label: "new", before: "", after: "" });
   assert.equal(h.redo.length, 0);
 });

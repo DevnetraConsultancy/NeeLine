@@ -6,7 +6,7 @@ import { ArrowUpRight, Calendar, Check, Clock, Pencil, RotateCcw, Trash2, X } fr
 import { Button, IconButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { errorMessage } from "@/lib/client/api";
-import { LIMITS } from "@/lib/validation/schemas";
+import { LIMITS } from "@/lib/validation/limits";
 import { timeAgo } from "@/lib/time-ago";
 import type { TimelineSummary } from "@/types/api";
 
@@ -43,7 +43,7 @@ export function TimelineCard({ timeline, onRename, onTrash, onRestore, onDelete 
   };
 
   return (
-    <article className="glass group flex h-full flex-col rounded-xl p-5 transition-[border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-line-strong">
+    <article className="glass group flex h-full flex-col rounded-xl p-4 transition-[border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-line-strong">
       {editing !== null ? (
         <form
           className="flex items-center gap-1"
@@ -69,7 +69,7 @@ export function TimelineCard({ timeline, onRename, onTrash, onRestore, onDelete 
         </form>
       ) : (
         <div className="flex items-start justify-between gap-2">
-          <h2 className="text-lg font-semibold leading-snug text-fg">
+          <h2 className="text-base font-semibold leading-snug text-fg">
             {trashed ? timeline.name : (
               <Link href={`/timeline/${timeline.id}`} className="hover:text-accent">{timeline.name}</Link>
             )}
@@ -81,7 +81,7 @@ export function TimelineCard({ timeline, onRename, onTrash, onRestore, onDelete 
 
       {timeline.description && <p className="mt-2 line-clamp-2 text-sm text-fg-muted">{timeline.description}</p>}
 
-      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-fg-muted">
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-fg-muted">
         <span className="inline-flex items-center gap-1.5">
           <Calendar className="size-3.5" aria-hidden />
           {timeline.eventCount} {timeline.eventCount === 1 ? "event" : "events"}
@@ -92,7 +92,7 @@ export function TimelineCard({ timeline, onRename, onTrash, onRestore, onDelete 
         </span>
       </div>
 
-      <div className="mt-auto flex items-center justify-between gap-2 pt-5">
+      <div className="mt-auto flex items-center justify-between gap-2 pt-3">
         {trashed ? (
           <>
             <Button size="sm" icon={RotateCcw} onClick={onRestore}>Restore</Button>

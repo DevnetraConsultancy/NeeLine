@@ -32,6 +32,7 @@ export async function migrateLegacyPrefs(timelineId: string, data: StudioData, s
     }
   };
 
+  let allSaved = true;
   const byKey = new Map(data.layers.map((l) => [layerNameKey(l.name), l]));
   const cachedLayers = Array.isArray(parse(raw.layers)) ? (parse(raw.layers) as Array<{ name?: unknown; color?: unknown }>) : [];
   const order: string[] = [];
@@ -53,19 +54,21 @@ export async function migrateLegacyPrefs(timelineId: string, data: StudioData, s
   if (order.length > 0) {
     const all = Array.from(byKey.values());
     const full = [...order, ...all.map((l) => l.id).filter((id) => !order.includes(id))];
-    if (full.join() !== data.layers.map((l) => l.id).join()) await studio.reorderLayers(full);
+    if (full.join() !== data.layers.map((l) => l.id).join()) allSaved = (await studio.reorderLayers(full)) && allSaved;
   }
 
   const active = parse(raw.active);
   if (Array.isArray(active) && active.length > 0) {
     const ids = active.flatMap((name) => (typeof name === "string" && byKey.get(layerNameKey(name)) ? [byKey.get(layerNameKey(name))!.id] : []));
-    if (ids.length > 0) await studio.setVisibleLayers(ids);
+    if (ids.length > 0) allSaved = (await studio.setVisibleLayers(ids)) && allSaved;
   }
 
   if (raw.description && !data.timeline.description) {
     await studio.updateTimeline({ description: raw.description.slice(0, 5000) });
   }
 
+  // Keep the old settings if anything failed, so the next visit can try again.
+  if (!allSaved) throw new Error("Some layer settings could not be saved; they will be retried next time.");
   for (const key of Object.values(keys)) localStorage.removeItem(key);
   return true;
 }

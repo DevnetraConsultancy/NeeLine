@@ -4,20 +4,20 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
-import { ChevronDown, LogIn, LogOut, User } from "lucide-react";
+import { ChevronDown, CircleHelp, LogIn, LogOut, User } from "lucide-react";
 import { BrandLink } from "@/components/layout/brand";
-import { HelpDialog } from "@/components/layout/help-dialog";
+import { useHelp } from "@/components/layout/help";
 import { ThemeToggle } from "@/components/layout/theme";
 import { Menu } from "@/components/ui/menu";
 import { cn } from "@/lib/cn";
 
-export function AppHeader({ children, className }: { children?: ReactNode; className?: string }) {
+/** Site header. `wide` spans the full window (the studio); otherwise it matches the page width. */
+export function AppHeader({ children, className, wide = false }: { children?: ReactNode; className?: string; wide?: boolean }) {
   return (
     <header className={cn("glass glass-blur sticky top-0 z-40 rounded-none border-x-0 border-t-0", className)}>
-      <div className="mx-auto flex h-14 max-w-7xl items-center gap-2 px-4 sm:px-6">
+      <div className={cn("mx-auto flex h-12 items-center gap-1 px-3 sm:px-4", !wide && "max-w-7xl sm:px-6")}>
         <BrandLink />
         <div className="flex-1">{children}</div>
-        <HelpDialog />
         <ThemeToggle />
         <AccountMenu />
       </div>
@@ -27,11 +27,12 @@ export function AppHeader({ children, className }: { children?: ReactNode; class
 
 function AccountMenu() {
   const { data: session, status } = useSession();
-  if (status === "loading") return <span className="skeleton size-10 rounded-md" aria-hidden />;
+  const { openHelp } = useHelp();
+  if (status === "loading") return <span className="skeleton size-9 rounded-md" aria-hidden />;
 
   if (!session?.user) {
     return (
-      <Link href="/#get-started" className="inline-flex h-10 items-center gap-2 rounded-md px-3 text-sm font-medium text-fg hover:bg-surface-hover">
+      <Link href="/#get-started" className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium text-fg hover:bg-surface-hover">
         <LogIn className="size-4" aria-hidden />
         Sign in
       </Link>
@@ -53,6 +54,7 @@ function AccountMenu() {
           onSelect: () => undefined,
         },
         "separator",
+        { label: "Help and shortcuts", icon: CircleHelp, onSelect: openHelp },
         { label: "Sign out", icon: LogOut, onSelect: () => void signOut({ callbackUrl: "/" }) },
       ]}
       trigger={(props) => (
@@ -60,7 +62,7 @@ function AccountMenu() {
           type="button"
           {...props}
           aria-label={`Account: ${displayName}`}
-          className="inline-flex h-10 items-center gap-2 rounded-md px-2 text-sm font-medium text-fg hover:bg-surface-hover"
+          className="inline-flex h-9 items-center gap-2 rounded-md px-2 text-sm font-medium text-fg hover:bg-surface-hover"
         >
           {image ? (
             <Image src={image} alt="" width={24} height={24} className="size-6 rounded-full" />

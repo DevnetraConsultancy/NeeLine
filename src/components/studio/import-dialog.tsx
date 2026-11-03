@@ -9,7 +9,7 @@ import { cn } from "@/lib/cn";
 import { api, errorMessage } from "@/lib/client/api";
 import { ImportFileError, parseImportFile, type ParsedImport } from "@/lib/domain/import";
 import { layerNameKey } from "@/lib/domain/layers";
-import { LIMITS } from "@/lib/validation/schemas";
+import { LIMITS } from "@/lib/validation/limits";
 import type { ImportResult, Layer } from "@/types/api";
 
 interface ImportDialogProps {
@@ -115,7 +115,7 @@ export function ImportDialog({ open, onClose, timelineId, layers, defaultLayerId
         </>
       }
     >
-      <div className="grid gap-5">
+      <div className="grid gap-4">
         <label
           htmlFor={inputId}
           onDragOver={(e) => {

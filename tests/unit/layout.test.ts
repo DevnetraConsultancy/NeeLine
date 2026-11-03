@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   axisMarkers, baseX, buildScale, fitView, gapBadges, inView, layoutItems, panPreservingFocus,
   valueAtBaseX, zoomAt, BASE_PX_PER_YEAR, EVEN_SPACING, ZOOM_LIMITS, type LayoutInput,
+  stackGeometry, spinePosition, pointCardTop, collapsedDotY, BELOW_SPINE, CANVAS_MARGIN,
 } from "../../src/lib/domain/layout";
 import { dateValue, type HistoricalDate } from "../../src/lib/domain/dates";
 
@@ -106,4 +107,27 @@ test("layout: gap badges use the shared year count", () => {
 test("layout: culling", () => {
   assert.equal(inView(0, 10, 100, 200, 0), false);
   assert.equal(inView(0, 10, 100, 200, 100), true);
+});
+
+test("layout: the stack is centred with a gap from the top", () => {
+  const items = layoutItems([ev("a", d(0), d(100)), ev("p", d(50))], (v) => v * 10, measure);
+  const { above, bracketY } = stackGeometry(items);
+  assert.ok(bracketY(0) < pointCardTop(0), "brackets sit above the point cards");
+  const short = spinePosition(800, above);
+  assert.ok(Math.abs((short - above) - (800 - short - BELOW_SPINE)) <= 1, "equal space above and below");
+  const fits = spinePosition(above + BELOW_SPINE + 2 * CANVAS_MARGIN, above);
+  assert.equal(fits - above, CANVAS_MARGIN, "an exact fit keeps the top margin");
+  const tall = spinePosition(100, above);
+  assert.equal(tall, 100 - BELOW_SPINE - CANVAS_MARGIN, "a stack taller than the canvas keeps the axis visible");
+});
+
+test("layout: collapsed dots sit below the first row of cards", () => {
+  assert.ok(collapsedDotY > pointCardTop(0) + 24);
+});
+
+test("layout: fit leaves room for wide labels", () => {
+  const scale = buildScale("proportional", []);
+  const narrow = fitView(scale, [0, 1000], 1200)!;
+  const wide = fitView(scale, [0, 1000], 1200, 300)!;
+  assert.ok(wide.zoom < narrow.zoom);
 });

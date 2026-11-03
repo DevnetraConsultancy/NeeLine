@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
-  AlertTriangle, ArrowLeft, Check, CircleDashed, Download, Eye, EyeOff, FileJson, FileText, ImageDown, Layers, Loader2,
+  AlertTriangle, ArrowLeft, Check, CircleDashed, Eye, EyeOff, FileJson, FileText, ImageDown, Layers, Loader2, MoreHorizontal,
   Plus, Redo2, Settings2, Undo2, Upload,
 } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
@@ -13,18 +14,20 @@ import { Menu } from "@/components/ui/menu";
 import { ErrorState, Skeleton } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import { TimelineCanvas, type CanvasColors, type CanvasHandle } from "@/components/studio/canvas";
-import { EventFormDialog } from "@/components/studio/event-form-dialog";
-import { LayersDialog } from "@/components/studio/layers-dialog";
-import { TimelineSettingsDialog } from "@/components/studio/timeline-settings-dialog";
-import { ImportDialog } from "@/components/studio/import-dialog";
-import { ExportJsonDialog } from "@/components/studio/export-json-dialog";
-import { JsonFormatDialog } from "@/components/studio/json-format-dialog";
 import { migrateLegacyPrefs } from "@/components/studio/legacy-prefs";
 import { useStudio, type SaveState } from "@/components/studio/use-studio";
 import { downloadBlob, eventsToTxt, slugify } from "@/lib/client/export";
 import { errorMessage } from "@/lib/client/api";
-import { LIMITS } from "@/lib/validation/schemas";
+import { LIMITS } from "@/lib/validation/limits";
 import type { TimelineEvent } from "@/lib/domain/events";
+
+// Dialogs load on first use, keeping them (and zod) out of the studio's first download.
+const EventFormDialog = dynamic(() => import("@/components/studio/event-form-dialog").then((m) => m.EventFormDialog), { ssr: false });
+const LayersDialog = dynamic(() => import("@/components/studio/layers-dialog").then((m) => m.LayersDialog), { ssr: false });
+const TimelineSettingsDialog = dynamic(() => import("@/components/studio/timeline-settings-dialog").then((m) => m.TimelineSettingsDialog), { ssr: false });
+const ImportDialog = dynamic(() => import("@/components/studio/import-dialog").then((m) => m.ImportDialog), { ssr: false });
+const ExportJsonDialog = dynamic(() => import("@/components/studio/export-json-dialog").then((m) => m.ExportJsonDialog), { ssr: false });
+const JsonFormatDialog = dynamic(() => import("@/components/studio/json-format-dialog").then((m) => m.JsonFormatDialog), { ssr: false });
 
 const THEME_CANVAS: Record<"dark" | "light", CanvasColors & { zero: string }> = {
   dark: { bg: "#070c16", spine: "#c9a84c", text: "#f5f0e8", zero: "#ef4444" },
@@ -66,6 +69,7 @@ export function Studio({ timelineId }: { timelineId: string }) {
   const [showControls, setShowControls] = useState(true);
   const [showGapBorder, setShowGapBorder] = useState(true);
   const migrated = useRef(false);
+  const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setShowControls(readFlag("neeline_canvas_controls", true));
@@ -179,46 +183,43 @@ export function Studio({ timelineId }: { timelineId: string }) {
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
-      <AppHeader />
+      <AppHeader wide />
       <div className="glass glass-blur z-30 rounded-none border-x-0 border-t-0">
-        <div className="flex min-h-14 flex-wrap items-center gap-2 px-3 py-2 sm:px-4">
-          <Link href="/dashboard" aria-label="Back to dashboard" className="flex size-10 items-center justify-center rounded-md text-fg-muted hover:bg-surface-hover hover:text-fg">
+        <div className="flex flex-wrap items-center gap-x-1 gap-y-1 px-2 py-1 sm:px-3">
+          <Link href="/dashboard" aria-label="Back to dashboard" className="flex size-8 items-center justify-center rounded-md text-fg-muted hover:bg-surface-hover hover:text-fg">
             <ArrowLeft className="size-4" aria-hidden />
           </Link>
-          <TimelineName
-            name={timeline.name}
-            onRename={(name) => studio.updateTimeline({ name }, true)}
-          />
-          <span className="hidden text-sm tabular-nums text-fg-muted md:inline">
+          <TimelineName name={timeline.name} onRename={(name) => studio.updateTimeline({ name }, true)} />
+          <span className="hidden text-xs tabular-nums text-fg-muted md:inline">
             {events.length} {events.length === 1 ? "event" : "events"}
           </span>
           <SaveIndicator state={saveState} />
+          {/* View controls from the canvas are rendered here; on phones they take their own row. */}
+          <div ref={setToolbarSlot} className="order-last flex w-full justify-center sm:order-none sm:ml-2 sm:w-auto sm:justify-start" />
 
-          <div className="ml-auto flex items-center gap-1">
-            <IconButton icon={Undo2} label={undoAction ? `Undo: ${undoAction.label} (Ctrl+Z)` : "Nothing to undo"} disabled={!undoAction} onClick={() => void studio.undo()} />
-            <IconButton icon={Redo2} label={redoAction ? `Redo: ${redoAction.label} (Ctrl+Y)` : "Nothing to redo"} disabled={!redoAction} onClick={() => void studio.redo()} />
+          <div className="ml-auto flex items-center gap-0.5">
+            <IconButton icon={Undo2} size="sm" label={undoAction ? `Undo: ${undoAction.label} (Ctrl+Z)` : "Nothing to undo"} disabled={!undoAction} onClick={() => void studio.undo()} />
+            <IconButton icon={Redo2} size="sm" label={redoAction ? `Redo: ${redoAction.label} (Ctrl+Y)` : "Nothing to redo"} disabled={!redoAction} onClick={() => void studio.redo()} />
             <Menu
-              label="Import and export"
+              label="More actions"
               items={[
-                { label: "Import JSON...", description: "Add events from a file", icon: Upload, onSelect: () => setDialog("import") },
-                { label: "Export layers as JSON...", description: "One file per layer", icon: FileJson, onSelect: () => setDialog("export") },
-                "separator",
-                { label: "Export PNG", description: "Visible layers, fitted, at 2x resolution", icon: ImageDown, onSelect: () => void exportPng() },
+                { label: "Import JSON...", icon: Upload, onSelect: () => setDialog("import") },
+                { label: "Export layers as JSON...", icon: FileJson, onSelect: () => setDialog("export") },
+                { label: "Export PNG (visible layers)", icon: ImageDown, onSelect: () => void exportPng() },
                 {
                   label: "Export TXT",
-                  description: "All events as tab-separated text",
                   icon: FileText,
                   onSelect: () => downloadBlob(new Blob([eventsToTxt(events, layers)], { type: "text/plain;charset=utf-8" }), `${slugify(timeline.name)}-events.txt`),
                 },
-                "separator",
                 { label: "JSON format and template", icon: FileJson, onSelect: () => setDialog("format") },
+                "separator",
+                { label: "Manage layers", icon: Layers, onSelect: () => setDialog("layers") },
+                { label: "Timeline settings", icon: Settings2, onSelect: () => setDialog("settings") },
+                { label: showControls ? "Hide zoom controls (V)" : "Show zoom controls (V)", icon: showControls ? EyeOff : Eye, onSelect: toggleControls },
               ]}
-              trigger={(props) => <IconButton {...props} icon={Download} label="Import and export" />}
+              trigger={(props) => <IconButton {...props} icon={MoreHorizontal} size="sm" label="More actions" />}
             />
-            <IconButton icon={Layers} label="Layers" onClick={() => setDialog("layers")} />
-            <IconButton icon={Settings2} label="Timeline settings" onClick={() => setDialog("settings")} />
-            <IconButton icon={showControls ? Eye : EyeOff} label={showControls ? "Hide canvas controls (V)" : "Show canvas controls (V)"} pressed={!showControls} onClick={toggleControls} />
-            <Button variant="primary" icon={Plus} onClick={() => openEvent(null)} className="ml-1" aria-label="Add event (N)">
+            <Button variant="primary" size="sm" icon={Plus} onClick={() => openEvent(null)} className="ml-1" aria-label="Add event (N)">
               <span className="hidden sm:inline">Add event</span>
             </Button>
           </div>
@@ -239,6 +240,7 @@ export function Studio({ timelineId }: { timelineId: string }) {
           onEditEvent={openEvent}
           onSetVisibleLayers={(ids) => void studio.setVisibleLayers(ids)}
           onManageLayers={() => setDialog("layers")}
+          toolbarSlot={toolbarSlot}
         />
       </main>
 
@@ -331,7 +333,7 @@ function TimelineName({ name, onRename }: { name: string; onRename: (name: strin
       <input
         autoFocus
         aria-label="Timeline name"
-        className="h-10 min-w-0 max-w-xs flex-1 rounded-md border border-accent bg-surface px-3 text-base font-semibold text-fg outline-none"
+        className="h-8 min-w-0 max-w-xs flex-1 rounded-md border border-accent bg-surface px-2 text-sm font-semibold text-fg outline-none"
         value={value}
         maxLength={LIMITS.timelineName}
         onChange={(e) => setValue(e.target.value)}
@@ -348,7 +350,7 @@ function TimelineName({ name, onRename }: { name: string; onRename: (name: strin
       type="button"
       onClick={() => setValue(name)}
       title="Rename timeline"
-      className="min-w-0 max-w-[40vw] truncate rounded-md px-2 py-1 text-left text-base font-semibold text-fg hover:bg-surface-hover"
+      className="min-w-0 max-w-[40vw] truncate rounded-md px-1.5 py-0.5 text-left text-sm font-semibold text-fg hover:bg-surface-hover"
     >
       {name}
     </button>

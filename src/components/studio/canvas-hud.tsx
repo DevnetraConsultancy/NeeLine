@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type Ref } from "react";
+import { createPortal } from "react-dom";
 import { Check, Layers, Maximize2, MoveHorizontal, SlidersHorizontal, ZoomIn, ZoomOut } from "lucide-react";
 import { Button, IconButton } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/field";
@@ -24,34 +25,51 @@ interface HudProps {
   onZoomOut: () => void;
   onFit: () => void;
   cursorLabelRef: Ref<HTMLSpanElement>;
+  /** Studio toolbar element that hosts the view controls, so they never cover events. */
+  toolbarSlot: HTMLElement | null;
 }
 
-/** Floating controls over the canvas. Hidden (not removed) in zen view. */
+/**
+ * View controls (spacing, gaps, layers) live in the studio toolbar; zoom and
+ * the position readout float in the canvas corners and hide in zen view.
+ */
 export function CanvasHud(props: HudProps) {
-  const { visible, mode, onModeChange, showGaps, onToggleGaps, zoomPercent, onZoomIn, onZoomOut, onFit, cursorLabelRef } = props;
+  const { visible, mode, onModeChange, showGaps, onToggleGaps, zoomPercent, onZoomIn, onZoomOut, onFit, cursorLabelRef, toolbarSlot } = props;
   const hiddenClass = visible ? "opacity-100" : "pointer-events-none opacity-0";
+
+  const viewControls = (
+    <div className="flex items-center gap-1">
+      <Segmented<LayoutMode>
+        label="Spacing"
+        size="sm"
+        value={mode}
+        onChange={onModeChange}
+        options={[
+          { value: "even", label: "Even" },
+          { value: "proportional", label: "Proportional" },
+        ]}
+      />
+      <Button
+        size="sm"
+        variant="ghost"
+        icon={MoveHorizontal}
+        aria-pressed={showGaps}
+        aria-label="Show year gaps"
+        title="Show year gaps between events"
+        onClick={onToggleGaps}
+        className={cn("px-2", showGaps && "bg-accent-soft text-accent hover:text-accent")}
+      >
+        <span className="hidden md:inline">Gaps</span>
+      </Button>
+      <LayersPopover {...props} />
+    </div>
+  );
 
   return (
     <>
-      <div className={cn("absolute right-3 top-3 z-10 flex flex-wrap items-center justify-end gap-2 transition-opacity duration-200", hiddenClass)} inert={!visible}>
-        <Segmented<LayoutMode>
-          label="Spacing"
-          size="sm"
-          className="glass glass-blur"
-          value={mode}
-          onChange={onModeChange}
-          options={[
-            { value: "even", label: "Even" },
-            { value: "proportional", label: "Proportional" },
-          ]}
-        />
-        <Button size="sm" icon={MoveHorizontal} aria-pressed={showGaps} onClick={onToggleGaps} className={cn(showGaps && "!border-accent text-accent")}>
-          Gaps
-        </Button>
-        <LayersPopover {...props} />
-      </div>
+      {toolbarSlot && createPortal(viewControls, toolbarSlot)}
 
-      <div className={cn("glass glass-blur absolute bottom-3 right-3 z-10 flex items-center gap-1 rounded-lg p-1 transition-opacity duration-200", hiddenClass)} inert={!visible}>
+      <div className={cn("glass glass-blur absolute bottom-2 right-2 z-10 flex items-center gap-0.5 rounded-lg p-0.5 transition-opacity duration-200", hiddenClass)} inert={!visible}>
         <IconButton icon={ZoomOut} label="Zoom out (-)" size="sm" onClick={onZoomOut} />
         <IconButton icon={ZoomIn} label="Zoom in (+)" size="sm" onClick={onZoomIn} />
         <span className="mx-1 h-4 w-px bg-line" aria-hidden />
@@ -61,7 +79,7 @@ export function CanvasHud(props: HudProps) {
       </div>
 
       <div
-        className={cn("glass glass-blur pointer-events-none absolute bottom-3 left-3 z-10 flex items-center gap-3 rounded-lg px-3 py-1.5 text-xs font-medium tabular-nums text-fg-muted transition-opacity duration-200", hiddenClass)}
+        className={cn("glass glass-blur pointer-events-none absolute bottom-2 left-2 z-10 flex items-center gap-3 rounded-md px-2 py-1 text-xs font-medium tabular-nums text-fg-muted transition-opacity duration-200", hiddenClass)}
         aria-hidden
       >
         <span>Zoom {zoomPercent.toLocaleString("en-US")}%</span>
@@ -103,8 +121,8 @@ function LayersPopover({ layers, events, onSetVisibleLayers, onManageLayers }: H
 
   return (
     <div ref={rootRef} className="relative">
-      <Button size="sm" icon={Layers} aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((v) => !v)}>
-        Layers
+      <Button size="sm" variant="ghost" icon={Layers} aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((v) => !v)} className="px-2">
+        <span className="sr-only md:not-sr-only">Layers </span>
         <span className="rounded-full bg-surface-hover px-1.5 text-xs tabular-nums">
           {visibleIds.length}/{layers.length}
         </span>

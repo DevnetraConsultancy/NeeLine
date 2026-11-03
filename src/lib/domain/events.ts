@@ -1,4 +1,4 @@
-import type { HistoricalDate } from "@/lib/domain/dates";
+import { dateValue, type HistoricalDate } from "@/lib/domain/dates";
 
 /** An event as the API returns it and the client holds it. */
 export interface TimelineEvent {
@@ -56,4 +56,12 @@ export function eventIdentityKey(
     layerKey,
     (e.notes ?? "").trim().toLowerCase(),
   ]);
+}
+
+/** Chronological order by start date; stable for equal dates. */
+export function sortByDate<T extends TimelineEvent>(events: T[]): T[] {
+  return events
+    .map((e, i) => ({ e, i, v: dateValue(startDate(e)) }))
+    .sort((a, b) => a.v - b.v || a.i - b.i)
+    .map(({ e }) => e);
 }

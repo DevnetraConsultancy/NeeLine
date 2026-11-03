@@ -1,10 +1,11 @@
+import { sortByDate } from "@/lib/domain/events";
 import { prisma } from "@/lib/prisma";
 import { ApiError, json, readBody, route } from "@/lib/server/api";
 import { requireWriter } from "@/lib/server/session";
 import { enforce, RATE_RULES } from "@/lib/server/rate-limit";
 import { newEventColumns } from "@/lib/server/events";
 import {
-  assertLayerInTimeline, getDefaultLayer, MAX_LAYERS_PER_TIMELINE, ownedTimeline, sortEvents, toEventDTO,
+  assertLayerInTimeline, getDefaultLayer, MAX_LAYERS_PER_TIMELINE, ownedTimeline, toEventDTO,
   toLayerDTO, touchTimeline,
 } from "@/lib/server/timelines";
 import { pickLayerColor } from "@/lib/domain/colors";
@@ -90,7 +91,7 @@ export const POST = route(async (req) => {
   const defaultLayer = await getDefaultLayer(input.timelineId);
   return json<ImportResult>(
     {
-      created: sortEvents(result.created.map((r) => toEventDTO(r, defaultLayer.id))),
+      created: sortByDate(result.created.map((r) => toEventDTO(r, defaultLayer.id))),
       createdLayers: result.createdLayers.map((l) => toLayerDTO(l)),
       skippedDuplicates: result.skippedDuplicates,
     },

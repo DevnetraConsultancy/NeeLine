@@ -1,61 +1,54 @@
-import type { Metadata } from "next";
-import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
-import AuthProvider from "@/components/AuthProvider";
+import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
+import { Providers } from "@/components/layout/providers";
+import { siteUrl } from "@/lib/site";
 import "./globals.css";
 
-const fontDisplay = Fraunces({
-  subsets: ["latin"],
-  variable: "--font-display",
-  display: "swap",
-});
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
-const fontBody = Inter({
-  subsets: ["latin"],
-  variable: "--font-body",
-  display: "swap",
-});
-
-const fontMono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-  display: "swap",
-});
+const description =
+  "NeeLine plots historical events on a horizontal number line, from deep antiquity (BCE) to today. Group events into layers, mark periods, and export PNG, TXT or JSON.";
 
 export const metadata: Metadata = {
-  title: "NeeLine — Visualize History on a Number Line",
-  description:
-    "A minimal, data-driven horizontal timeline builder. Visualize history on a number line.",
+  metadataBase: new URL(siteUrl()),
+  title: { default: "NeeLine: history on a number line", template: "%s · NeeLine" },
+  description,
+  applicationName: "NeeLine",
+  openGraph: {
+    type: "website",
+    siteName: "NeeLine",
+    title: "NeeLine: history on a number line",
+    description,
+    url: "/",
+  },
+  twitter: { card: "summary_large_image", title: "NeeLine: history on a number line", description },
+  alternates: { canonical: "/" },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#070c16" },
+    { media: "(prefers-color-scheme: light)", color: "#faf8f5" },
+  ],
+};
+
+// Applies the saved theme before first paint so there is no flash.
+const themeScript = `try{var t=localStorage.getItem("neeline_theme");document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark")}catch(e){document.documentElement.setAttribute("data-theme","dark")}`;
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" data-theme="dark" className={inter.variable} suppressHydrationWarning>
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  var saved = localStorage.getItem('neeline_theme');
-                  if (saved === 'light' || saved === 'dark') {
-                    document.documentElement.setAttribute('data-theme', saved);
-                  } else {
-                    document.documentElement.setAttribute('data-theme', 'dark');
-                  }
-                } catch (e) {}
-              })();
-            `,
-          }}
-        />
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body
-        className={`${fontDisplay.variable} ${fontBody.variable} ${fontMono.variable} antialiased`}
-      >
-        <AuthProvider>{children}</AuthProvider>
+      <body>
+        <a
+          href="#main"
+          className="sr-only-focusable fixed left-4 top-4 z-[100] rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-fg"
+        >
+          Skip to content
+        </a>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

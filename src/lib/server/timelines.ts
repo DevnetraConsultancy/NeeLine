@@ -3,10 +3,9 @@ import type { Event as EventRow, Layer as LayerRow, Prisma, Timeline as Timeline
 import { prisma } from "@/lib/prisma";
 import { ApiError, notFound } from "@/lib/server/api";
 import { backfillTimeline } from "@/lib/server/legacy-backfill";
-import { dateValue } from "@/lib/domain/dates";
 import { DEFAULT_EVENT_COLOR } from "@/lib/domain/colors";
 import { DEFAULT_LAYER_NAME, layerNameKey } from "@/lib/domain/layers";
-import { startDate, type TimelineEvent } from "@/lib/domain/events";
+import { sortByDate, type TimelineEvent } from "@/lib/domain/events";
 import type { Layer, StudioData, TimelineDetail, TimelineSummary } from "@/types/api";
 
 export const MAX_LAYERS_PER_TIMELINE = 200;
@@ -90,13 +89,6 @@ export function toTimelineDetail(row: TimelineRow, eventCount: number): Timeline
   };
 }
 
-export function sortEvents<T extends TimelineEvent>(events: T[]): T[] {
-  return events
-    .map((e, index) => ({ e, index, value: dateValue(startDate(e)) }))
-    .sort((a, b) => a.value - b.value || a.index - b.index)
-    .map(({ e }) => e);
-}
-
 export async function getDefaultLayer(timelineId: string): Promise<LayerRow> {
   const layer = await prisma.layer.findFirst({ where: { timelineId, isDefault: true } });
   if (layer) return layer;
@@ -120,7 +112,7 @@ export async function loadStudio(userId: string, timelineId: string): Promise<St
   ]);
 
   const defaultLayerId = layerRows.find((l) => l.isDefault)!.id;
-  const events = sortEvents(eventRows.map((row) => toEventDTO(row, defaultLayerId)));
+  const events = sortByDate(eventRows.map((row) => toEventDTO(row, defaultLayerId)));
   const counts = new Map<string, number>();
   for (const e of events) counts.set(e.layerId, (counts.get(e.layerId) ?? 0) + 1);
 

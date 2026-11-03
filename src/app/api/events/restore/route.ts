@@ -1,8 +1,9 @@
+import { sortByDate } from "@/lib/domain/events";
 import { prisma } from "@/lib/prisma";
 import { json, readBody, route } from "@/lib/server/api";
 import { requireWriter } from "@/lib/server/session";
 import { newEventColumns } from "@/lib/server/events";
-import { getDefaultLayer, ownedTimeline, sortEvents, toEventDTO, touchTimeline } from "@/lib/server/timelines";
+import { getDefaultLayer, ownedTimeline, toEventDTO, touchTimeline } from "@/lib/server/timelines";
 import { eventRestoreSchema } from "@/lib/validation/schemas";
 import type { TimelineEvent } from "@/types/api";
 
@@ -36,5 +37,5 @@ export const POST = route(async (req) => {
     return tx.event.findMany({ where: { timelineId, id: { in: events.map((e) => e.id) } } });
   });
 
-  return json<TimelineEvent[]>(sortEvents(rows.map((r) => toEventDTO(r, defaultLayer.id))));
+  return json<TimelineEvent[]>(sortByDate(rows.map((r) => toEventDTO(r, defaultLayer.id))));
 });

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiRequestError, errorMessage } from "@/lib/client/api";
 import { eventFields, sortByDate, type EventFields, type TimelineEvent } from "@/lib/domain/events";
 import {
-  afterRedo, afterUndo, discardLatest, emptyHistory, forgetEvents, moveLayer, record, redoOperation, undoOperation,
+  afterRedo, afterUndo, discard, emptyHistory, forgetEvents, moveLayer, record, redoOperation, undoOperation,
   type History, type HistoryAction, type HistoryOperation,
 } from "@/lib/domain/history";
 import type { ImportResult, Layer, LayerDeleteResult, StudioData, TimelineDetail } from "@/types/api";
@@ -136,25 +136,50 @@ export function useStudio(timelineId: string) {
     return layer;
   }, [patchData, track]);
 
-  /** Optimistic, because toggling visibility should feel instant; rolls back on failure. */
-  const setVisibleLayers = useCallback(async (visibleIds: string[]) => {
-    const previous = data?.layers;
+  /**
+   * Layer visibility and order update the screen at once and are saved in the
+   * background, one request at a time with only the latest state sent, so
+   * quick toggles cannot reach the server out of order. On failure the studio
+   * reloads from the server. Resolves to whether the save succeeded.
+   */
+  const layerSync = useRef<{ running: boolean; queued: { path: string; body: unknown; failure: string } | null; waiters: Array<(ok: boolean) => void> }>({ running: false, queued: null, waiters: [] });
+
+  const syncLayers = useCallback((path: string, body: unknown, failure: string) => {
+    const sync = layerSync.current;
+    sync.queued = { path, body, failure };
+    const done = new Promise<boolean>((resolve) => sync.waiters.push(resolve));
+    if (!sync.running) {
+      sync.running = true;
+      void (async () => {
+        let ok = true;
+        while (sync.queued) {
+          const next = sync.queued;
+          sync.queued = null;
+          const result = await attempt(() => api.post(next.path, next.body), next.failure);
+          if (result === undefined) ok = false;
+        }
+        sync.running = false;
+        if (!ok) await load();
+        for (const resolve of sync.waiters.splice(0)) resolve(ok);
+      })();
+    }
+    return done;
+  }, [attempt, load]);
+
+  const setVisibleLayers = useCallback((visibleIds: string[]) => {
     const visible = new Set(visibleIds);
     patchData((d) => ({ ...d, layers: d.layers.map((l) => ({ ...l, visible: visible.has(l.id) })) }));
-    const ok = await attempt(() => api.post("/api/layers/visibility", { timelineId, visibleIds }), "Could not save layer visibility");
-    if (ok === undefined && previous) patchData((d) => ({ ...d, layers: previous }));
-  }, [attempt, data?.layers, patchData, timelineId]);
+    return syncLayers("/api/layers/visibility", { timelineId, visibleIds }, "Could not save layer visibility");
+  }, [patchData, syncLayers, timelineId]);
 
-  const reorderLayers = useCallback(async (orderedIds: string[]) => {
-    const previous = data?.layers;
+  const reorderLayers = useCallback((orderedIds: string[]) => {
     const position = new Map(orderedIds.map((id, i) => [id, i]));
     patchData((d) => ({
       ...d,
       layers: [...d.layers].map((l) => ({ ...l, position: position.get(l.id) ?? l.position })).sort((a, b) => a.position - b.position),
     }));
-    const ok = await attempt(() => api.post("/api/layers/reorder", { timelineId, orderedIds }), "Could not save the new layer order");
-    if (ok === undefined && previous) patchData((d) => ({ ...d, layers: previous }));
-  }, [attempt, data?.layers, patchData, timelineId]);
+    return syncLayers("/api/layers/reorder", { timelineId, orderedIds }, "Could not save the new layer order");
+  }, [patchData, syncLayers, timelineId]);
 
   const deleteLayer = useCallback(async (id: string, mode: "move-to-default" | "delete-events") => {
     const result = await track(() => api.delete<LayerDeleteResult>(`/api/layers/${id}`, { mode }));
@@ -166,11 +191,15 @@ export function useStudio(timelineId: string) {
           ? d.events.filter((e) => e.layerId !== id)
           : d.events.map((e) => (e.layerId === id ? { ...e, layerId: result.movedToLayerId ?? e.layerId } : e)),
     }));
-    setHistory((h) =>
-      mode === "delete-events" ? forgetEvents(h, new Set(result.deletedEventIds)) : moveLayer(h, id, result.movedToLayerId ?? id),
-    );
+    // Older history entries may still point at this layer; send them to General.
+    const defaultLayerId = data?.layers.find((l) => l.isDefault)?.id;
+    setHistory((h) => {
+      const remaining = mode === "delete-events" ? forgetEvents(h, new Set(result.deletedEventIds)) : h;
+      const target = result.movedToLayerId ?? defaultLayerId;
+      return target ? moveLayer(remaining, id, target) : remaining;
+    });
     return result;
-  }, [patchData, track]);
+  }, [data?.layers, patchData, track]);
 
   // ─── Undo / redo ────────────────────────────────────────────────────
 
@@ -206,21 +235,25 @@ export function useStudio(timelineId: string) {
   const step = useCallback(async (direction: "undo" | "redo") => {
     const action: HistoryAction | undefined = (direction === "undo" ? history.undo : history.redo).at(-1);
     if (!action || historyBusy.current) return;
+    if (pending > 0) {
+      toast.show("Wait a moment: the last change is still saving.", { duration: 2500 });
+      return;
+    }
     historyBusy.current = true;
     try {
       await track(() => perform(direction === "undo" ? undoOperation(action) : redoOperation(action)));
-      setHistory((h) => (direction === "undo" ? afterUndo(h) : afterRedo(h)));
+      setHistory((h) => (direction === "undo" ? afterUndo(h, action) : afterRedo(h, action)));
       toast.show(`${direction === "undo" ? "Undid" : "Redid"}: ${action.label}`, { duration: 3000 });
     } catch (error) {
       const gone = error instanceof ApiRequestError && (error.status === 404 || error.status === 400);
-      if (gone) setHistory((h) => discardLatest(h, direction));
+      if (gone) setHistory((h) => discard(h, action));
       toast.error(`Could not ${direction} "${action.label}"`, {
         description: gone ? "The item it refers to no longer exists, so this step was removed." : errorMessage(error),
       });
     } finally {
       historyBusy.current = false;
     }
-  }, [history, perform, toast, track]);
+  }, [history, pending, perform, toast, track]);
 
   const saveState: SaveState = pending > 0 ? "saving" : lastFailed ? "error" : "saved";
 

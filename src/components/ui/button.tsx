@@ -21,8 +21,8 @@ const variants: Record<ButtonVariant, string> = {
 
 const sizes: Record<ButtonSize, string> = {
   sm: "h-8 px-3 text-sm",
-  md: "h-10 px-4 text-sm",
-  lg: "h-12 px-6 text-base",
+  md: "h-9 px-3.5 text-sm",
+  lg: "h-11 px-5 text-base",
 };
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -94,7 +94,7 @@ export function IconButton({
       className={cn(
         base,
         variantClass,
-        size === "sm" ? "size-8" : "size-10",
+        size === "sm" ? "size-8" : "size-9",
         pressed && "bg-accent-soft text-accent hover:bg-accent-soft hover:text-accent",
         className,
       )}

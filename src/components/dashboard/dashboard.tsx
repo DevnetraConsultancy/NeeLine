@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { Archive, Layers, Plus, Search, Trash2 } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
 import { SiteFooter } from "@/components/layout/site-footer";
@@ -11,10 +12,11 @@ import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import { TabPanel, Tabs } from "@/components/ui/tabs";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
-import { CreateTimelineDialog } from "@/components/dashboard/create-timeline-dialog";
 import { TimelineCard } from "@/components/dashboard/timeline-card";
 import { api, errorMessage } from "@/lib/client/api";
 import type { TimelineSummary } from "@/types/api";
+
+const CreateTimelineDialog = dynamic(() => import("@/components/dashboard/create-timeline-dialog").then((m) => m.CreateTimelineDialog), { ssr: false });
 
 type Tab = "active" | "trash";
 type Pending = { kind: "trash" | "delete"; timeline: TimelineSummary } | null;
@@ -79,16 +81,13 @@ export function Dashboard() {
   return (
     <div className="flex min-h-dvh flex-col">
       <AppHeader />
-      <main id="main" className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 sm:py-12">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-fg">Your timelines</h1>
-            <p className="mt-1 text-fg-muted">Create, organise and open your historical timelines.</p>
-          </div>
-          <Button variant="primary" icon={Plus} size="lg" onClick={() => setCreating(true)}>New timeline</Button>
+      <main id="main" className="mx-auto w-full max-w-7xl flex-1 px-4 py-5 sm:px-6">
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-xl font-semibold tracking-tight text-fg">Your timelines</h1>
+          <Button variant="primary" icon={Plus} onClick={() => setCreating(true)}>New timeline</Button>
         </div>
 
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <Tabs<Tab>
             label="Timeline lists"
             panelId="timeline-list"
@@ -105,13 +104,13 @@ export function Dashboard() {
           </div>
         </div>
 
-        <TabPanel id="timeline-list" className="mt-6 outline-none">
+        <TabPanel id="timeline-list" className="mt-4 outline-none">
           {loadError ? (
             <ErrorState title="Your timelines could not be loaded" description={loadError} action={<Button variant="primary" onClick={load}>Try again</Button>} />
           ) : filtered === null ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
               <span className="sr-only" role="status">Loading timelines</span>
-              {Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-44 rounded-xl" />)}
+              {Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
             </div>
           ) : filtered.length === 0 ? (
             query.trim() ? (
@@ -127,7 +126,7 @@ export function Dashboard() {
               <EmptyState icon={Trash2} title="The trash is empty" description="Timelines you move to the trash stay here until you restore them or delete them permanently." />
             )
           ) : (
-            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {filtered.map((t) => (
                 <li key={t.id}>
                   <TimelineCard

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { MAX_YEAR, compareDates, validateDate, type HistoricalDate } from "@/lib/domain/dates";
-import { MAX_LAYER_NAME_LENGTH } from "@/lib/domain/layers";
+import { LIMITS } from "@/lib/validation/limits";
 
 // The CSP forbids eval; stop zod from probing for it (which logs a violation).
 z.config({ jitless: true });
@@ -10,16 +10,7 @@ z.config({ jitless: true });
  * everything; client checks exist only to give faster, friendlier feedback.
  */
 
-export const LIMITS = {
-  timelineName: 120,
-  timelineDescription: 5_000,
-  eventTitle: 200,
-  eventNotes: 10_000,
-  layerName: MAX_LAYER_NAME_LENGTH,
-  importEvents: 5_000,
-  importFileBytes: 5 * 1024 * 1024,
-  bulkDeleteIds: 5_000,
-} as const;
+export { LIMITS };
 
 // No control characters other than tab and newline in free text.
 const CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;

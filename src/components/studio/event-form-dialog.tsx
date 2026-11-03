@@ -196,7 +196,7 @@ export function EventFormDialog({ open, event, layers, events, defaultLayerId, o
           </>
         }
       >
-        <form id="event-form" className="grid gap-5" onSubmit={submit} noValidate>
+        <form id="event-form" className="grid gap-4" onSubmit={submit} noValidate>
           {errors.form && (
             <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm font-medium text-danger">
               {errors.form} Your changes are still here.
@@ -271,7 +271,7 @@ export function EventFormDialog({ open, event, layers, events, defaultLayerId, o
               )}
             </Field>
             {newLayer && (
-              <div className="grid gap-3 rounded-lg border border-line p-4">
+              <div className="grid gap-3 rounded-lg border border-line p-3">
                 <Field label="New layer name" error={errors.layer}>
                   {(p) => (
                     <Input
@@ -345,7 +345,7 @@ function DateFields({
 }) {
   const set = (patch: Partial<DateDraft>) => onChange({ ...value, ...patch });
   return (
-    <fieldset className="grid gap-3 rounded-lg border border-line p-4" aria-invalid={error ? true : undefined}>
+    <fieldset className="grid gap-2 rounded-lg border border-line p-3" aria-invalid={error ? true : undefined}>
       <legend className="px-1 text-sm font-medium text-fg">{legend}</legend>
       <div className="flex flex-wrap items-end gap-3">
         <Segmented

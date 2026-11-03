@@ -15,10 +15,10 @@ export function BrandMark({ className }: { className?: string }) {
 export function BrandLink({ className }: { className?: string }) {
   return (
     <Link href="/" className={cn("inline-flex items-center gap-2 rounded-md text-fg", className)} aria-label="NeeLine home">
-      <span className="flex size-9 items-center justify-center rounded-md bg-accent-soft text-accent">
-        <BrandMark />
+      <span className="flex size-8 items-center justify-center rounded-md bg-accent-soft text-accent">
+        <BrandMark className="size-5" />
       </span>
-      <span className="text-lg font-semibold tracking-tight">
+      <span className="text-base font-semibold tracking-tight">
         Nee<span className="text-accent">Line</span>
       </span>
     </Link>

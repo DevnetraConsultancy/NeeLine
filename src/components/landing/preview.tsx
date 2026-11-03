@@ -35,12 +35,12 @@ export function LandingPreview() {
   const selected = EVENTS.find((e) => e.id === selectedId) ?? EVENTS[2];
 
   return (
-    <div className="glass rounded-xl p-4 sm:p-6">
+    <div className="glass rounded-xl p-3 sm:p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-lg font-semibold text-fg">Try the preview</h2>
         <p className="text-sm text-fg-muted">3200 BCE to 2026 CE. Choose an event to see its details.</p>
       </div>
-      <div className="mt-4 overflow-x-auto rounded-lg border border-line bg-[var(--canvas-bg)]">
+      <div className="mt-3 overflow-x-auto rounded-lg border border-line bg-[var(--canvas-bg)]">
         <svg viewBox="0 0 800 200" className="h-auto min-w-[720px] w-full" role="group" aria-label="Sample timeline">
           <line x1={30} x2={770} y1={SPINE_Y} y2={SPINE_Y} stroke="var(--canvas-spine)" strokeWidth={2.5} />
           {EVENTS.map((e) => {
@@ -75,7 +75,7 @@ export function LandingPreview() {
           })}
         </svg>
       </div>
-      <div className="mt-4 flex gap-4 rounded-lg border border-line p-4" aria-live="polite">
+      <div className="mt-3 flex gap-3 rounded-lg border border-line p-3" aria-live="polite">
         <span className="w-1 shrink-0 rounded-full" style={{ backgroundColor: selected.color }} aria-hidden />
         <div>
           <p className="text-base font-semibold text-fg">{selected.title}</p>

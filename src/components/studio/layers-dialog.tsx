@@ -8,7 +8,7 @@ import { Modal } from "@/components/ui/modal";
 import { ColorPicker } from "@/components/ui/color-picker";
 import { errorMessage } from "@/lib/client/api";
 import { pickLayerColor } from "@/lib/domain/colors";
-import { LIMITS } from "@/lib/validation/schemas";
+import { LIMITS } from "@/lib/validation/limits";
 import type { TimelineEvent } from "@/lib/domain/events";
 import type { Layer } from "@/types/api";
 import type { Studio } from "@/components/studio/use-studio";
@@ -83,7 +83,7 @@ export function LayersDialog({ open, onClose, layers, events, studio, onDeleted 
         size="md"
         footer={<Button variant="primary" onClick={onClose}>Done</Button>}
       >
-        <section aria-labelledby="new-layer-heading" className="grid gap-3 rounded-lg border border-line p-4">
+        <section aria-labelledby="new-layer-heading" className="grid gap-3 rounded-lg border border-line p-3">
           <h3 id="new-layer-heading" className="text-sm font-semibold text-fg">New layer</h3>
           <Field label="Name" error={createError}>
             {(p) => (
@@ -108,7 +108,7 @@ export function LayersDialog({ open, onClose, layers, events, studio, onDeleted 
           <ColorPicker label="Colour" value={color} usedColors={usedColors} onChange={setColor} />
         </section>
 
-        <section aria-labelledby="layer-list-heading" className="mt-6">
+        <section aria-labelledby="layer-list-heading" className="mt-4">
           <div className="mb-2 flex items-center justify-between">
             <h3 id="layer-list-heading" className="text-sm font-semibold text-fg">
               Your layers ({layers.length})
@@ -124,7 +124,7 @@ export function LayersDialog({ open, onClose, layers, events, studio, onDeleted 
             {layers.map((layer, index) => {
               const count = counts.get(layer.id) ?? 0;
               return (
-                <li key={layer.id} className="p-3">
+                <li key={layer.id} className="px-2 py-1.5">
                   <div className="flex items-center gap-2">
                     <span className="flex flex-col">
                       <IconButton icon={ArrowUp} size="sm" label={`Move ${layer.name} up`} disabled={index === 0} onClick={() => move(index, -1)} className="!h-6" />

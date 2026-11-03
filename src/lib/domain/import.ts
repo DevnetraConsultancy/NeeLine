@@ -1,5 +1,6 @@
 import { DEFAULT_EVENT_COLOR, isHexColor } from "@/lib/domain/colors";
 import { hasLegacyTag, parseLegacyEventMetadata } from "@/lib/legacy/event-metadata";
+import { layerNameKey } from "@/lib/domain/layers";
 import { importEventSchema, LIMITS, type ImportEventInput } from "@/lib/validation/schemas";
 
 /**
@@ -135,6 +136,10 @@ export function parseImportFile(textContent: string): ParsedImport {
     else rowErrors.push(`${label}: ${parsed.error.issues[0]?.message ?? "invalid event."}`);
   });
 
-  const layers = Array.isArray(json) ? [] : readLayers((json as Raw).layers);
+  // Only send colours for layers the events actually use (the server accepts at most 200).
+  const used = new Set(events.flatMap((e) => (e.layerName ? [layerNameKey(e.layerName)] : [])));
+  const layers = (Array.isArray(json) ? [] : readLayers((json as Raw).layers))
+    .filter((l, i, all) => used.has(layerNameKey(l.name)) && all.findIndex((o) => layerNameKey(o.name) === layerNameKey(l.name)) === i)
+    .slice(0, 200);
   return { events, layers, rowErrors };
 }

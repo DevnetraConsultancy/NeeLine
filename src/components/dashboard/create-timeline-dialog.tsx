@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
 import { api, errorMessage } from "@/lib/client/api";
-import { LIMITS } from "@/lib/validation/schemas";
+import { LIMITS } from "@/lib/validation/limits";
 import type { TimelineSummary } from "@/types/api";
 
 export function CreateTimelineDialog({ onClose, onCreated }: { onClose: () => void; onCreated: (t: TimelineSummary) => void }) {

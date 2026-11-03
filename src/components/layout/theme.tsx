@@ -40,5 +40,5 @@ export function useTheme() {
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
   const next = theme === "dark" ? "light" : "dark";
-  return <IconButton icon={theme === "dark" ? Sun : Moon} label={`Switch to ${next} theme`} onClick={() => setTheme(next)} />;
+  return <IconButton icon={theme === "dark" ? Sun : Moon} size="sm" label={`Switch to ${next} theme`} onClick={() => setTheme(next)} />;
 }

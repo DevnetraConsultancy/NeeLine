@@ -40,9 +40,15 @@ export function Modal({ open, onClose, title, description, children, footer, siz
 
   useEffect(() => {
     const dialog = ref.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
+    if (!dialog || !open) return;
+    // Remember what had focus; the browser only restores it on close(), and
+    // dialogs are often unmounted while open, so restore it ourselves.
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (!dialog.open) dialog.showModal();
+    return () => {
+      if (dialog.open) dialog.close();
+      if (opener?.isConnected) opener.focus();
+    };
   }, [open]);
 
   useEffect(() => {
@@ -71,22 +77,22 @@ export function Modal({ open, onClose, title, description, children, footer, siz
         if (e.target === e.currentTarget && dismissible) onClose();
       }}
     >
-      <header className="flex items-start gap-3 border-b border-line px-6 pb-4 pt-5">
-        {icon && <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent">{icon}</span>}
+      <header className="flex items-start gap-3 border-b border-line px-5 pb-3 pt-4">
+        {icon && <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent">{icon}</span>}
         <div className="min-w-0 flex-1">
-          <h2 id={titleId} className="text-lg font-semibold leading-tight text-fg">
+          <h2 id={titleId} className="text-base font-semibold leading-tight text-fg">
             {title}
           </h2>
           {description && (
-            <p id={descriptionId} className="mt-1 text-sm text-fg-muted">
+            <p id={descriptionId} className="mt-0.5 text-sm text-fg-muted">
               {description}
             </p>
           )}
         </div>
         <IconButton icon={X} label="Close" size="sm" onClick={onClose} disabled={!dismissible} className="-mr-2 -mt-1" />
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
-      {footer && <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-line px-6 py-4">{footer}</footer>}
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
+      {footer && <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-line px-5 py-3">{footer}</footer>}
     </dialog>
   );
 }

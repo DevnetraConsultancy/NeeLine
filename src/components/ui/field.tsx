@@ -50,17 +50,17 @@ export function Field({ label, hint, error, required, hideLabel, className, chil
 }
 
 export function Input({ className, ref, ...rest }: InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement> }) {
-  return <input ref={ref} className={cn(controlClass, "h-10", className)} {...rest} />;
+  return <input ref={ref} className={cn(controlClass, "h-9", className)} {...rest} />;
 }
 
 export function Textarea({ className, ref, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement> & { ref?: Ref<HTMLTextAreaElement> }) {
-  return <textarea ref={ref} className={cn(controlClass, "min-h-24 py-2 leading-relaxed resize-y", className)} {...rest} />;
+  return <textarea ref={ref} className={cn(controlClass, "min-h-20 py-2 leading-relaxed resize-y", className)} {...rest} />;
 }
 
 export function Select({ className, children, ref, ...rest }: SelectHTMLAttributes<HTMLSelectElement> & { ref?: Ref<HTMLSelectElement> }) {
   return (
     <div className="relative">
-      <select ref={ref} className={cn(controlClass, "h-10 appearance-none pr-9", className)} {...rest}>
+      <select ref={ref} className={cn(controlClass, "h-9 appearance-none pr-9", className)} {...rest}>
         {children}
       </select>
       <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-fg-muted" aria-hidden />

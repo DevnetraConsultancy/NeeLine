@@ -36,11 +36,15 @@ const FIELDS: Array<[string, string]> = [
 ];
 
 export function JsonFormatDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const copy = async () => {
-    await navigator.clipboard.writeText(TEMPLATE_TEXT);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(TEMPLATE_TEXT);
+      setCopyState("copied");
+    } catch {
+      setCopyState("failed");
+    }
+    window.setTimeout(() => setCopyState("idle"), 2500);
   };
 
   return (
@@ -75,8 +79,8 @@ export function JsonFormatDialog({ open, onClose }: { open: boolean; onClose: ()
       <div className="mt-5 overflow-hidden rounded-lg border border-line">
         <div className="flex items-center justify-between border-b border-line px-4 py-2">
           <span className="text-xs font-medium text-fg-muted">neeline-chronicle-template.json</span>
-          <Button size="sm" variant="ghost" icon={copied ? Check : Copy} onClick={copy}>
-            {copied ? "Copied" : "Copy"}
+          <Button size="sm" variant="ghost" icon={copyState === "copied" ? Check : Copy} onClick={copy} aria-live="polite">
+            {copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy blocked: select the text instead" : "Copy"}
           </Button>
         </div>
         <pre className="max-h-72 overflow-auto p-4 text-xs leading-relaxed text-fg"><code>{TEMPLATE_TEXT}</code></pre>

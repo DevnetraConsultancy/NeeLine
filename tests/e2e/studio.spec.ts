@@ -69,7 +69,8 @@ test("periods, layers, visibility and import persist", async ({ page }) => {
   await page.getByRole("dialog", { name: "Add period" }).getByRole("button", { name: "Add period" }).click();
   await expect(page.getByRole("button", { name: /^Late Republic, 10 BCE – 10 CE \(19 yrs\)/ })).toBeVisible();
 
-  await page.getByRole("button", { name: "Layers", exact: true }).first().click();
+  await page.getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: "Manage layers" }).click();
   const layers = page.getByRole("dialog", { name: "Layers" });
   await layers.getByLabel("Name").fill("Greece");
   await layers.getByRole("button", { name: "Add", exact: true }).click();
@@ -81,7 +82,7 @@ test("periods, layers, visibility and import persist", async ({ page }) => {
   await page.reload();
   await expect(page.getByText("No events in the visible layers")).toBeVisible();
 
-  await page.getByRole("button", { name: "Import and export" }).click();
+  await page.getByRole("button", { name: "More actions" }).click();
   await page.getByRole("menuitem", { name: /Import JSON/ }).click();
   const importDialog = page.getByRole("dialog", { name: "Import events from JSON" });
   await importDialog.locator('input[type="file"]').setInputFiles({
@@ -103,7 +104,7 @@ test("periods, layers, visibility and import persist", async ({ page }) => {
   await expect(page.getByRole("button", { name: /^Marathon, 490 BCE, layer Classical Greece/ })).toBeVisible();
 
   const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Import and export" }).click();
+  await page.getByRole("button", { name: "More actions" }).click();
   await page.getByRole("menuitem", { name: /Export TXT/ }).click();
   const file = await download;
   const text = await (await file.createReadStream()).toArray().then((chunks) => Buffer.concat(chunks).toString("utf8"));

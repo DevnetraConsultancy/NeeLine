@@ -9,12 +9,16 @@ import { eventFields, type EventFields, type TimelineEvent } from "@/lib/domain/
 
 export const MAX_HISTORY = 50;
 
-export type HistoryAction =
+/** `id` is assigned by record() and lets an in-flight undo find its entry even if the stacks changed meanwhile. */
+export type HistoryAction = { id?: number } & (
   | { kind: "create"; label: string; event: TimelineEvent }
   | { kind: "update"; label: string; before: TimelineEvent; after: TimelineEvent }
   | { kind: "delete"; label: string; events: TimelineEvent[] }
   | { kind: "import"; label: string; events: TimelineEvent[] }
-  | { kind: "rename"; label: string; before: string; after: string };
+  | { kind: "rename"; label: string; before: string; after: string }
+);
+
+let nextId = 1;
 
 export type HistoryOperation =
   | { type: "delete-events"; ids: string[] }
@@ -30,7 +34,7 @@ export interface History {
 export const emptyHistory: History = { undo: [], redo: [] };
 
 export function record(history: History, action: HistoryAction): History {
-  return { undo: [...history.undo.slice(-(MAX_HISTORY - 1)), action], redo: [] };
+  return { undo: [...history.undo.slice(-(MAX_HISTORY - 1)), { ...action, id: nextId++ }], redo: [] };
 }
 
 export function undoOperation(action: HistoryAction): HistoryOperation {
@@ -63,23 +67,23 @@ export function redoOperation(action: HistoryAction): HistoryOperation {
   }
 }
 
-/** Call after the undo operation succeeded on the server. */
-export function afterUndo(history: History): History {
-  const action = history.undo.at(-1);
-  if (!action) return history;
-  return { undo: history.undo.slice(0, -1), redo: [...history.redo, action] };
+/** Call after the undo of `action` succeeded on the server: moves that entry (not just the newest) to redo. */
+export function afterUndo(history: History, action: HistoryAction): History {
+  const entry = history.undo.find((a) => a.id === action.id);
+  if (!entry) return history;
+  return { undo: history.undo.filter((a) => a !== entry), redo: [...history.redo, entry] };
 }
 
-/** Call after the redo operation succeeded on the server. */
-export function afterRedo(history: History): History {
-  const action = history.redo.at(-1);
-  if (!action) return history;
-  return { undo: [...history.undo, action], redo: history.redo.slice(0, -1) };
+/** Call after the redo of `action` succeeded on the server. */
+export function afterRedo(history: History, action: HistoryAction): History {
+  const entry = history.redo.find((a) => a.id === action.id);
+  if (!entry) return history;
+  return { undo: [...history.undo, entry], redo: history.redo.filter((a) => a !== entry) };
 }
 
-/** Drop the newest entry of a stack, e.g. when the server says it can no longer apply. */
-export function discardLatest(history: History, stack: "undo" | "redo"): History {
-  return { ...history, [stack]: history[stack].slice(0, -1) };
+/** Drop an entry the server says can no longer be applied. */
+export function discard(history: History, action: HistoryAction): History {
+  return { undo: history.undo.filter((a) => a.id !== action.id), redo: history.redo.filter((a) => a.id !== action.id) };
 }
 
 function mapAction(action: HistoryAction, fn: (events: TimelineEvent[]) => TimelineEvent[]): HistoryAction | null {

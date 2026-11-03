@@ -43,19 +43,19 @@ export function SignInPanel({ googleEnabled }: { googleEnabled: boolean }) {
   };
 
   return (
-    <div id="get-started" className="glass-strong w-full max-w-md scroll-mt-24 rounded-xl p-6 sm:p-8">
+    <div id="get-started" className="glass-strong w-full max-w-md scroll-mt-16 rounded-xl p-5 sm:p-6">
       <h2 className="text-lg font-semibold text-fg">Open your workspace</h2>
       <p className="mt-1 text-sm text-fg-muted">Start mapping a chronology in seconds.</p>
-      <div className="mt-6 grid gap-3">
+      <div className="mt-4 grid gap-2">
         {googleEnabled && (
           <form action={signInWithGoogle} onSubmit={() => setGoogleLoading(true)}>
-            <Button type="submit" size="lg" className="w-full" loading={googleLoading} disabled={guestLoading}>
+            <Button type="submit" size="md" className="w-full" loading={googleLoading} disabled={guestLoading}>
               {!googleLoading && <GoogleMark />}
               Continue with Google
             </Button>
           </form>
         )}
-        <Button variant={googleEnabled ? "secondary" : "primary"} size="lg" icon={UserRound} iconEnd={ArrowRight} loading={guestLoading} disabled={googleLoading} onClick={continueAsGuest}>
+        <Button variant={googleEnabled ? "secondary" : "primary"} size="md" icon={UserRound} iconEnd={ArrowRight} loading={guestLoading} disabled={googleLoading} onClick={continueAsGuest}>
           Continue as guest
         </Button>
       </div>

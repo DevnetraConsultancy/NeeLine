@@ -20,9 +20,9 @@ export const ZOOM_LIMITS: Record<LayoutMode, { min: number; max: number }> = {
 };
 
 export const TIER_SPACING = 32;
-export const BRACKET_TIER_SPACING = 42;
+export const BRACKET_TIER_SPACING = 36;
 export const MAX_POINT_TIERS = 4;
-export const MAX_BRACKET_TIERS = 6;
+export const MAX_BRACKET_TIERS = 12;
 const LABEL_GAP = 8;
 const AXIS_LABEL_MIN_GAP = 52;
 const GAP_BADGE_MIN_WIDTH = 50;
@@ -105,14 +105,17 @@ export function zoomAt(mode: LayoutMode, view: Viewport, factor: number, focusX:
   return { zoom, panX: focusX - width / 2 - worldAtFocus * zoom };
 }
 
-/** Viewport that frames the given date values. */
-export function fitView(scale: Scale, values: number[], width: number): Viewport | null {
+/**
+ * Viewport that frames the given date values. `edgePadding` (screen px on
+ * each side) should leave room for the widest label at the ends.
+ */
+export function fitView(scale: Scale, values: number[], width: number, edgePadding?: number): Viewport | null {
   if (values.length === 0) return null;
   const bases = values.map((v) => baseX(scale, v));
   const min = Math.min(...bases);
   const max = Math.max(...bases);
   const span = max - min;
-  const padding = scale.mode === "proportional" ? 100 : 140;
+  const padding = Math.min(width / 3, Math.max(edgePadding ?? 0, scale.mode === "proportional" ? 100 : 140));
   const available = Math.max(200, width - padding * 2);
   if (span <= 0) return { zoom: 1, panX: -min };
   const raw = available / span;
@@ -227,6 +230,64 @@ export function layoutItems<T extends LayoutInput>(
   }
 
   return [...points, ...spans];
+}
+
+// ─── Vertical geometry (pixels relative to the spine; negative is up) ───
+
+export const TICK = 14;
+const CARD_HEIGHT = 24;
+const BRACKET_LABEL_HALF = 13;
+/** Row just above the spine where collapsed events sit as dots, clear of the cards. */
+const COLLAPSED_ROW = 14;
+/** Space the axis needs below the spine: date labels, the 0 badge and gap badges. */
+export const BELOW_SPINE = 56;
+/** Minimum gap between the canvas edge and the content. */
+export const CANVAS_MARGIN = 16;
+
+/** y of the dot for a collapsed event. */
+export const collapsedDotY = -(TICK / 2 + 8);
+
+/** Top edge of a point card on the given tier. */
+export function pointCardTop(tier: number): number {
+  return -(TICK / 2 + 8 + COLLAPSED_ROW + CARD_HEIGHT + tier * TIER_SPACING);
+}
+
+export interface StackGeometry {
+  /** y of each bracket tier's crossbar. */
+  bracketY: (tier: number) => number;
+  /** Pixels the whole stack reaches above the spine. */
+  above: number;
+}
+
+/**
+ * Brackets start just above the highest point-card row actually in use, so
+ * the stack is only as tall as it needs to be.
+ */
+export function stackGeometry<T>(items: ItemLayout<T>[]): StackGeometry {
+  let pointTop = -(TICK / 2 + 8 + COLLAPSED_ROW);
+  let maxBracketTier = -1;
+  for (const item of items) {
+    if (item.kind === "point") {
+      if (!item.collapsed) pointTop = Math.min(pointTop, pointCardTop(item.tier));
+    } else {
+      maxBracketTier = Math.max(maxBracketTier, item.tier);
+    }
+  }
+  const base = pointTop - 8 - BRACKET_LABEL_HALF;
+  const bracketY = (tier: number) => base - tier * BRACKET_TIER_SPACING;
+  const top = maxBracketTier >= 0 ? bracketY(maxBracketTier) - BRACKET_LABEL_HALF : pointTop;
+  return { bracketY, above: -top };
+}
+
+/**
+ * Spine position that centres the stack and the axis labels in the canvas,
+ * keeping CANVAS_MARGIN from the top. When the stack is taller than the
+ * canvas the axis stays visible and the top rows are clipped instead.
+ */
+export function spinePosition(height: number, above: number): number {
+  const content = above + BELOW_SPINE;
+  const margin = Math.max(CANVAS_MARGIN, (height - content) / 2);
+  return Math.round(Math.min(margin + above, height - BELOW_SPINE - CANVAS_MARGIN));
 }
 
 // ─── Axis markers and gap badges ───────────────────────────────────────

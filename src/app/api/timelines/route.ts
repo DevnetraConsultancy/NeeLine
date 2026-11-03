@@ -1,255 +1,46 @@
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { parseEventMetadata, serializeEventMetadata } from "@/lib/event-metadata";
+import { json, readBody, route } from "@/lib/server/api";
+import { requireUser, requireWriter } from "@/lib/server/session";
+import { defaultLayerData, toTimelineSummary } from "@/lib/server/timelines";
+import { timelineCreateSchema } from "@/lib/validation/schemas";
+import { DEFAULT_EVENT_COLOR } from "@/lib/domain/colors";
+import type { TimelineSummary } from "@/types/api";
 
-// GET /api/timelines - List user's timelines
-export async function GET(req: NextRequest) {
-  try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+/** GET /api/timelines?trash=1 — the user's active (or trashed) timelines. */
+export const GET = route(async (req) => {
+  const user = await requireUser();
+  const inTrash = new URL(req.url).searchParams.get("trash") === "1";
+  const rows = await prisma.timeline.findMany({
+    where: { userId: user.id, deletedAt: inTrash ? { not: null } : null },
+    include: { _count: { select: { events: true } } },
+    orderBy: { updatedAt: "desc" },
+  });
+  return json<TimelineSummary[]>(rows.map((t) => toTimelineSummary(t, t._count.events)));
+});
 
-    const url = new URL(req.url);
-    const id = url.searchParams.get("id");
-    const showTrash = url.searchParams.get("trash") === "true";
+/** POST /api/timelines — create a timeline with its General layer and Year Zero marker event. */
+export const POST = route(async (req) => {
+  const user = await requireWriter();
+  const input = await readBody(req, timelineCreateSchema);
 
-    if (id) {
-      const timeline = await prisma.timeline.findFirst({
-        where: {
-          id,
-          userId: session.user.id,
-          deletedAt: showTrash ? { not: null } : null,
-        },
-        include: {
-          _count: { select: { events: true } },
-          events: {
-            take: 5,
-            select: { title: true, description: true },
-            orderBy: { createdAt: "asc" },
-          },
-        },
-      });
-
-      if (!timeline) {
-        return NextResponse.json({ error: "Timeline not found" }, { status: 404 });
-      }
-
-      let desc: string | null = null;
-      const seed = timeline.events.find((e) => e.title === "Year Zero") || timeline.events[0];
-      if (seed?.description) {
-        desc = parseEventMetadata(seed.description).description;
-      }
-
-      return NextResponse.json({
-        id: timeline.id,
-        userId: timeline.userId,
-        name: timeline.name,
-        description: desc,
-        bgColor: timeline.bgColor,
-        spineColor: timeline.spineColor,
-        tickColor: timeline.tickColor,
-        textColor: timeline.textColor,
-        deletedAt: timeline.deletedAt,
-        createdAt: timeline.createdAt,
-        updatedAt: timeline.updatedAt,
-        _count: timeline._count,
-      });
-    }
-
-    const timelines = await prisma.timeline.findMany({
-      where: {
-        userId: session.user.id,
-        deletedAt: showTrash ? { not: null } : null,
-      },
-      include: {
-        _count: { select: { events: true } },
-        events: {
-          take: 5,
-          select: { title: true, description: true },
-          orderBy: { createdAt: "asc" },
-        },
-      },
-      orderBy: { updatedAt: "desc" },
-    });
-
-    const enriched = timelines.map((t) => {
-      let desc: string | null = null;
-      const seed = t.events.find((e) => e.title === "Year Zero") || t.events[0];
-      if (seed?.description) {
-        desc = parseEventMetadata(seed.description).description;
-      }
-      return {
-        id: t.id,
-        userId: t.userId,
-        name: t.name,
-        description: desc,
-        bgColor: t.bgColor,
-        spineColor: t.spineColor,
-        tickColor: t.tickColor,
-        textColor: t.textColor,
-        deletedAt: t.deletedAt,
-        createdAt: t.createdAt,
-        updatedAt: t.updatedAt,
-        _count: t._count,
-      };
-    });
-
-    return NextResponse.json(enriched);
-  } catch (error) {
-    console.error("GET /api/timelines error:", error);
-    return NextResponse.json({ error: "Failed to fetch timelines" }, { status: 500 });
-  }
-}
-
-// POST /api/timelines - Create a new timeline
-export async function POST(req: NextRequest) {
-  try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const body = await req.json();
-    const name = String(body.name || "Untitled Timeline").trim() || "Untitled Timeline";
-    const description = body.description ? String(body.description).trim() : null;
-
-    const timeline = await prisma.timeline.create({
+  const created = await prisma.$transaction(async (tx) => {
+    const timeline = await tx.timeline.create({
       data: {
-        userId: session.user.id,
-        name,
-        events: {
-          create: {
-            year: 0,
-            isBce: false,
-            title: "Year Zero",
-            description: serializeEventMetadata({ layer: "General" }, description || null),
-            color: "#c9a84c",
-          },
-        },
+        userId: user.id,
+        name: input.name,
+        description: input.description ?? null,
+        bgColor: null,
+        spineColor: null,
+        tickColor: null,
+        textColor: null,
       },
-      include: { events: true },
     });
-
-    return NextResponse.json({ ...timeline, description }, { status: 201 });
-  } catch (error) {
-    console.error("POST /api/timelines error:", error);
-    return NextResponse.json({ error: "Failed to create timeline" }, { status: 500 });
-  }
-}
-
-// PATCH /api/timelines?id=xxx - Update a timeline (rename, colors, restore)
-export async function PATCH(req: NextRequest) {
-  try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const url = new URL(req.url);
-    const id = url.searchParams.get("id");
-    if (!id) {
-      return NextResponse.json({ error: "Missing id" }, { status: 400 });
-    }
-
-    // Verify ownership
-    const existing = await prisma.timeline.findFirst({
-      where: { id, userId: session.user.id },
+    const layer = await tx.layer.create({ data: defaultLayerData(timeline.id) });
+    await tx.event.create({
+      data: { timelineId: timeline.id, layerId: layer.id, year: 0, isBce: false, title: "Year Zero", color: DEFAULT_EVENT_COLOR },
     });
-    if (!existing) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
+    return timeline;
+  });
 
-    const body = await req.json();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: Record<string, any> = {};
-
-    if (body.name !== undefined) data.name = String(body.name).trim();
-    if (body.deletedAt !== undefined) data.deletedAt = body.deletedAt;
-    if (body.bgColor !== undefined && typeof body.bgColor === "string") data.bgColor = body.bgColor;
-    if (body.spineColor !== undefined && typeof body.spineColor === "string") data.spineColor = body.spineColor;
-    if (body.tickColor !== undefined && typeof body.tickColor === "string") data.tickColor = body.tickColor;
-    if (body.textColor !== undefined && typeof body.textColor === "string") data.textColor = body.textColor;
-
-    if (body.description !== undefined) {
-      const desc = body.description ? String(body.description).trim() : null;
-      let seedEvent = await prisma.event.findFirst({
-        where: { timelineId: id, title: "Year Zero" },
-      });
-      if (!seedEvent) {
-        seedEvent = await prisma.event.findFirst({
-          where: { timelineId: id },
-          orderBy: { createdAt: "asc" },
-        });
-      }
-      if (seedEvent) {
-        const meta = parseEventMetadata(seedEvent.description);
-        await prisma.event.update({
-          where: { id: seedEvent.id },
-          data: { description: serializeEventMetadata(meta, desc) },
-        });
-      } else {
-        await prisma.event.create({
-          data: {
-            timelineId: id,
-            year: 0,
-            isBce: false,
-            title: "Year Zero",
-            color: "#c9a84c",
-            description: serializeEventMetadata({ layer: "General" }, desc),
-          },
-        });
-      }
-    }
-
-    const updated = await prisma.timeline.update({
-      where: { id },
-      data,
-    });
-
-    return NextResponse.json({ ...updated, description: body.description });
-  } catch (error) {
-    console.error("PATCH /api/timelines error:", error);
-    return NextResponse.json({ error: "Failed to update timeline" }, { status: 500 });
-  }
-}
-
-// DELETE /api/timelines?id=xxx - Soft delete or permanent delete
-export async function DELETE(req: NextRequest) {
-  try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const url = new URL(req.url);
-    const id = url.searchParams.get("id");
-    const permanent = url.searchParams.get("permanent") === "true";
-
-    if (!id) {
-      return NextResponse.json({ error: "Missing id" }, { status: 400 });
-    }
-
-    const existing = await prisma.timeline.findFirst({
-      where: { id, userId: session.user.id },
-    });
-    if (!existing) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
-
-    if (permanent) {
-      await prisma.timeline.delete({ where: { id } });
-    } else {
-      await prisma.timeline.update({
-        where: { id },
-        data: { deletedAt: new Date() },
-      });
-    }
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("DELETE /api/timelines error:", error);
-    return NextResponse.json({ error: "Failed to delete timeline" }, { status: 500 });
-  }
-}
+  return json<TimelineSummary>(toTimelineSummary(created, 1), 201);
+});

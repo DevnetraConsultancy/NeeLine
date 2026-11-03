@@ -94,18 +94,22 @@ export function checkEventDates(value: DateFields, ctx: z.RefinementCtx): void {
 }
 
 export const eventCreateSchema = z
-  .object({
-    timelineId: idSchema,
-    /** Present only when undo restores a deleted event under its old id. */
-    restoreId: idSchema.optional(),
-    ...eventShape,
-  })
+  .object({ timelineId: idSchema, ...eventShape })
   .superRefine(checkEventDates);
 
 export const eventUpdateSchema = z.object(eventShape).partial().strict();
 
 /** Validates an existing event merged with an update. */
 export const eventFieldsSchema = z.object(eventShape).superRefine(checkEventDates);
+
+/** Undo and redo put deleted events back under their original ids. */
+export const eventRestoreSchema = z.object({
+  timelineId: idSchema,
+  events: z
+    .array(z.object({ id: idSchema, ...eventShape }).superRefine(checkEventDates))
+    .min(1)
+    .max(LIMITS.importEvents),
+});
 
 export const eventDeleteSchema = z.object({
   ids: z.array(idSchema).min(1, "Nothing to delete.").max(LIMITS.bulkDeleteIds),

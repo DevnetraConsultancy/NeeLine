@@ -16,16 +16,16 @@ export default function OpengraphImage() {
           justifyContent: "center",
           alignItems: "center",
           padding: 80,
-          backgroundColor: "#0b0714",
-          backgroundImage: "radial-gradient(900px 500px at 15% -10%, rgba(139,92,246,0.35), transparent 60%), radial-gradient(800px 460px at 88% 6%, rgba(201,168,76,0.28), transparent 60%)",
+          backgroundColor: "#0b0a08",
+          backgroundImage: "radial-gradient(900px 500px at 15% -10%, rgba(212,175,55,0.26), transparent 60%), radial-gradient(800px 460px at 88% 6%, rgba(176,126,24,0.24), transparent 60%)",
           color: "#f5f0e8",
           textAlign: "center",
         }}
       >
-        <div style={{ fontSize: 34, color: "#c9a84c", letterSpacing: 1 }}>NeeLine</div>
+        <div style={{ fontSize: 34, color: "#d4af37", letterSpacing: 1 }}>NeeLine</div>
         <div style={{ fontSize: 84, fontWeight: 700, marginTop: 18, lineHeight: 1.05 }}>All of history, on one line.</div>
         <div style={{ display: "flex", alignItems: "center", width: "100%", marginTop: 70 }}>
-          <div style={{ height: 6, flex: 1, borderRadius: 3, background: "linear-gradient(90deg, #8b5cf6, #c9a84c 56%, #e9a23b)" }} />
+          <div style={{ height: 6, flex: 1, borderRadius: 3, background: "linear-gradient(90deg, #9a7420, #d4af37 56%, #f0cf7e)" }} />
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", width: "100%", fontSize: 28, marginTop: 18, color: "#b8b2a7" }}>
           <span>3200 BCE</span>

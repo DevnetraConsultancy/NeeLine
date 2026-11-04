@@ -22,18 +22,18 @@ interface BandEvent {
  * gently until the reader touches it; choosing an event shows its record.
  */
 const EVENTS: BandEvent[] = [
-  { id: "cuneiform", title: "Cuneiform script", date: "3200 BCE", x: 96, tier: 0, color: "#8b5cf6", notes: "Reed styluses press the first written records into Sumerian clay." },
-  { id: "pyramid", title: "Great Pyramid", date: "2560 BCE", x: 175, tier: 1, color: "#8b5cf6", notes: "Giza's largest pyramid is finished after about twenty years of work." },
-  { id: "vedic", title: "Vedic period", date: "1500 – 500 BCE", x: 320, tier: 2, color: "#a855f7", notes: "The hymns of the Vedas are composed and carried forward by memory.", span: { x1: 245, x2: 395, date: "1500 – 500 BCE" } },
-  { id: "buddha", title: "Gautama Buddha", date: "563 BCE", x: 435, tier: 0, color: "#a855f7", notes: "A teacher in the Ganges basin sets out the Middle Way." },
-  { id: "parthenon", title: "Parthenon rises", date: "447 BCE", x: 530, tier: 1, color: "#c084fc", notes: "Athens begins its marble temple to Athena above the city." },
-  { id: "caesar", title: "Caesar assassinated", date: "44 BCE", x: 625, tier: 2, color: "#c9a84c", notes: "Rome's dictator falls on the Ides of March; the Republic follows." },
+  { id: "cuneiform", title: "Cuneiform script", date: "3200 BCE", x: 96, tier: 0, color: "#a8832a", notes: "Reed styluses press the first written records into Sumerian clay." },
+  { id: "pyramid", title: "Great Pyramid", date: "2560 BCE", x: 175, tier: 1, color: "#b08e2e", notes: "Giza's largest pyramid is finished after about twenty years of work." },
+  { id: "vedic", title: "Vedic period", date: "1500 – 500 BCE", x: 320, tier: 2, color: "#bd9733", notes: "The hymns of the Vedas are composed and carried forward by memory.", span: { x1: 245, x2: 395, date: "1500 – 500 BCE" } },
+  { id: "buddha", title: "Gautama Buddha", date: "563 BCE", x: 435, tier: 0, color: "#c49e34", notes: "A teacher in the Ganges basin sets out the Middle Way." },
+  { id: "parthenon", title: "Parthenon rises", date: "447 BCE", x: 530, tier: 1, color: "#cda63a", notes: "Athens begins its marble temple to Athena above the city." },
+  { id: "caesar", title: "Caesar assassinated", date: "44 BCE", x: 625, tier: 2, color: "#d4af37", notes: "Rome's dictator falls on the Ides of March; the Republic follows." },
   { id: "zero", title: "0", date: "The origin", x: 690, tier: 0, color: "#ef4444", zero: true, notes: "NeeLine keeps a fixed zero between 1 BCE and 1 CE, so eras never drift." },
-  { id: "paper", title: "Paper perfected", date: "105 CE", x: 775, tier: 1, color: "#c9a84c", notes: "Cai Lun's pulp process gives the world a cheap writing surface." },
-  { id: "gutenberg", title: "Gutenberg press", date: "1440 CE", x: 880, tier: 0, color: "#d9a53f", notes: "Movable type in Mainz turns books from treasures into tools." },
-  { id: "principia", title: "Newton's Principia", date: "1687 CE", x: 975, tier: 2, color: "#d9a53f", notes: "Motion and gravity are written down as three short laws." },
-  { id: "apollo", title: "Apollo 11", date: "1969 CE", x: 1070, tier: 1, color: "#e9a23b", notes: "Two people stand on the Sea of Tranquility and look back at Earth." },
-  { id: "today", title: "You are here", date: "Today", x: 1138, tier: 0, color: "#e9a23b", notes: "The right-hand end of the line keeps moving. Add what matters to you." },
+  { id: "paper", title: "Paper perfected", date: "105 CE", x: 775, tier: 1, color: "#dcb847", notes: "Cai Lun's pulp process gives the world a cheap writing surface." },
+  { id: "gutenberg", title: "Gutenberg press", date: "1440 CE", x: 880, tier: 0, color: "#e3c158", notes: "Movable type in Mainz turns books from treasures into tools." },
+  { id: "principia", title: "Newton's Principia", date: "1687 CE", x: 975, tier: 2, color: "#e8c766", notes: "Motion and gravity are written down as three short laws." },
+  { id: "apollo", title: "Apollo 11", date: "1969 CE", x: 1070, tier: 1, color: "#eccf74", notes: "Two people stand on the Sea of Tranquility and look back at Earth." },
+  { id: "today", title: "You are here", date: "Today", x: 1138, tier: 0, color: "#f0d183", notes: "The right-hand end of the line keeps moving. Add what matters to you." },
 ];
 
 const SPINE_Y = 214;

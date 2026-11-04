@@ -12,8 +12,8 @@ const base =
 
 const variants: Record<ButtonVariant, string> = {
   primary:
-    "bg-accent text-accent-fg shadow-sm hover:bg-accent-hover " +
-    "shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_1px_2px_rgb(0_0_0/0.3)]",
+    "bg-[linear-gradient(135deg,var(--accent-hover),var(--accent)_60%)] text-accent-fg hover:brightness-110 " +
+    "shadow-[inset_0_1px_0_rgb(255_255_255/0.28),0_1px_2px_rgb(0_0_0/0.3)]",
   secondary: "glass text-fg hover:bg-surface-hover hover:border-line-strong",
   ghost: "text-fg-muted hover:text-fg hover:bg-surface-hover",
   danger: "bg-danger text-danger-fg hover:opacity-90 shadow-sm",

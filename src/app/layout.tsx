@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Instrument_Serif, Inter } from "next/font/google";
 import { Providers } from "@/components/layout/providers";
 import { siteUrl } from "@/lib/site";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const instrument = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--font-instrument", display: "swap" });
 
 const description =
   "NeeLine plots historical events on a horizontal number line, from deep antiquity (BCE) to today. Group events into layers, mark periods, and export PNG, TXT or JSON.";
@@ -37,7 +38,7 @@ const themeScript = `try{var t=localStorage.getItem("neeline_theme");document.do
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-theme="dark" className={inter.variable} suppressHydrationWarning>
+    <html lang="en" data-theme="dark" className={`${inter.variable} ${instrument.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

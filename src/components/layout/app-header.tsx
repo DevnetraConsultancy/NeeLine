@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
-import { ChevronDown, CircleHelp, LogIn, LogOut, User } from "lucide-react";
+import { ChevronDown, CircleHelp, LogOut, User } from "lucide-react";
 import { BrandLink } from "@/components/layout/brand";
 import { useHelp } from "@/components/layout/help";
 import { ThemeToggle } from "@/components/layout/theme";
@@ -32,8 +32,7 @@ function AccountMenu() {
 
   if (!session?.user) {
     return (
-      <Link href="/#get-started" className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium text-fg hover:bg-surface-hover">
-        <LogIn className="size-4" aria-hidden />
+      <Link href="/#get-started" className="inline-flex h-8 items-center rounded-full border border-line px-3.5 text-sm font-medium text-fg transition-colors hover:border-line-strong hover:bg-surface-hover">
         Sign in
       </Link>
     );

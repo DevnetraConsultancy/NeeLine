@@ -77,6 +77,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
         if (e.target === e.currentTarget && dismissible) onClose();
       }}
     >
+      <span className="hairline-strata shrink-0 opacity-60" aria-hidden />
       <header className="flex items-start gap-3 border-b border-line px-5 pb-3 pt-4">
         {icon && <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent">{icon}</span>}
         <div className="min-w-0 flex-1">

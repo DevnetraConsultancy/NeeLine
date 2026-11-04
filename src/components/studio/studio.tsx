@@ -30,8 +30,14 @@ const ExportJsonDialog = dynamic(() => import("@/components/studio/export-json-d
 const JsonFormatDialog = dynamic(() => import("@/components/studio/json-format-dialog").then((m) => m.JsonFormatDialog), { ssr: false });
 
 const THEME_CANVAS: Record<"dark" | "light", CanvasColors & { zero: string }> = {
-  dark: { bg: "#070c16", spine: "#c9a84c", text: "#f5f0e8", zero: "#ef4444" },
+  dark: { bg: "#0b0714", spine: "#c9a84c", text: "#f5f0e8", zero: "#ef4444" },
   light: { bg: "#faf8f5", spine: "#7d5e10", text: "#0f172a", zero: "#dc2626" },
+};
+
+/** The strata-of-light spine (past -> origin -> present), used when the canvas follows the theme. */
+const THEME_STRATA: Record<"dark" | "light", [string, string, string]> = {
+  dark: ["#8b5cf6", "#c9a84c", "#e9a23b"],
+  light: ["#7c3aed", "#7d5e10", "#b45309"],
 };
 
 type Dialog = "event" | "layers" | "settings" | "import" | "export" | "format" | null;
@@ -184,7 +190,8 @@ export function Studio({ timelineId }: { timelineId: string }) {
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
       <AppHeader wide />
-      <div className="glass glass-blur z-30 rounded-none border-x-0 border-t-0">
+      <div className="glass glass-blur relative z-30 rounded-none border-x-0 border-t-0">
+        <span className="hairline-strata absolute inset-x-0 bottom-0 opacity-70" aria-hidden />
         <div className="flex flex-wrap items-center gap-x-1 gap-y-1 px-2 py-1 sm:px-3">
           <Link href="/dashboard" aria-label="Back to dashboard" className="flex size-8 items-center justify-center rounded-md text-fg-muted hover:bg-surface-hover hover:text-fg">
             <ArrowLeft className="size-4" aria-hidden />
@@ -231,6 +238,7 @@ export function Studio({ timelineId }: { timelineId: string }) {
         <TimelineCanvas
           ref={canvasRef}
           timelineId={timelineId}
+          spineStrata={timeline.colors.spine ? null : THEME_STRATA[theme]}
           events={events}
           layers={layers}
           colors={colors}

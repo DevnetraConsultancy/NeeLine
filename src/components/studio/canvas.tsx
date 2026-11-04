@@ -7,7 +7,7 @@ import { dateValue, formatDateLabel, formatSpanLabel } from "@/lib/domain/dates"
 import { endDate, startDate, type TimelineEvent } from "@/lib/domain/events";
 import {
   axisMarkers, baseX, buildScale, clampPan, fitView, gapBadges, inView, layoutItems, panPreservingFocus, valueAtBaseX, zoomAt,
-  collapsedDotY, pointCardTop, spinePosition, stackGeometry, TICK, type ItemLayout, type LayoutInput, type LayoutMode, type Scale, type Viewport,
+  collapsedDotY, pointCardTop, spinePosition, stackGeometry, stackScale, TICK, type ItemLayout, type LayoutInput, type LayoutMode, type Scale, type Viewport,
 } from "@/lib/domain/layout";
 import type { Layer } from "@/types/api";
 import { CanvasHud } from "@/components/studio/canvas-hud";
@@ -349,6 +349,11 @@ export function TimelineCanvas({
 
   const geometry = stackGeometry(items);
   const spineY = spinePosition(size.height, geometry.above);
+  // When the stack is taller than the space above the spine, the whole stack
+  // shrinks uniformly (boxes, text and spacing together). The group below is
+  // scaled about the spine; x positions are counter-scaled so every event
+  // stays glued to its date on the axis.
+  const shrink = stackScale(geometry.above, spineY);
   const viewLeft = -offsetX;
   const viewRight = size.width - offsetX;
   const [spineLeft, spineRight] = visibleValues.length
@@ -446,19 +451,25 @@ export function TimelineCanvas({
                   </g>
                 )}
 
-                {ordered.map((item) => (
-                  <EventMark
-                    key={item.event.id}
-                    item={item}
-                    offscreen={!isOnScreen(item)}
-                    spineY={spineY}
-                    bracketY={geometry.bracketY}
-                    colors={colors}
-                    zeroColor={zeroColor}
-                    onActivate={activate}
-                    onFocusChange={onEventFocus}
-                  />
-                ))}
+                <g transform={shrink === 1 ? undefined : `translate(0 ${spineY}) scale(${shrink}) translate(0 ${-spineY})`}>
+                  {ordered.map((item) => (
+                    <EventMark
+                      key={item.event.id}
+                      item={
+                        shrink === 1 ? item : item.kind === "point"
+                          ? { ...item, x: item.x / shrink }
+                          : { ...item, x: item.x / shrink, x1: item.x1 / shrink, x2: item.x2 / shrink }
+                      }
+                      offscreen={!isOnScreen(item)}
+                      spineY={spineY}
+                      bracketY={geometry.bracketY}
+                      colors={colors}
+                      zeroColor={zeroColor}
+                      onActivate={activate}
+                      onFocusChange={onEventFocus}
+                    />
+                  ))}
+                </g>
               </>
             )}
           </g>

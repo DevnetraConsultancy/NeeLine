@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   axisMarkers, baseX, buildScale, fitView, gapBadges, inView, layoutItems, panPreservingFocus,
   valueAtBaseX, zoomAt, BASE_PX_PER_YEAR, EVEN_SPACING, ZOOM_LIMITS, type LayoutInput,
-  stackGeometry, spinePosition, pointCardTop, collapsedDotY, BELOW_SPINE, CANVAS_MARGIN, clampPan,
+  stackGeometry, spinePosition, pointCardTop, collapsedDotY, BELOW_SPINE, CANVAS_MARGIN, clampPan, stackScale,
 } from "../../src/lib/domain/layout";
 import { dateValue, type HistoricalDate } from "../../src/lib/domain/dates";
 
@@ -136,4 +136,11 @@ test("layout: panning stops with a sliver of content still on screen", () => {
   assert.equal(clampPan(99999, -500, 500, 1000), 880, "left edge keeps 120px visible");
   assert.equal(clampPan(-99999, -500, 500, 1000), -880, "right edge keeps 120px visible");
   assert.equal(clampPan(5000, -10, 10, 240), 70, "narrow screens keep a quarter visible");
+});
+
+test("layout: the stack shrinks to fit above the spine", () => {
+  assert.equal(stackScale(200, 480), 1, "a stack that fits is untouched");
+  assert.equal(stackScale(464, 480), 1, "exactly the available space still fits");
+  assert.ok(Math.abs(stackScale(580, 480) - 464 / 580) < 1e-9, "a taller stack scales to fit");
+  assert.equal(stackScale(5000, 480), 0.55, "shrinking stops at 55% for readability");
 });

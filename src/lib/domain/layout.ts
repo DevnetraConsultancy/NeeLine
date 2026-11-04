@@ -291,15 +291,18 @@ export function stackGeometry<T>(items: ItemLayout<T>[]): StackGeometry {
   return { bracketY, above: -top };
 }
 
+/** Where the axis rests: just below the vertical centre of the canvas. */
+export const SPINE_ANCHOR = 0.6;
+
 /**
- * Spine position that centres the stack and the axis labels in the canvas,
- * keeping CANVAS_MARGIN from the top. When the stack is taller than the
- * canvas the axis stays visible and the top rows are clipped instead.
+ * Spine position fixed slightly below the canvas centre, so the axis never
+ * wanders as the stack grows: a stack taller than the space above it is
+ * clipped at the top instead of pushing the axis to the bottom. On very
+ * short canvases the axis labels stay visible.
  */
 export function spinePosition(height: number, above: number): number {
-  const content = above + BELOW_SPINE;
-  const margin = Math.max(CANVAS_MARGIN, (height - content) / 2);
-  return Math.round(Math.min(margin + above, height - BELOW_SPINE - CANVAS_MARGIN));
+  void above;
+  return Math.round(Math.min(height * SPINE_ANCHOR, height - BELOW_SPINE - CANVAS_MARGIN));
 }
 
 // ─── Axis markers and gap badges ───────────────────────────────────────

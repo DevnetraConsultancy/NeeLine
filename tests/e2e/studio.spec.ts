@@ -36,7 +36,7 @@ test("add, validate, edit, undo and delete an event", async ({ page }) => {
   await expect(form).toBeHidden();
   const event = page.getByRole("button", { name: /^Founding of Rome, Apr 21, 753 BCE/ });
   await expect(event).toBeVisible();
-  await expect(page.getByRole("status").filter({ hasText: "All changes saved" })).toBeAttached();
+  await expect(page.getByRole("status").filter({ hasText: "Saved" })).toBeAttached();
 
   await event.click();
   const edit = page.getByRole("dialog", { name: "Edit milestone" });
@@ -125,4 +125,10 @@ test("dashboard: rename, trash and restore", async ({ page }) => {
   await page.getByRole("button", { name: "Restore" }).first().click();
   await page.getByRole("tab", { name: /Active/ }).click();
   await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
+
+  // Descriptions are edited straight on the card.
+  await page.getByRole("button", { name: "Add a description" }).first().click();
+  await page.getByLabel("Timeline description").fill("Bronze Age to the Mauryas");
+  await page.getByRole("button", { name: "Save description" }).click();
+  await expect(page.getByRole("button", { name: "Bronze Age to the Mauryas" }).first()).toBeVisible();
 });

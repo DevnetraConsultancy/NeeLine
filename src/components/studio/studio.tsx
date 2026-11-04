@@ -307,15 +307,15 @@ export function Studio({ timelineId }: { timelineId: string }) {
 
 function SaveIndicator({ state }: { state: SaveState }) {
   const content = {
-    saved: { icon: Check, text: "All changes saved", className: "text-fg-muted" },
-    saving: { icon: Loader2, text: "Saving...", className: "text-fg-muted [&>svg]:animate-spin" },
-    error: { icon: AlertTriangle, text: "Last change was not saved", className: "text-danger" },
+    saved: { icon: Check, text: "Saved", title: "All changes saved", className: "text-fg-muted" },
+    saving: { icon: Loader2, text: "Saving...", title: "Saving your change", className: "text-fg-muted [&>svg]:animate-spin" },
+    error: { icon: AlertTriangle, text: "Not saved", title: "The last change was not saved", className: "text-danger" },
   }[state];
   const Icon = content.icon ?? CircleDashed;
   return (
-    <span role="status" title={content.text} className={`inline-flex items-center gap-1.5 text-xs font-medium ${content.className}`}>
-      <Icon className="size-3.5" aria-hidden />
-      <span className="sr-only sm:not-sr-only">{content.text}</span>
+    <span role="status" title={content.title} className={`inline-flex shrink-0 items-center gap-1.5 text-xs font-medium sm:w-20 ${content.className}`}>
+      <Icon className="size-3.5 shrink-0" aria-hidden />
+      <span className="sr-only truncate sm:not-sr-only">{content.text}</span>
     </span>
   );
 }

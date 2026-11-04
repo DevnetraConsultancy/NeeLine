@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Calendar, Check, Clock, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { Button, IconButton } from "@/components/ui/button";
-import { Input } from "@/components/ui/field";
+import { Input, Textarea } from "@/components/ui/field";
 import { errorMessage } from "@/lib/client/api";
 import { LIMITS } from "@/lib/validation/limits";
 import { timeAgo } from "@/lib/time-ago";
@@ -13,14 +13,16 @@ import type { TimelineSummary } from "@/types/api";
 interface Props {
   timeline: TimelineSummary;
   onRename: (name: string) => Promise<void>;
+  onDescribe: (description: string | null) => Promise<void>;
   onTrash: () => void;
   onRestore: () => void;
   onDelete: () => void;
 }
 
-export function TimelineCard({ timeline, onRename, onTrash, onRestore, onDelete }: Props) {
+export function TimelineCard({ timeline, onRename, onDescribe, onTrash, onRestore, onDelete }: Props) {
   const trashed = timeline.deletedAt !== null;
   const [editing, setEditing] = useState<string | null>(null);
+  const [editingDescription, setEditingDescription] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -34,6 +36,24 @@ export function TimelineCard({ timeline, onRename, onTrash, onRestore, onDelete 
     try {
       await onRename(next);
       setEditing(null);
+      setError(null);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveDescription = async () => {
+    const next = editingDescription?.trim() ?? "";
+    if (next === (timeline.description ?? "")) {
+      setEditingDescription(null);
+      return;
+    }
+    setSaving(true);
+    try {
+      await onDescribe(next || null);
+      setEditingDescription(null);
       setError(null);
     } catch (err) {
       setError(errorMessage(err));
@@ -80,7 +100,45 @@ export function TimelineCard({ timeline, onRename, onTrash, onRestore, onDelete 
       )}
       {error && <p role="alert" className="mt-1 text-xs font-medium text-danger">{error}</p>}
 
-      {timeline.description && <p className="mt-2 line-clamp-2 text-sm text-fg-muted">{timeline.description}</p>}
+      {editingDescription !== null ? (
+        <form
+          className="mt-2 flex flex-col gap-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void saveDescription();
+          }}
+        >
+          <Textarea
+            autoFocus
+            aria-label="Timeline description"
+            rows={2}
+            className="min-h-16 text-sm"
+            maxLength={LIMITS.timelineDescription}
+            value={editingDescription}
+            onChange={(e) => setEditingDescription(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setEditingDescription(null);
+            }}
+            disabled={saving}
+            placeholder="Scope, themes or sources for this timeline"
+          />
+          <span className="flex justify-end gap-1">
+            <IconButton icon={Check} size="sm" label="Save description" type="submit" disabled={saving} />
+            <IconButton icon={X} size="sm" label="Cancel" onClick={() => setEditingDescription(null)} />
+          </span>
+        </form>
+      ) : trashed ? (
+        timeline.description && <p className="mt-2 line-clamp-2 text-sm text-fg-muted">{timeline.description}</p>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditingDescription(timeline.description ?? "")}
+          title="Edit description"
+          className={`mt-2 rounded-sm text-left text-sm hover:text-fg ${timeline.description ? "line-clamp-2 text-fg-muted" : "text-fg-subtle"}`}
+        >
+          {timeline.description ?? "Add a description"}
+        </button>
+      )}
 
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-fg-muted">
         <span className="inline-flex items-center gap-1.5">

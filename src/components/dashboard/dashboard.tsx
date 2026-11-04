@@ -59,6 +59,11 @@ export function Dashboard() {
     setActive((l) => l?.map((t) => (t.id === id ? { ...t, name: updated.name, updatedAt: updated.updatedAt } : t)) ?? l);
   };
 
+  const describe = async (id: string, description: string | null) => {
+    const updated = await api.patch<TimelineSummary>(`/api/timelines/${id}`, { description });
+    setActive((l) => l?.map((t) => (t.id === id ? { ...t, description: updated.description, updatedAt: updated.updatedAt } : t)) ?? l);
+  };
+
   const restore = async (timeline: TimelineSummary) => {
     try {
       await api.post(`/api/timelines/${timeline.id}/restore`);
@@ -132,6 +137,7 @@ export function Dashboard() {
                   <TimelineCard
                     timeline={t}
                     onRename={(name) => rename(t.id, name)}
+                    onDescribe={(description) => describe(t.id, description)}
                     onTrash={() => setPending({ kind: "trash", timeline: t })}
                     onRestore={() => void restore(t)}
                     onDelete={() => setPending({ kind: "delete", timeline: t })}

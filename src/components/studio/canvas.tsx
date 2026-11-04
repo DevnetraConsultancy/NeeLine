@@ -573,13 +573,16 @@ function EventTooltip({ item, offsetX, spineY, width, height }: { item: ItemLayo
   const e = item.event;
   const end = endDate(e.source);
   const left = Math.max(8, Math.min(offsetX + item.x - 140, width - 296));
-  // Below the axis labels when there is room, otherwise pinned to the bottom edge.
-  const top = Math.max(8, Math.min(spineY + 60, height - 168));
+  // Below the axis labels when a full-height tooltip fits; otherwise pinned to
+  // the bottom edge so long notes grow upward instead of off screen.
+  const MAX_HEIGHT = 280;
+  const below = spineY + 56;
+  const position = below + MAX_HEIGHT <= height ? { top: below } : { bottom: 8 };
   return (
     <div
       role="tooltip"
       className="glass-strong pointer-events-none absolute z-20 w-72 rounded-lg p-3 text-sm"
-      style={{ left, top }}
+      style={{ left, maxHeight: MAX_HEIGHT, ...position }}
     >
       <div className="flex items-center gap-2 text-xs font-medium text-fg-muted">
         <span className="size-2.5 rounded-full" style={{ backgroundColor: e.layerColor }} aria-hidden />
@@ -589,7 +592,7 @@ function EventTooltip({ item, offsetX, spineY, width, height }: { item: ItemLayo
       </div>
       <p className="mt-1 font-semibold text-fg">{e.title}</p>
       <p className="text-xs font-medium text-accent">{end ? formatSpanLabel(startDate(e.source), end) : formatDateLabel(startDate(e.source))}</p>
-      {e.source.notes && <p className="mt-2 line-clamp-6 whitespace-pre-wrap text-xs text-fg-muted">{e.source.notes}</p>}
+      {e.source.notes && <p className="mt-2 line-clamp-5 whitespace-pre-wrap text-xs text-fg-muted">{e.source.notes}</p>}
       <p className="mt-2 text-xs text-fg-subtle">Click or press Enter to edit</p>
     </div>
   );

@@ -109,16 +109,14 @@ test("layout: culling", () => {
   assert.equal(inView(0, 10, 100, 200, 100), true);
 });
 
-test("layout: the stack is centred with a gap from the top", () => {
+test("layout: the spine is anchored just below the canvas centre", () => {
   const items = layoutItems([ev("a", d(0), d(100)), ev("p", d(50))], (v) => v * 10, measure);
   const { above, bracketY } = stackGeometry(items);
   assert.ok(bracketY(0) < pointCardTop(0), "brackets sit above the point cards");
-  const short = spinePosition(800, above);
-  assert.ok(Math.abs((short - above) - (800 - short - BELOW_SPINE)) <= 1, "equal space above and below");
-  const fits = spinePosition(above + BELOW_SPINE + 2 * CANVAS_MARGIN, above);
-  assert.equal(fits - above, CANVAS_MARGIN, "an exact fit keeps the top margin");
+  assert.equal(spinePosition(800, above), 480, "60% of the canvas height");
+  assert.equal(spinePosition(800, 10_000), 480, "a tall stack never pushes the axis down");
   const tall = spinePosition(100, above);
-  assert.equal(tall, 100 - BELOW_SPINE - CANVAS_MARGIN, "a stack taller than the canvas keeps the axis visible");
+  assert.equal(tall, 100 - BELOW_SPINE - CANVAS_MARGIN, "a short canvas keeps the axis labels visible");
 });
 
 test("layout: collapsed dots sit below the first row of cards", () => {

@@ -100,7 +100,7 @@ test("periods, layers, visibility and import persist", async ({ page }) => {
   await expect(importDialog.getByText("1 row will be skipped")).toBeVisible();
   await importDialog.getByRole("button", { name: /^Import 2 events/ }).click();
   await expect(page.getByText("Imported 1 event. Skipped 1 exact duplicates.")).toBeVisible();
-  await page.keyboard.press("0");
+  // The canvas refits on its own, so the imported event is on screen without pressing 0.
   await expect(page.getByRole("button", { name: /^Marathon, 490 BCE, layer Classical Greece/ })).toBeVisible();
 
   const download = page.waitForEvent("download");

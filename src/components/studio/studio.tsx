@@ -296,6 +296,8 @@ export function Studio({ timelineId }: { timelineId: string }) {
             studio.applyImport(result);
             const skipped = result.skippedDuplicates > 0 ? ` Skipped ${result.skippedDuplicates} exact duplicates.` : "";
             toast.success(`Imported ${result.created.length} ${result.created.length === 1 ? "event" : "events"}.${skipped}`);
+            // Bring every imported event into view once the canvas has re-laid out.
+            if (result.created.length > 0) setTimeout(() => canvasRef.current?.fit(), 0);
           }}
         />
       )}

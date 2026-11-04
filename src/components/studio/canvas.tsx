@@ -6,7 +6,7 @@ import { exportSvgAsPng } from "@/lib/client/export";
 import { dateValue, formatDateLabel, formatSpanLabel } from "@/lib/domain/dates";
 import { endDate, startDate, type TimelineEvent } from "@/lib/domain/events";
 import {
-  axisMarkers, baseX, buildScale, fitView, gapBadges, inView, layoutItems, panPreservingFocus, valueAtBaseX, zoomAt,
+  axisMarkers, baseX, buildScale, clampPan, fitView, gapBadges, inView, layoutItems, panPreservingFocus, valueAtBaseX, zoomAt,
   collapsedDotY, pointCardTop, spinePosition, stackGeometry, TICK, type ItemLayout, type LayoutInput, type LayoutMode, type Scale, type Viewport,
 } from "@/lib/domain/layout";
 import type { Layer } from "@/types/api";
@@ -135,14 +135,27 @@ export function TimelineCanvas({
     [visible, fontsReady],
   );
 
+  // The reachable world: panning stops once only a sliver of content is left on screen.
+  const bounds = useMemo(() => {
+    if (visibleValues.length === 0) return null;
+    const bases = visibleValues.map((v) => baseX(scale, v));
+    return { min: Math.min(...bases), max: Math.max(...bases) };
+  }, [scale, visibleValues]);
+
+  const clampView = useCallback((v: Viewport): Viewport => {
+    if (!bounds) return v;
+    const panX = clampPan(v.panX, bounds.min * v.zoom, bounds.max * v.zoom, size.width);
+    return panX === v.panX ? v : { ...v, panX };
+  }, [bounds, size.width]);
+
   const fit = useCallback(() => {
     const next = fitView(scale, visibleValues, size.width, labelPadding);
     if (next) setView(next);
   }, [scale, visibleValues, size.width, labelPadding]);
 
   const zoomBy = useCallback((factor: number, focusX = size.width / 2) => {
-    setView((v) => zoomAt(mode, v, factor, focusX, size.width));
-  }, [mode, size.width]);
+    setView((v) => clampView(zoomAt(mode, v, factor, focusX, size.width)));
+  }, [clampView, mode, size.width]);
 
   useEffect(() => {
     document.fonts?.ready.then(() => {
@@ -206,6 +219,12 @@ export function TimelineCanvas({
     });
   }, [scale]);
 
+  // When the reachable world shrinks (layers hidden, events removed, saved
+  // viewports restored), pull a stranded view back to the content.
+  useLayoutEffect(() => {
+    if (hasViewport.current) setView((v) => clampView(v));
+  }, [clampView]);
+
   const switchMode = useCallback((next: LayoutMode) => {
     setMode(next);
     const nextScale = buildScale(next, allValues);
@@ -260,7 +279,7 @@ export function TimelineCanvas({
       e.preventDefault();
       const rect = el.getBoundingClientRect();
       if (!e.ctrlKey && Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-        setView((v) => ({ ...v, panX: v.panX - e.deltaX }));
+        setView((v) => clampView({ ...v, panX: v.panX - e.deltaX }));
         return;
       }
       const factor = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015));
@@ -268,7 +287,7 @@ export function TimelineCanvas({
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, [zoomBy]);
+  }, [clampView, zoomBy]);
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0 && e.pointerType === "mouse") return;
@@ -306,7 +325,7 @@ export function TimelineCanvas({
     if (!dragged.current && Math.abs(dx) < 3) return;
     if (!dragged.current) containerRef.current?.setPointerCapture(e.pointerId);
     dragged.current = true;
-    setView((v) => ({ ...v, panX: v.panX + dx }));
+    setView((v) => clampView({ ...v, panX: v.panX + dx }));
   };
 
   const endPointer = (e: React.PointerEvent) => {
@@ -316,8 +335,8 @@ export function TimelineCanvas({
 
   const onCanvasKeyDown = (e: KeyboardEvent) => {
     if (e.target !== e.currentTarget) return;
-    if (e.key === "ArrowLeft") setView((v) => ({ ...v, panX: v.panX + PAN_STEP * (e.shiftKey ? 4 : 1) }));
-    else if (e.key === "ArrowRight") setView((v) => ({ ...v, panX: v.panX - PAN_STEP * (e.shiftKey ? 4 : 1) }));
+    if (e.key === "ArrowLeft") setView((v) => clampView({ ...v, panX: v.panX + PAN_STEP * (e.shiftKey ? 4 : 1) }));
+    else if (e.key === "ArrowRight") setView((v) => clampView({ ...v, panX: v.panX - PAN_STEP * (e.shiftKey ? 4 : 1) }));
     else return;
     e.preventDefault();
   };
@@ -351,7 +370,7 @@ export function TimelineCanvas({
     setFocusId(id);
     const item = id ? items.find((i) => i.event.id === id) : undefined;
     if (!item || isOnScreen(item)) return;
-    setView((v) => ({ ...v, panX: v.panX + size.width / 2 - (offsetX + item.x) }));
+    setView((v) => clampView({ ...v, panX: v.panX + size.width / 2 - (offsetX + item.x) }));
   };
   const focused = focusId ? items.find((i) => i.event.id === focusId) : undefined;
 

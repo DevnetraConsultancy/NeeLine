@@ -124,6 +124,18 @@ export function fitView(scale: Scale, values: number[], width: number, edgePaddi
 }
 
 /**
+ * Keeps part of the timeline on screen: panX is limited so at least
+ * `keep` pixels of content remain visible at either edge. contentLeft and
+ * contentRight are world pixels (zoom already applied).
+ */
+export function clampPan(panX: number, contentLeft: number, contentRight: number, width: number, keep = 120): number {
+  const margin = Math.min(keep, width / 4);
+  const lowest = margin - width / 2 - contentRight;
+  const highest = width / 2 - margin - contentLeft;
+  return Math.min(highest, Math.max(lowest, panX));
+}
+
+/**
  * When events are added or removed in even mode the anchors shift. Keep the
  * anchor that was closest to the screen centre where it was.
  */

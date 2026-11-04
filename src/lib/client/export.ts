@@ -48,21 +48,61 @@ function applyTransform(ctx: CanvasRenderingContext2D, transform: string | null)
   }
 }
 
+/** Applies stop-opacity to a computed rgb()/rgba() stop colour. */
+function stopColor(color: string, opacity: number): string {
+  if (opacity >= 1) return color;
+  const m = /^rgba?\(([^)]+)\)$/.exec(color);
+  if (!m) return color;
+  const [r = "0", g = "0", bl = "0", a = "1"] = m[1].split(/[\s,/]+/).filter(Boolean);
+  return `rgba(${r}, ${g}, ${bl}, ${parseFloat(a) * opacity})`;
+}
+
+/**
+ * Turns an SVG paint value into something the canvas accepts. Resolves
+ * url(#id) references to linear gradients defined with userSpaceOnUse
+ * coordinates (which share the element's user space, so the canvas CTM
+ * already matches). Unknown references paint nothing.
+ */
+function resolvePaint(ctx: CanvasRenderingContext2D, el: Element, value: string): string | CanvasGradient | null {
+  const ref = /^url\(["']?#([^"')]+)["']?\)/.exec(value);
+  if (!ref) return value;
+  const root = (el as SVGGraphicsElement).ownerSVGElement;
+  const def = root?.querySelector(`[id="${ref[1]}"]`);
+  if (!(def instanceof SVGLinearGradientElement)) return null;
+  const gradient = ctx.createLinearGradient(
+    def.x1.baseVal.value, def.y1.baseVal.value, def.x2.baseVal.value, def.y2.baseVal.value,
+  );
+  for (const stop of Array.from(def.querySelectorAll("stop"))) {
+    const stopStyle = getComputedStyle(stop);
+    gradient.addColorStop(
+      (stop as SVGStopElement).offset.baseVal,
+      stopColor(stopStyle.stopColor, num(stopStyle.stopOpacity, 1)),
+    );
+  }
+  return gradient;
+}
+
 function paint(ctx: CanvasRenderingContext2D, el: Element, style: CSSStyleDeclaration, fill: boolean, stroke: boolean): void {
   const fillColor = style.fill;
   const strokeColor = style.stroke;
   if (fill && fillColor && fillColor !== "none") {
-    ctx.globalAlpha *= num(style.fillOpacity, 1);
-    ctx.fillStyle = fillColor;
-    ctx.fill();
+    const resolved = resolvePaint(ctx, el, fillColor);
+    if (resolved) {
+      ctx.globalAlpha *= num(style.fillOpacity, 1);
+      ctx.fillStyle = resolved;
+      ctx.fill();
+    }
   }
   if (stroke && strokeColor && strokeColor !== "none") {
-    ctx.strokeStyle = strokeColor;
-    ctx.lineWidth = num(style.strokeWidth, 1);
-    const dash = el.getAttribute("stroke-dasharray");
-    ctx.setLineDash(dash ? dash.split(/[\s,]+/).map(Number).filter(Number.isFinite) : []);
-    ctx.lineCap = (style.strokeLinecap as CanvasLineCap) || "butt";
-    ctx.stroke();
+    const resolved = resolvePaint(ctx, el, strokeColor);
+    if (resolved) {
+      ctx.strokeStyle = resolved;
+      ctx.lineWidth = num(style.strokeWidth, 1);
+      const dash = el.getAttribute("stroke-dasharray");
+      ctx.setLineDash(dash ? dash.split(/[\s,]+/).map(Number).filter(Number.isFinite) : []);
+      ctx.lineCap = (style.strokeLinecap as CanvasLineCap) || "butt";
+      ctx.stroke();
+    }
   }
 }
 

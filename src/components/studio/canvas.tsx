@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type Ref } from "react";
+import { useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type Ref } from "react";
 import { measureText, resetTextMeasurements } from "@/lib/client/measure-text";
 import { exportSvgAsPng } from "@/lib/client/export";
 import { dateValue, formatDateLabel, formatSpanLabel } from "@/lib/domain/dates";
@@ -26,6 +26,8 @@ export interface CanvasHandle {
 
 interface CanvasProps {
   timelineId: string;
+  /** Past -> origin -> present colours for the spine when following the theme; null keeps a solid spine. */
+  spineStrata: [string, string, string] | null;
   events: TimelineEvent[];
   layers: Layer[];
   colors: CanvasColors;
@@ -71,7 +73,7 @@ function describe(e: CanvasEvent): string {
 }
 
 export function TimelineCanvas({
-  timelineId, events, layers, colors, zeroColor, showControls, showGapBorder,
+  timelineId, spineStrata, events, layers, colors, zeroColor, showControls, showGapBorder,
   onEditEvent, onSetVisibleLayers, onManageLayers, toolbarSlot, ref,
 }: CanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -333,6 +335,8 @@ export function TimelineCanvas({
   const [spineLeft, spineRight] = visibleValues.length
     ? [Math.min(...visibleValues.map(worldX)) - 60, Math.max(...visibleValues.map(worldX)) + 60]
     : [viewLeft + size.width * 0.15, viewRight - size.width * 0.15];
+  const spineGradientId = useId();
+  const spineStroke = spineStrata ? `url(#${spineGradientId})` : colors.spine;
   const zeroX = worldX(0);
   const showZero = visibleValues.length > 0 && zeroX >= spineLeft && zeroX <= spineRight;
 
@@ -371,14 +375,24 @@ export function TimelineCanvas({
         }}
       >
         <svg ref={svgRef} width={size.width} height={size.height} className="absolute inset-0" style={{ fontFamily: "var(--font-sans)" }}>
+          {spineStrata && (
+            <defs>
+              {/* userSpaceOnUse, so the PNG exporter can rebuild it exactly. */}
+              <linearGradient id={spineGradientId} gradientUnits="userSpaceOnUse" x1={spineLeft} y1={0} x2={spineRight} y2={0}>
+                <stop offset="0" stopColor={spineStrata[0]} />
+                <stop offset="0.55" stopColor={spineStrata[1]} />
+                <stop offset="1" stopColor={spineStrata[2]} />
+              </linearGradient>
+            </defs>
+          )}
           <line ref={cursorLineRef} y1={0} y2={size.height} stroke={colors.spine} strokeWidth={0.8} strokeDasharray="3 3" opacity={0.3} visibility="hidden" />
           <g transform={`translate(${offsetX} 0)`}>
             {visible.length === 0 ? (
               <EmptyCanvas cx={viewLeft + size.width / 2} cy={size.height / 2} colors={colors} hasEvents={events.length > 0} />
             ) : (
               <>
-                <line x1={spineLeft} x2={spineRight} y1={spineY} y2={spineY} stroke={colors.spine} strokeWidth={6} opacity={0.15} />
-                <line x1={spineLeft} x2={spineRight} y1={spineY} y2={spineY} stroke={colors.spine} strokeWidth={2.5} opacity={0.85} />
+                <line x1={spineLeft} x2={spineRight} y1={spineY} y2={spineY} stroke={spineStroke} strokeWidth={6} opacity={0.18} />
+                <line x1={spineLeft} x2={spineRight} y1={spineY} y2={spineY} stroke={spineStroke} strokeWidth={2.5} opacity={0.9} />
                 <circle cx={spineLeft} cy={spineY} r={3} fill={colors.spine} />
                 <circle cx={spineRight} cy={spineY} r={3} fill={colors.spine} />
 

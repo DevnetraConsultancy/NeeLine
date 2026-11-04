@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { ArrowRight, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { signInWithGoogle } from "@/app/actions";
 
@@ -19,6 +18,7 @@ function GoogleMark() {
   );
 }
 
+/** The hero's two ways in: guest first (instant), Google beside it. */
 export function SignInPanel({ googleEnabled }: { googleEnabled: boolean }) {
   const router = useRouter();
   const [guestLoading, setGuestLoading] = useState(false);
@@ -43,26 +43,34 @@ export function SignInPanel({ googleEnabled }: { googleEnabled: boolean }) {
   };
 
   return (
-    <div id="get-started" className="glass-strong w-full max-w-md scroll-mt-16 rounded-xl p-5 sm:p-6">
-      <h2 className="text-lg font-semibold text-fg">Open your workspace</h2>
-      <p className="mt-1 text-sm text-fg-muted">Start mapping a chronology in seconds.</p>
-      <div className="mt-4 grid gap-2">
+    <div id="get-started" className="scroll-mt-16">
+      <div className="flex flex-wrap items-center justify-center gap-2.5">
+        <Button
+          variant="primary"
+          size="lg"
+          loading={guestLoading}
+          disabled={googleLoading}
+          onClick={continueAsGuest}
+          className="min-w-44 shadow-[var(--cta-glow)]"
+        >
+          Continue as guest
+        </Button>
         {googleEnabled && (
           <form action={signInWithGoogle} onSubmit={() => setGoogleLoading(true)}>
-            <Button type="submit" size="md" className="w-full" loading={googleLoading} disabled={guestLoading}>
+            <Button type="submit" size="lg" className="min-w-44" loading={googleLoading} disabled={guestLoading}>
               {!googleLoading && <GoogleMark />}
               Continue with Google
             </Button>
           </form>
         )}
-        <Button variant={googleEnabled ? "secondary" : "primary"} size="md" icon={UserRound} iconEnd={ArrowRight} loading={guestLoading} disabled={googleLoading} onClick={continueAsGuest}>
-          Continue as guest
-        </Button>
       </div>
-      {error && <p role="alert" className="mt-4 rounded-md bg-danger-soft px-3 py-2 text-sm font-medium text-danger">{error}</p>}
-      <p className="mt-4 text-xs text-fg-muted">
-        No registration needed. Guest workspaces are deleted after 30 days without use; sign in with Google to keep your
-        timelines.
+      {error && (
+        <p role="alert" className="mx-auto mt-3 max-w-md rounded-md bg-danger-soft px-3 py-2 text-sm font-medium text-danger">
+          {error}
+        </p>
+      )}
+      <p className="mt-3 text-xs text-fg-subtle">
+        No account needed. Guest work is kept for 30 days; sign in with Google to keep it for good.
       </p>
     </div>
   );

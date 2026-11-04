@@ -43,7 +43,8 @@ export function TimelineCard({ timeline, onRename, onTrash, onRestore, onDelete 
   };
 
   return (
-    <article className="glass group flex h-full flex-col rounded-xl p-4 transition-[border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-line-strong">
+    <article className="glass group relative flex h-full flex-col overflow-hidden rounded-xl p-4 transition-[border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-line-strong">
+      <span className="hairline-strata absolute inset-x-0 top-0" aria-hidden />
       {editing !== null ? (
         <form
           className="flex items-center gap-1"

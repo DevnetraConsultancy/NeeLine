@@ -83,7 +83,7 @@ export function Dashboard() {
       <AppHeader />
       <main id="main" className="mx-auto w-full max-w-7xl flex-1 px-4 py-5 sm:px-6">
         <div className="flex items-center justify-between gap-3">
-          <h1 className="text-xl font-semibold tracking-tight text-fg">Your timelines</h1>
+          <h1 className="font-serif text-3xl tracking-tight text-fg">Your timelines</h1>
           <Button variant="primary" icon={Plus} onClick={() => setCreating(true)}>New timeline</Button>
         </div>
 

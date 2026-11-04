@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   axisMarkers, baseX, buildScale, fitView, gapBadges, inView, layoutItems, panPreservingFocus,
   valueAtBaseX, zoomAt, BASE_PX_PER_YEAR, EVEN_SPACING, ZOOM_LIMITS, type LayoutInput,
-  stackGeometry, spinePosition, pointCardTop, collapsedDotY, BELOW_SPINE, CANVAS_MARGIN,
+  stackGeometry, spinePosition, pointCardTop, collapsedDotY, BELOW_SPINE, CANVAS_MARGIN, clampPan,
 } from "../../src/lib/domain/layout";
 import { dateValue, type HistoricalDate } from "../../src/lib/domain/dates";
 
@@ -130,4 +130,12 @@ test("layout: fit leaves room for wide labels", () => {
   const narrow = fitView(scale, [0, 1000], 1200)!;
   const wide = fitView(scale, [0, 1000], 1200, 300)!;
   assert.ok(wide.zoom < narrow.zoom);
+});
+
+test("layout: panning stops with a sliver of content still on screen", () => {
+  // Content spans world pixels [-500, 500]; canvas is 1000 wide.
+  assert.equal(clampPan(0, -500, 500, 1000), 0, "centred view is untouched");
+  assert.equal(clampPan(99999, -500, 500, 1000), 880, "left edge keeps 120px visible");
+  assert.equal(clampPan(-99999, -500, 500, 1000), -880, "right edge keeps 120px visible");
+  assert.equal(clampPan(5000, -10, 10, 240), 70, "narrow screens keep a quarter visible");
 });

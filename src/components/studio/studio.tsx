@@ -30,7 +30,7 @@ const ExportJsonDialog = dynamic(() => import("@/components/studio/export-json-d
 const JsonFormatDialog = dynamic(() => import("@/components/studio/json-format-dialog").then((m) => m.JsonFormatDialog), { ssr: false });
 
 const THEME_CANVAS: Record<"dark" | "light", CanvasColors & { zero: string }> = {
-  dark: { bg: "#0b0a08", spine: "#d4af37", text: "#f5f0e8", zero: "#ef4444" },
+  dark: { bg: "#000000", spine: "#d4af37", text: "#f5f0e8", zero: "#ef4444" },
   light: { bg: "#faf8f5", spine: "#7d5e10", text: "#0f172a", zero: "#dc2626" },
 };
 
@@ -296,6 +296,8 @@ export function Studio({ timelineId }: { timelineId: string }) {
             studio.applyImport(result);
             const skipped = result.skippedDuplicates > 0 ? ` Skipped ${result.skippedDuplicates} exact duplicates.` : "";
             toast.success(`Imported ${result.created.length} ${result.created.length === 1 ? "event" : "events"}.${skipped}`);
+            // Bring every imported event into view once the canvas has re-laid out.
+            if (result.created.length > 0) setTimeout(() => canvasRef.current?.fit(), 0);
           }}
         />
       )}

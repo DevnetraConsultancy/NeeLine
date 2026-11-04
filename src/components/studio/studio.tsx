@@ -30,14 +30,14 @@ const ExportJsonDialog = dynamic(() => import("@/components/studio/export-json-d
 const JsonFormatDialog = dynamic(() => import("@/components/studio/json-format-dialog").then((m) => m.JsonFormatDialog), { ssr: false });
 
 const THEME_CANVAS: Record<"dark" | "light", CanvasColors & { zero: string }> = {
-  dark: { bg: "#0b0714", spine: "#c9a84c", text: "#f5f0e8", zero: "#ef4444" },
+  dark: { bg: "#0b0a08", spine: "#d4af37", text: "#f5f0e8", zero: "#ef4444" },
   light: { bg: "#faf8f5", spine: "#7d5e10", text: "#0f172a", zero: "#dc2626" },
 };
 
 /** The strata-of-light spine (past -> origin -> present), used when the canvas follows the theme. */
 const THEME_STRATA: Record<"dark" | "light", [string, string, string]> = {
-  dark: ["#8b5cf6", "#c9a84c", "#e9a23b"],
-  light: ["#7c3aed", "#7d5e10", "#b45309"],
+  dark: ["#9a7420", "#d4af37", "#f0cf7e"],
+  light: ["#5f4708", "#7d5e10", "#a97b0c"],
 };
 
 type Dialog = "event" | "layers" | "settings" | "import" | "export" | "format" | null;

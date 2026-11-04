@@ -16,8 +16,8 @@ export default function OpengraphImage() {
           justifyContent: "center",
           alignItems: "center",
           padding: 80,
-          backgroundColor: "#0b0a08",
-          backgroundImage: "radial-gradient(900px 500px at 15% -10%, rgba(212,175,55,0.26), transparent 60%), radial-gradient(800px 460px at 88% 6%, rgba(176,126,24,0.24), transparent 60%)",
+          backgroundColor: "#000000",
+          backgroundImage: "radial-gradient(900px 500px at 15% -10%, rgba(255,255,255,0.06), transparent 60%)",
           color: "#f5f0e8",
           textAlign: "center",
         }}

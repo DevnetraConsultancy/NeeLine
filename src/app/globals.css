@@ -4,7 +4,9 @@
  * NeeLine design tokens: "molten gold on black".
  * The time axis carries the identity: one bar of gold running from deep
  * bronze in the far past, through pure gold at the origin, to bright
- * champagne at the present, over warm lacquer black (parchment in light).
+ * champagne at the present. Dark surfaces are pure neutral black - gold
+ * never tints them, so the two colours stay crisp instead of muddying
+ * to brown (parchment in light).
  * Dark is the default theme; [data-theme="light"] switches.
  * Every text/background pair below meets WCAG 2.2 AA (4.5:1 for text).
  */
@@ -14,22 +16,22 @@
 :root,
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0b0a08;
+  --bg: #000000;
   --fg: #f5f0e8;
-  --fg-muted: #b8b2a7;          /* 9.5:1 on --bg */
-  --fg-subtle: #8e8a84;         /* 5.9:1 on --bg, for meta text only */
+  --fg-muted: #b3b3b3;          /* 10.0:1 on --bg */
+  --fg-subtle: #8c8c8c;         /* 6.1:1 on --bg, for meta text only */
   --line: rgb(255 255 255 / 0.12);
   --line-strong: rgb(255 255 255 / 0.22);
   --surface: rgb(255 255 255 / 0.05);
   --surface-hover: rgb(255 255 255 / 0.09);
-  --surface-solid: #181308;
-  --glass-bg: rgb(32 26 14 / 0.55);
-  --glass-bg-strong: rgb(24 19 10 / 0.88);
+  --surface-solid: #141414;
+  --glass-bg: rgb(20 20 20 / 0.55);
+  --glass-bg-strong: rgb(10 10 10 / 0.88);
   --glass-border: rgb(255 255 255 / 0.12);
   --glass-highlight: rgb(255 255 255 / 0.10);
-  --accent: #d4af37;            /* 9.4:1 on --bg */
+  --accent: #d4af37;            /* 9.9:1 on --bg */
   --accent-hover: #e7c158;
-  --accent-fg: #0b0a08;         /* text on accent, 9.4:1 */
+  --accent-fg: #000000;         /* text on accent, 9.9:1 */
   --accent-soft: rgb(212 175 55 / 0.14);
   --accent-ring: rgb(212 175 55 / 0.55);
   --danger: #f87171;
@@ -38,11 +40,11 @@
   --success: #34d399;
   --success-soft: rgb(52 211 153 / 0.14);
   --zero-marker: #ef4444;
-  --overlay: rgb(6 5 3 / 0.68);
+  --overlay: rgb(0 0 0 / 0.70);
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
   --shadow-md: 0 8px 24px -8px rgb(0 0 0 / 0.55), 0 2px 6px rgb(0 0 0 / 0.3);
   --shadow-lg: 0 24px 64px -16px rgb(0 0 0 / 0.7), 0 8px 20px -8px rgb(0 0 0 / 0.45);
-  --canvas-bg: #0b0a08;
+  --canvas-bg: #000000;
   --canvas-spine: #d4af37;
   --canvas-text: #f5f0e8;
   /* The golden strata: deep past -> origin -> present. */
@@ -53,10 +55,11 @@
   --strata-dawn: rgb(212 175 55 / 0.30);
   /* Headline gradient: a metallic sheen, each stop at least 7:1 on --bg. */
   --strata-text: linear-gradient(105deg, #f6e7b4 0%, #e7c158 38%, #c59a28 68%, #f0d183 100%);
+  /* No gold wash over the black: surfaces stay pure, gold lives on the
+     accents alone. A whisper of neutral depth keeps the page from going flat. */
   --mesh:
-    radial-gradient(55rem 38rem at 12% -8%, rgb(212 175 55 / 0.13), transparent 62%),
-    radial-gradient(48rem 34rem at 88% 2%, rgb(176 126 24 / 0.11), transparent 60%),
-    radial-gradient(64rem 46rem at 50% 118%, rgb(120 86 20 / 0.12), transparent 62%);
+    radial-gradient(55rem 38rem at 12% -8%, rgb(255 255 255 / 0.04), transparent 62%),
+    radial-gradient(64rem 46rem at 50% 118%, rgb(255 255 255 / 0.03), transparent 62%);
   --cta-glow: 0 10px 30px -8px rgb(212 175 55 / 0.45);
 }
 

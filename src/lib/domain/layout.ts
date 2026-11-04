@@ -295,6 +295,17 @@ export function stackGeometry<T>(items: ItemLayout<T>[]): StackGeometry {
 export const SPINE_ANCHOR = 0.6;
 
 /**
+ * How much to shrink the stack (cards, brackets, their text) so it fits in
+ * the space above the spine. 1 when it already fits; never below 0.55, so
+ * labels stay readable - beyond that the top rows clip.
+ */
+export function stackScale(above: number, spineY: number): number {
+  const available = spineY - CANVAS_MARGIN;
+  if (above <= available) return 1;
+  return Math.max(0.55, available / above);
+}
+
+/**
  * Spine position fixed slightly below the canvas centre, so the axis never
  * wanders as the stack grows: a stack taller than the space above it is
  * clipped at the top instead of pushing the axis to the bottom. On very

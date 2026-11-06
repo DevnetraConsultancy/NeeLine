@@ -20,6 +20,8 @@ export interface CanvasColors {
 
 export interface CanvasHandle {
   fit: () => void;
+  /** Fits on the next commit, after pending data changes (e.g. an import) have rendered. */
+  requestFit: () => void;
   zoomBy: (factor: number) => void;
   exportPng: (filename: string) => Promise<void>;
 }
@@ -87,6 +89,8 @@ export function TimelineCanvas({
   const [focusId, setFocusId] = useState<string | null>(null);
   const [fontsReady, setFontsReady] = useState(0);
   const hasViewport = useRef(false);
+  const [fitRequest, setFitRequest] = useState(0);
+  const requestFit = useCallback(() => setFitRequest((n) => n + 1), []);
 
   // ─── Data ───────────────────────────────────────────────────────────
 
@@ -225,15 +229,35 @@ export function TimelineCanvas({
     if (hasViewport.current) setView((v) => clampView(v));
   }, [clampView]);
 
+  // Fit when the canvas starts showing layers again, or when exactly one layer
+  // is shown on its own. Adding layers to ones already on screen keeps the view.
+  const visibleLayerKey = layers.filter((l) => l.visible).map((l) => l.id).sort().join(",");
+  const previousLayerKey = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const prev = previousLayerKey.current;
+    previousLayerKey.current = visibleLayerKey;
+    if (prev === null || prev === visibleLayerKey || !visibleLayerKey) return;
+    if (prev === "" || !visibleLayerKey.includes(",")) requestFit();
+  }, [visibleLayerKey, requestFit]);
+
+  // Declared after the effects above, so its plain setView wins over their
+  // functional updates in the same commit.
+  const fitRef = useRef(fit);
+  fitRef.current = fit;
+  useLayoutEffect(() => {
+    if (fitRequest === 0) return;
+    hasViewport.current = true;
+    fitRef.current();
+  }, [fitRequest]);
+
   const switchMode = useCallback((next: LayoutMode) => {
     setMode(next);
-    const nextScale = buildScale(next, allValues);
-    const fitted = fitView(nextScale, visibleValues, size.width, labelPadding);
-    if (fitted) setView(fitted);
-  }, [allValues, visibleValues, size.width, labelPadding]);
+    requestFit();
+  }, [requestFit]);
 
   useImperativeHandle(ref, () => ({
     fit,
+    requestFit,
     zoomBy: (factor: number) => zoomBy(factor),
     exportPng: async (filename: string) => {
       const before = view;
@@ -245,7 +269,7 @@ export function TimelineCanvas({
         setView(before);
       }
     },
-  }), [colors.bg, fit, view, zoomBy]);
+  }), [colors.bg, fit, requestFit, view, zoomBy]);
 
   // ─── Pointer, wheel and keyboard ────────────────────────────────────
 
@@ -528,7 +552,8 @@ interface MarkProps {
 function EventMark({ item, spineY, offscreen, bracketY, colors, zeroColor, onActivate, onFocusChange }: MarkProps) {
   const e = item.event;
   const isZero = e.start.year === 0 || e.end?.year === 0;
-  const border = isZero ? zeroColor : e.source.color;
+  // Everything except the spine takes the layer colour: stems, brackets and card borders.
+  const border = isZero ? zeroColor : e.layerColor;
   const a11y = {
     role: "button",
     tabIndex: 0,

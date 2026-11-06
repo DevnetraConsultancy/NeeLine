@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDown, ArrowUp, Check, Layers, Palette, Pencil, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Layers, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Button, IconButton } from "@/components/ui/button";
-import { Field, Input } from "@/components/ui/field";
+import { Input } from "@/components/ui/field";
+import { cn } from "@/lib/cn";
 import { Modal } from "@/components/ui/modal";
 import { ColorPicker } from "@/components/ui/color-picker";
 import { errorMessage } from "@/lib/client/api";
@@ -30,6 +31,7 @@ export function LayersDialog({ open, onClose, layers, events, studio, onDeleted 
   const [rowError, setRowError] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
   const [recolouring, setRecolouring] = useState<string | null>(null);
+  const [pickingNewColor, setPickingNewColor] = useState(false);
   const [deleting, setDeleting] = useState<Layer | null>(null);
 
   const counts = new Map<string, number>();
@@ -78,70 +80,99 @@ export function LayersDialog({ open, onClose, layers, events, studio, onDeleted 
         open={open}
         onClose={onClose}
         title="Layers"
-        description="Group events into layers, each with its own colour. Order, colours and visibility are saved with the timeline."
+        description="A layer's colour is used for its cards, stems and brackets."
         icon={<Layers className="size-5" aria-hidden />}
         size="md"
-        footer={<Button variant="primary" onClick={onClose}>Done</Button>}
+        footer={<Button variant="primary" size="sm" onClick={onClose}>Done</Button>}
       >
-        <section aria-labelledby="new-layer-heading" className="grid gap-3 rounded-lg border border-line p-3">
-          <h3 id="new-layer-heading" className="text-sm font-semibold text-fg">New layer</h3>
-          <Field label="Name" error={createError}>
-            {(p) => (
-              <div className="flex gap-2">
-                <Input
-                  {...p}
-                  value={name}
-                  maxLength={LIMITS.layerName}
-                  placeholder="e.g. Bronze Age, Classical Rome, Renaissance"
-                  onChange={(e) => setName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      void create();
-                    }
-                  }}
-                />
-                <Button variant="primary" loading={creating} onClick={create}>Add</Button>
-              </div>
-            )}
-          </Field>
-          <ColorPicker label="Colour" value={color} usedColors={usedColors} onChange={setColor} />
+        <section aria-label="New layer" className="grid gap-2">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              aria-label="Choose colour for the new layer"
+              aria-expanded={pickingNewColor}
+              title="Colour"
+              onClick={() => setPickingNewColor((v) => !v)}
+              className="size-7 shrink-0 rounded-full border-2 border-line-strong outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)]"
+              style={{ backgroundColor: color }}
+            />
+            <Input
+              aria-label="New layer name"
+              aria-invalid={createError ? true : undefined}
+              className="h-8"
+              value={name}
+              maxLength={LIMITS.layerName}
+              placeholder="New layer name"
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void create();
+                }
+              }}
+            />
+            <Button variant="primary" size="sm" icon={Plus} loading={creating} onClick={create}>Add</Button>
+          </div>
+          {pickingNewColor && (
+            <ColorPicker
+              compact
+              className="pl-9"
+              label="Colour for the new layer"
+              value={color}
+              usedColors={usedColors}
+              onChange={(hex) => {
+                setColor(hex);
+                setPickingNewColor(false);
+              }}
+            />
+          )}
+          {createError && <p role="alert" className="pl-9 text-xs font-medium text-danger">{createError}</p>}
         </section>
 
-        <section aria-labelledby="layer-list-heading" className="mt-4">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 id="layer-list-heading" className="text-sm font-semibold text-fg">
+        <section aria-labelledby="layer-list-heading" className="mt-3">
+          <div className="mb-1 flex items-center justify-between">
+            <h3 id="layer-list-heading" className="text-xs font-semibold uppercase tracking-wide text-fg-muted">
               Your layers ({layers.length})
             </h3>
-            <span className="flex gap-1">
-              <Button size="sm" variant="ghost" onClick={() => studio.setVisibleLayers(layers.map((l) => l.id))}>Show all</Button>
-              <Button size="sm" variant="ghost" onClick={() => studio.setVisibleLayers([])}>Hide all</Button>
+            <span className="flex gap-0.5">
+              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => studio.setVisibleLayers(layers.map((l) => l.id))}>Show all</Button>
+              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => studio.setVisibleLayers([])}>Hide all</Button>
             </span>
           </div>
-          {rowError && <p role="alert" className="mb-2 rounded-md bg-danger-soft px-3 py-2 text-sm font-medium text-danger">{rowError}</p>}
+          {rowError && <p role="alert" className="mb-2 rounded-md bg-danger-soft px-3 py-1.5 text-xs font-medium text-danger">{rowError}</p>}
 
-          <ul className="divide-y divide-line rounded-lg border border-line">
+          <ul className="max-h-[50dvh] divide-y divide-line overflow-y-auto rounded-lg border border-line">
             {layers.map((layer, index) => {
               const count = counts.get(layer.id) ?? 0;
               return (
-                <li key={layer.id} className="px-2 py-1.5">
-                  <div className="flex items-center gap-2">
+                <li key={layer.id} className="px-1.5 py-0.5">
+                  <div className="flex items-center gap-1.5">
                     <span className="flex flex-col">
-                      <IconButton icon={ArrowUp} size="sm" label={`Move ${layer.name} up`} disabled={index === 0} onClick={() => move(index, -1)} className="!h-6" />
-                      <IconButton icon={ArrowDown} size="sm" label={`Move ${layer.name} down`} disabled={index === layers.length - 1} onClick={() => move(index, 1)} className="!h-6" />
+                      <IconButton icon={ArrowUp} size="sm" label={`Move ${layer.name} up`} disabled={index === 0} onClick={() => move(index, -1)} className="!h-4 !w-6 [&>svg]:!size-3" />
+                      <IconButton icon={ArrowDown} size="sm" label={`Move ${layer.name} down`} disabled={index === layers.length - 1} onClick={() => move(index, 1)} className="!h-4 !w-6 [&>svg]:!size-3" />
                     </span>
-                    <label className="flex items-center" title={layer.visible ? `Hide ${layer.name}` : `Show ${layer.name}`}>
-                      <input
-                        type="checkbox"
-                        className="size-4 accent-[var(--accent)]"
-                        checked={layer.visible}
-                        aria-label={`Show ${layer.name} on the canvas`}
-                        onChange={() =>
-                          studio.setVisibleLayers(layer.visible ? visibleIds.filter((id) => id !== layer.id) : [...visibleIds, layer.id])
-                        }
-                      />
-                    </label>
-                    <span className="size-4 shrink-0 rounded-full" style={{ backgroundColor: layer.color }} aria-hidden />
+                    <input
+                      type="checkbox"
+                      className="size-4 shrink-0 accent-[var(--accent)]"
+                      checked={layer.visible}
+                      title={layer.visible ? `Hide ${layer.name}` : `Show ${layer.name}`}
+                      aria-label={`Show ${layer.name} on the canvas`}
+                      onChange={() =>
+                        studio.setVisibleLayers(layer.visible ? visibleIds.filter((id) => id !== layer.id) : [...visibleIds, layer.id])
+                      }
+                    />
+                    <button
+                      type="button"
+                      aria-label={`Change colour of ${layer.name}`}
+                      aria-pressed={recolouring === layer.id}
+                      title="Change colour"
+                      onClick={() => setRecolouring(recolouring === layer.id ? null : layer.id)}
+                      className={cn(
+                        "size-4 shrink-0 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)]",
+                        recolouring === layer.id && "ring-2 ring-fg",
+                      )}
+                      style={{ backgroundColor: layer.color }}
+                    />
 
                     {renaming?.id === layer.id ? (
                       <form
@@ -154,7 +185,7 @@ export function LayersDialog({ open, onClose, layers, events, studio, onDeleted 
                         <Input
                           autoFocus
                           aria-label={`New name for ${layer.name}`}
-                          className="h-8"
+                          className="h-7"
                           maxLength={LIMITS.layerName}
                           value={renaming.value}
                           onChange={(e) => setRenaming({ id: layer.id, value: e.target.value })}
@@ -165,27 +196,22 @@ export function LayersDialog({ open, onClose, layers, events, studio, onDeleted 
                             }
                           }}
                         />
-                        <IconButton icon={Check} size="sm" label="Save name" type="submit" />
-                        <IconButton icon={X} size="sm" label="Cancel rename" onClick={() => setRenaming(null)} />
+                        <IconButton icon={Check} size="sm" label="Save name" type="submit" className="!size-7" />
+                        <IconButton icon={X} size="sm" label="Cancel rename" onClick={() => setRenaming(null)} className="!size-7" />
                       </form>
                     ) : (
-                      <span className="flex min-w-0 flex-1 items-center gap-2">
+                      <span className="flex min-w-0 flex-1 items-center gap-1.5">
                         <span className="truncate text-sm font-medium text-fg">{layer.name}</span>
-                        {layer.isDefault && <span className="rounded-sm bg-surface-hover px-1.5 text-xs text-fg-muted">Default</span>}
+                        {layer.isDefault && <span className="rounded-sm bg-surface-hover px-1 text-[10px] text-fg-muted">Default</span>}
                       </span>
                     )}
 
-                    <span className="shrink-0 text-xs tabular-nums text-fg-muted">{count} {count === 1 ? "event" : "events"}</span>
+                    <span className="shrink-0 rounded-sm bg-surface px-1.5 text-xs tabular-nums text-fg-muted" title={`${count} ${count === 1 ? "event" : "events"}`}>
+                      {count}
+                    </span>
                     {!layer.isDefault && renaming?.id !== layer.id && (
-                      <IconButton icon={Pencil} size="sm" label={`Rename ${layer.name}`} onClick={() => setRenaming({ id: layer.id, value: layer.name })} />
+                      <IconButton icon={Pencil} size="sm" label={`Rename ${layer.name}`} onClick={() => setRenaming({ id: layer.id, value: layer.name })} className="!size-7" />
                     )}
-                    <IconButton
-                      icon={Palette}
-                      size="sm"
-                      label={`Change colour of ${layer.name}`}
-                      pressed={recolouring === layer.id}
-                      onClick={() => setRecolouring(recolouring === layer.id ? null : layer.id)}
-                    />
                     <IconButton
                       icon={Trash2}
                       size="sm"
@@ -193,15 +219,20 @@ export function LayersDialog({ open, onClose, layers, events, studio, onDeleted 
                       label={layer.isDefault ? "The General layer cannot be deleted" : `Delete ${layer.name}`}
                       disabled={layer.isDefault}
                       onClick={() => setDeleting(layer)}
+                      className="!size-7"
                     />
                   </div>
                   {recolouring === layer.id && (
                     <ColorPicker
-                      className="mt-3 pl-12"
+                      compact
+                      className="pb-1.5 pl-[3.25rem] pt-1"
                       label={`Colour for ${layer.name}`}
                       value={layer.color}
                       usedColors={usedColors}
-                      onChange={(hex) => void run(() => studio.updateLayer(layer.id, { color: hex }))}
+                      onChange={(hex) => {
+                        void run(() => studio.updateLayer(layer.id, { color: hex }));
+                        setRecolouring(null);
+                      }}
                     />
                   )}
                 </li>

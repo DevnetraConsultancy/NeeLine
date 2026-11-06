@@ -44,6 +44,7 @@ export function CanvasHud(props: HudProps) {
         size="sm"
         value={mode}
         onChange={onModeChange}
+        onReselect={onModeChange}
         options={[
           { value: "even", label: "Even" },
           { value: "proportional", label: "Proportional" },

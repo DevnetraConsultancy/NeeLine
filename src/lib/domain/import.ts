@@ -90,7 +90,8 @@ function normalizeRow(row: Raw, fallbackTitle: string): Raw {
     endIsBce: hasEnd ? end.isBce : null,
     endMonth: hasEnd ? toNumber(row.endMonth) : null,
     endDay: hasEnd ? toNumber(row.endDay) : null,
-    color: isHexColor(row.color) ? row.color : DEFAULT_EVENT_COLOR,
+    // Colour belongs to the layer; any per-event colour in the file is ignored.
+    color: DEFAULT_EVENT_COLOR,
     layerName,
   };
 }

@@ -76,7 +76,7 @@ export function EventFormDialog({ open, event, layers, events, defaultLayerId, o
   const [title, setTitle] = useState(event?.title ?? "");
   const [notes, setNotes] = useState(event?.notes ?? "");
   const [layerId, setLayerId] = useState(event?.layerId ?? defaultLayerId);
-  const [color, setColor] = useState(event?.color ?? layers.find((l) => l.id === defaultLayerId)?.color ?? DEFAULT_EVENT_COLOR);
+  const [color, setColor] = useState(layers.find((l) => l.id === (event?.layerId ?? defaultLayerId))?.color ?? DEFAULT_EVENT_COLOR);
   const [start, setStart] = useState<DateDraft>(event ? toDraft(event.year, event.isBce, event.month, event.day) : blankDate);
   const [end, setEnd] = useState<DateDraft>(event ? toDraft(event.endYear, event.endIsBce, event.endMonth, event.endDay) : blankDate);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -311,7 +311,6 @@ export function EventFormDialog({ open, event, layers, events, defaultLayerId, o
             )}
           </Field>
 
-          <ColorPicker label="Card border colour" value={color} onChange={setColor} />
         </form>
       </Modal>
 

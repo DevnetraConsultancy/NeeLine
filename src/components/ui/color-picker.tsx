@@ -12,10 +12,12 @@ interface ColorPickerProps {
   /** Colours already taken elsewhere; still selectable but marked. */
   usedColors?: ReadonlyArray<string>;
   className?: string;
+  /** Smaller swatches in one wrapping row, with the label kept for screen readers only. */
+  compact?: boolean;
 }
 
 /** The 16 layer colours as a radio group (arrow keys move, Space/Enter selects). */
-export function ColorPicker({ label, value, onChange, usedColors = [], className }: ColorPickerProps) {
+export function ColorPicker({ label, value, onChange, usedColors = [], className, compact = false }: ColorPickerProps) {
   const labelId = useId();
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
   const current = value.toLowerCase();
@@ -32,11 +34,11 @@ export function ColorPicker({ label, value, onChange, usedColors = [], className
   };
 
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
-      <span id={labelId} className="text-sm font-medium text-fg">
+    <div className={cn("flex flex-col", !compact && "gap-2", className)}>
+      <span id={labelId} className={compact ? "sr-only" : "text-sm font-medium text-fg"}>
         {label}
       </span>
-      <div role="radiogroup" aria-labelledby={labelId} className="grid grid-cols-8 gap-2">
+      <div role="radiogroup" aria-labelledby={labelId} className={compact ? "flex flex-wrap gap-1.5" : "grid grid-cols-8 gap-2"}>
         {LAYER_COLOR_PRESETS.map((preset, index) => {
           const selected = preset.hex === current;
           const taken = used.has(preset.hex) && !selected;
@@ -55,13 +57,14 @@ export function ColorPicker({ label, value, onChange, usedColors = [], className
               onClick={() => onChange(preset.hex)}
               onKeyDown={(e) => onKeyDown(e, index)}
               className={cn(
-                "relative flex size-8 items-center justify-center rounded-full border-2 transition-transform hover:scale-110",
+                "relative flex items-center justify-center rounded-full border-2 transition-transform hover:scale-110",
+                compact ? "size-6" : "size-8",
                 selected ? "border-fg" : "border-transparent",
                 taken && "opacity-40",
               )}
               style={{ backgroundColor: preset.hex }}
             >
-              {selected && <Check className="size-4 text-[#070c16]" strokeWidth={3} aria-hidden />}
+              {selected && <Check className={compact ? "size-3.5 text-[#070c16]" : "size-4 text-[#070c16]"} strokeWidth={3} aria-hidden />}
             </button>
           );
         })}

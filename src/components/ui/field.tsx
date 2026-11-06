@@ -114,6 +114,7 @@ export function Segmented<T extends string>({
   value,
   options,
   onChange,
+  onReselect,
   className,
   size = "md",
 }: {
@@ -121,6 +122,8 @@ export function Segmented<T extends string>({
   value: T;
   options: ReadonlyArray<{ value: T; label: string }>;
   onChange: (value: T) => void;
+  /** Called when the already-selected option is clicked again. */
+  onReselect?: (value: T) => void;
   className?: string;
   size?: "sm" | "md";
 }) {
@@ -143,6 +146,9 @@ export function Segmented<T extends string>({
             value={option.value}
             checked={value === option.value}
             onChange={() => onChange(option.value)}
+            onClick={() => {
+              if (value === option.value) onReselect?.(option.value);
+            }}
             className="peer sr-only"
           />
           <span className="peer-focus-visible:underline peer-focus-visible:underline-offset-4">{option.label}</span>

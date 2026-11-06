@@ -16,10 +16,10 @@ const TEMPLATE = {
     { name: "Roman Republic & Empire", color: "#c9a84c" },
   ],
   events: [
-    { title: "Founding of the Roman Republic", year: 509, isBce: true, month: null, day: null, color: "#c9a84c", layer: "Roman Republic & Empire", description: "Overthrow of the Roman monarchy and establishment of the Republican government." },
-    { title: "Classical Period of Greece", year: 510, isBce: true, endYear: 323, endIsBce: true, color: "#38bdf8", layer: "Classical Greece", description: "Era between the Persian Wars and the death of Alexander the Great." },
-    { title: "Pax Romana Era", year: 27, isBce: true, endYear: 180, endIsBce: false, color: "#c9a84c", layer: "Roman Republic & Empire", description: "Extensive period of peace and imperial order initiated under Caesar Augustus." },
-    { title: "Fall of the Western Roman Empire", year: 476, isBce: false, month: 9, day: 4, color: "#f43f5e", layer: "Roman Republic & Empire", description: "Deposition of Emperor Romulus Augustulus by Odoacer." },
+    { title: "Founding of the Roman Republic", year: 509, isBce: true, month: null, day: null, layer: "Roman Republic & Empire", description: "Overthrow of the Roman monarchy and establishment of the Republican government." },
+    { title: "Classical Period of Greece", year: 510, isBce: true, endYear: 323, endIsBce: true, layer: "Classical Greece", description: "Era between the Persian Wars and the death of Alexander the Great." },
+    { title: "Pax Romana Era", year: 27, isBce: true, endYear: 180, endIsBce: false, layer: "Roman Republic & Empire", description: "Extensive period of peace and imperial order initiated under Caesar Augustus." },
+    { title: "Fall of the Western Roman Empire", year: 476, isBce: false, month: 9, day: 4, layer: "Roman Republic & Empire", description: "Deposition of Emperor Romulus Augustulus by Odoacer." },
   ],
 };
 
@@ -31,7 +31,7 @@ const FIELDS: Array<[string, string]> = [
   ["month, day", "Optional. Month 1-12; a day needs a month and must exist in that month."],
   ["endYear, endIsBce, endMonth, endDay", "Optional. Makes the event a period drawn as a bracket. Must end on or after the start."],
   ["layer", "Optional. Layer name. Missing layers can be created during import."],
-  ["color", "Optional. Card border colour as #rrggbb."],
+  ["layers[].color", "Optional. One colour per layer as #rrggbb, used for its cards, stems and brackets."],
   ["description", "Optional. Notes, up to 10,000 characters."],
 ];
 

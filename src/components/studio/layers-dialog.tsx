@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowDown, ArrowUp, Check, Layers, Pencil, Plus, Trash2, X } from "lucide-react";
+import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { Check, GripVertical, Layers, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Button, IconButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
@@ -68,11 +68,63 @@ export function LayersDialog({ open, onClose, layers, events, studio, onDeleted 
     }
   };
 
-  const move = (index: number, delta: -1 | 1) => {
+  /** Moves the layer at `from` so it sits before the layer currently at `before` (layers.length = end). */
+  const moveTo = (from: number, before: number) => {
+    const to = before > from ? before - 1 : before;
+    if (to === from || to < 0 || to >= layers.length) return;
     const ids = layers.map((l) => l.id);
-    [ids[index], ids[index + delta]] = [ids[index + delta], ids[index]];
+    const [id] = ids.splice(from, 1);
+    ids.splice(to, 0, id);
     void studio.reorderLayers(ids);
   };
+
+  // Pointer-driven drag from the grip, so it works with mouse, pen and touch.
+  const listRef = useRef<HTMLUListElement>(null);
+  const [drag, setDrag] = useState<{ from: number; before: number } | null>(null);
+  const dropIndex = (clientY: number) => {
+    const rows = Array.from(listRef.current?.children ?? []);
+    const i = rows.findIndex((row) => {
+      const r = row.getBoundingClientRect();
+      return clientY < r.top + r.height / 2;
+    });
+    return i === -1 ? rows.length : i;
+  };
+  const autoScroll = (target: HTMLElement, clientY: number) => {
+    const scroller = target.closest<HTMLElement>(".overflow-y-auto");
+    if (!scroller) return;
+    const r = scroller.getBoundingClientRect();
+    if (clientY < r.top + 32) scroller.scrollTop -= 12;
+    else if (clientY > r.bottom - 32) scroller.scrollTop += 12;
+  };
+  const grip = (index: number, layerName: string) => ({
+    "aria-label": `Reorder ${layerName}. Drag, or use the up and down arrow keys.`,
+    title: "Drag to reorder",
+    onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      setDrag({ from: index, before: index });
+    },
+    onPointerMove: (e: ReactPointerEvent<HTMLButtonElement>) => {
+      if (!drag) return;
+      autoScroll(e.currentTarget, e.clientY);
+      const before = dropIndex(e.clientY);
+      if (before !== drag.before) setDrag({ ...drag, before });
+    },
+    onPointerUp: () => {
+      if (drag) moveTo(drag.from, drag.before);
+      setDrag(null);
+    },
+    onPointerCancel: () => setDrag(null),
+    onKeyDown: (e: ReactKeyboardEvent<HTMLButtonElement>) => {
+      if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+      e.preventDefault();
+      moveTo(index, e.key === "ArrowUp" ? index - 1 : index + 2);
+      // Keep focus on the same layer's grip after it moves.
+      const id = layers[index].id;
+      requestAnimationFrame(() => listRef.current?.querySelector<HTMLButtonElement>(`[data-grip="${id}"]`)?.focus());
+    },
+  });
 
   return (
     <>
@@ -141,16 +193,33 @@ export function LayersDialog({ open, onClose, layers, events, studio, onDeleted 
           </div>
           {rowError && <p role="alert" className="mb-2 rounded-md bg-danger-soft px-3 py-1.5 text-xs font-medium text-danger">{rowError}</p>}
 
-          <ul className="max-h-[50dvh] divide-y divide-line overflow-y-auto rounded-lg border border-line">
+          <ul ref={listRef} className={cn("divide-y divide-line rounded-lg border border-line", drag && "select-none")}>
             {layers.map((layer, index) => {
               const count = counts.get(layer.id) ?? 0;
+              const dropAbove = drag && drag.before === index && drag.before !== drag.from && drag.before !== drag.from + 1;
+              const dropBelow = drag && index === layers.length - 1 && drag.before === layers.length && drag.from !== index;
               return (
-                <li key={layer.id} className="px-1.5 py-0.5">
+                <li
+                  key={layer.id}
+                  className={cn(
+                    "relative px-1.5 py-0.5",
+                    drag?.from === index && "bg-surface-hover opacity-60",
+                    dropAbove && "before:absolute before:inset-x-0 before:-top-px before:h-0.5 before:bg-accent",
+                    dropBelow && "after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:bg-accent",
+                  )}
+                >
                   <div className="flex items-center gap-1.5">
-                    <span className="flex flex-col">
-                      <IconButton icon={ArrowUp} size="sm" label={`Move ${layer.name} up`} disabled={index === 0} onClick={() => move(index, -1)} className="!h-4 !w-6 [&>svg]:!size-3" />
-                      <IconButton icon={ArrowDown} size="sm" label={`Move ${layer.name} down`} disabled={index === layers.length - 1} onClick={() => move(index, 1)} className="!h-4 !w-6 [&>svg]:!size-3" />
-                    </span>
+                    <button
+                      type="button"
+                      data-grip={layer.id}
+                      {...grip(index, layer.name)}
+                      className={cn(
+                        "flex h-7 w-5 shrink-0 touch-none items-center justify-center rounded-sm text-fg-subtle outline-none hover:bg-surface-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)]",
+                        drag ? "cursor-grabbing" : "cursor-grab",
+                      )}
+                    >
+                      <GripVertical className="size-4" aria-hidden />
+                    </button>
                     <input
                       type="checkbox"
                       className="size-4 shrink-0 accent-[var(--accent)]"
@@ -225,7 +294,7 @@ export function LayersDialog({ open, onClose, layers, events, studio, onDeleted 
                   {recolouring === layer.id && (
                     <ColorPicker
                       compact
-                      className="pb-1.5 pl-[3.25rem] pt-1"
+                      className="pb-1.5 pl-12 pt-1"
                       label={`Colour for ${layer.name}`}
                       value={layer.color}
                       usedColors={usedColors}

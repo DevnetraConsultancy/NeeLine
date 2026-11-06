@@ -76,50 +76,50 @@ export function TimelineSettingsDialog({ open, onClose, timeline, events, layers
       icon={<Settings2 className="size-5" aria-hidden />}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button variant="primary" type="submit" form="timeline-settings" loading={saving}>Save</Button>
+          <Button variant="ghost" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button variant="primary" size="sm" type="submit" form="timeline-settings" loading={saving}>Save</Button>
         </>
       }
     >
-      <form id="timeline-settings" className="grid gap-4" onSubmit={submit}>
-        {error && <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm font-medium text-danger">{error}</p>}
+      <form id="timeline-settings" className="grid gap-3" onSubmit={submit}>
+        {error && <p role="alert" className="rounded-md bg-danger-soft px-3 py-1.5 text-xs font-medium text-danger">{error}</p>}
 
-        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <dl className="flex flex-wrap items-center gap-1.5 text-xs">
           {[
             ["Events", String(events.length)],
             ["Periods", String(periods)],
             ["Layers", String(layers.length)],
             ["Range", range(events) ?? "No events"],
           ].map(([label, value]) => (
-            <div key={label} className="rounded-lg border border-line p-3">
-              <dt className="text-xs text-fg-muted">{label}</dt>
-              <dd className="mt-1 text-sm font-semibold text-fg">{value}</dd>
+            <div key={label} className="flex items-baseline gap-1 rounded-md border border-line px-2 py-1">
+              <dt className="text-fg-muted">{label}</dt>
+              <dd className="font-semibold text-fg">{value}</dd>
             </div>
           ))}
         </dl>
 
-        <Field label="Description" hint="Scope, themes, sources. Shown on the dashboard card.">
+        <Field label="Description" hint="Shown on the dashboard card.">
           {(p) => (
-            <Textarea {...p} rows={5} maxLength={LIMITS.timelineDescription} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Historical context, overarching themes or geographical boundaries" />
+            <Textarea {...p} rows={3} className="min-h-0" maxLength={LIMITS.timelineDescription} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Scope, themes, sources or geographical boundaries" />
           )}
         </Field>
 
-        <fieldset className="grid gap-4">
-          <legend className="mb-2 text-sm font-semibold text-fg">Canvas appearance</legend>
-          <Switch label="Follow the light/dark theme" description="Turn off to choose fixed canvas colours for this timeline." checked={followTheme} onChange={setFollowTheme} />
+        <fieldset className="grid gap-2 rounded-lg border border-line px-3 pb-3 pt-1">
+          <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-fg-muted">Canvas appearance</legend>
+          <Switch label="Follow the light/dark theme" title="Turn off to choose fixed canvas colours for this timeline." checked={followTheme} onChange={setFollowTheme} />
           {!followTheme && (
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-3 gap-2">
               <ColorInput label="Background" value={bg} onChange={setBg} />
               <ColorInput label="Number line" value={spine} onChange={setSpine} />
               <ColorInput label="Text" value={text} onChange={setText} />
               {ratio < 4.5 && (
-                <p role="status" className="text-sm text-danger sm:col-span-3">
+                <p role="status" className="col-span-3 text-xs text-danger">
                   Text contrast is {ratio.toFixed(1)}:1. Some readers will struggle below 4.5:1.
                 </p>
               )}
             </div>
           )}
-          <Switch label="Border around gap badges" description="Outline the year-gap labels under the line." checked={showGapBorder} onChange={onShowGapBorderChange} />
+          <Switch label="Border around gap badges" title="Outline the year-gap labels under the line." checked={showGapBorder} onChange={onShowGapBorderChange} />
         </fieldset>
       </form>
     </Modal>
@@ -128,13 +128,9 @@ export function TimelineSettingsDialog({ open, onClose, timeline, events, layers
 
 function ColorInput({ label, value, onChange }: { label: string; value: string; onChange: (hex: string) => void }) {
   return (
-    <Field label={label}>
-      {(p) => (
-        <span className="flex h-10 items-center gap-2 rounded-md border border-line bg-surface px-2">
-          <input {...p} type="color" value={value} onChange={(e) => onChange(e.target.value)} className="size-7 cursor-pointer rounded-sm border-0 bg-transparent p-0" />
-          <span className="text-sm tabular-nums text-fg-muted">{value}</span>
-        </span>
-      )}
-    </Field>
+    <label className="flex h-8 min-w-0 items-center gap-1.5 rounded-md border border-line bg-surface px-1.5" title={value}>
+      <input type="color" aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} className="size-5 shrink-0 cursor-pointer rounded-sm border-0 bg-transparent p-0" />
+      <span className="truncate text-xs text-fg-muted">{label}</span>
+    </label>
   );
 }

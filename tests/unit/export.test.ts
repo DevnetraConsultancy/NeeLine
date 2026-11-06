@@ -33,7 +33,7 @@ test("export: JSON round-trips through import, keeping layer colour and a year-0
   assert.equal(parsed.rowErrors.length, 0);
   assert.deepEqual(parsed.layers, [{ name: "Rome", color: "#f43f5e" }]);
   assert.equal(parsed.events[1].endYear, 0);
-  assert.equal(parsed.events[0].color, "#38bdf8", "the card colour is not replaced by the layer colour");
+  assert.ok(!("color" in file.events[0]), "events carry no colour; the layer colour is used");
   assert.equal(parsed.events[0].notes, "Ides\tof March");
 });
 

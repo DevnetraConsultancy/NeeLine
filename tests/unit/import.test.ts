@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ImportFileError, parseImportFile } from "../../src/lib/domain/import";
 
-test("import: reads the export format with layers and colours", () => {
+test("import: reads the export format; colour comes from the layer, not the event", () => {
   const file = JSON.stringify({
     format: "neeline-chronicle-v1",
     layers: [{ name: "Rome", color: "#F43F5E" }],
@@ -13,7 +13,7 @@ test("import: reads the export format with layers and colours", () => {
   assert.equal(rowErrors.length, 0);
   assert.equal(events[0].layerName, "Rome");
   assert.equal(events[0].notes, "Ides");
-  assert.equal(events[0].color, "#38bdf8");
+  assert.notEqual(events[0].color, "#38bdf8", "a per-event colour in the file is ignored");
 });
 
 test("import: string booleans are read correctly", () => {

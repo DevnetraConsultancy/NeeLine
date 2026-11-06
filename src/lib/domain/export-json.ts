@@ -24,7 +24,6 @@ export interface ChronicleFile {
     endIsBce: boolean | null;
     endMonth: number | null;
     endDay: number | null;
-    color: string;
     layer: string;
     description: string | null;
   }>;
@@ -55,7 +54,6 @@ export function buildExport(timeline: TimelineDetail, layers: Layer[], events: T
       endIsBce: e.endYear === null ? null : e.endIsBce,
       endMonth: e.endYear === null ? null : e.endMonth,
       endDay: e.endYear === null ? null : e.endDay,
-      color: e.color,
       layer: nameOf.get(e.layerId) ?? "General",
       description: e.notes,
     })),

@@ -28,8 +28,22 @@ export default async function OpengraphImage() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 36 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={logoSrc} width={150} height={150} alt="" />
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 180,
+              height: 180,
+              borderRadius: 28,
+              border: "3px solid #b8912a",
+              backgroundColor: "#000000",
+              boxShadow: "inset 0 0 28px rgba(212,175,55,0.25)",
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={logoSrc} width={140} height={140} alt="" />
+          </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left" }}>
             <div style={{ fontSize: 40, color: "#d4af37", letterSpacing: 1 }}>NeeLine</div>
             <div style={{ fontSize: 76, fontWeight: 700, marginTop: 6, lineHeight: 1.05 }}>All of history, on one line.</div>

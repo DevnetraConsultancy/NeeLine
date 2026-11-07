@@ -10,24 +10,36 @@ export interface SessionUser {
 }
 
 const DAY_MS = 86_400_000;
-/** Per-instance memory of the last activity write, so we touch the row at most once a day. */
-const lastTouched = new Map<string, number>();
+/** How long a confirmed user row is trusted before it is looked up again. */
+const CONFIRM_MS = 10 * 60_000;
+/** Per-instance memory of when each user row was last confirmed to exist. */
+const confirmedAt = new Map<string, number>();
 
-async function touchActivity(userId: string): Promise<void> {
+/**
+ * Confirms the user row still exists (expired guests are deleted while their
+ * session cookie may still be valid) and records activity at most once a day.
+ * The lookup is cached for a few minutes per instance.
+ */
+async function confirmUser(userId: string): Promise<boolean> {
   const now = Date.now();
-  if (now - (lastTouched.get(userId) ?? 0) < DAY_MS) return;
-  lastTouched.set(userId, now);
-  await prisma.user.updateMany({
-    where: { id: userId, lastActiveAt: { lt: new Date(now - DAY_MS) } },
-    data: { lastActiveAt: new Date(now) },
-  });
+  if (now - (confirmedAt.get(userId) ?? 0) < CONFIRM_MS) return true;
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { lastActiveAt: true } });
+  if (!user) {
+    confirmedAt.delete(userId);
+    return false;
+  }
+  confirmedAt.set(userId, now);
+  if (now - user.lastActiveAt.getTime() >= DAY_MS) {
+    await prisma.user.updateMany({ where: { id: userId }, data: { lastActiveAt: new Date(now) } });
+  }
+  return true;
 }
 
 export async function requireUser(): Promise<SessionUser> {
   const session = await auth();
   const id = session?.user?.id;
   if (!id) throw new ApiError(401, "Please sign in to continue.");
-  await touchActivity(id);
+  if (!(await confirmUser(id))) throw new ApiError(401, "Your session has expired. Please sign in again.");
   return { id, isGuest: Boolean(session.user.isGuest) };
 }
 

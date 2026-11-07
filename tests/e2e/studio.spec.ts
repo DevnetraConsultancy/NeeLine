@@ -69,8 +69,8 @@ test("periods, layers, visibility and import persist", async ({ page }) => {
   await page.getByRole("dialog", { name: "Add period" }).getByRole("button", { name: "Add period" }).click();
   await expect(page.getByRole("button", { name: /^Late Republic, 10 BCE – 10 CE \(19 yrs\)/ })).toBeVisible();
 
-  await page.getByRole("button", { name: "More actions" }).click();
-  await page.getByRole("menuitem", { name: "Manage layers" }).click();
+  await page.getByRole("button", { name: /^Layers/ }).click();
+  await page.getByRole("dialog", { name: "Layer visibility" }).getByRole("button", { name: "Manage layers" }).click();
   const layers = page.getByRole("dialog", { name: "Layers" });
   await layers.getByLabel("Name").fill("Greece");
   await layers.getByRole("button", { name: "Add", exact: true }).click();

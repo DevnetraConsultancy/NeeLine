@@ -40,7 +40,12 @@ function errorResponse(error: unknown, req: Request): Response {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2025") return json({ error: "That item was not found. It may have been deleted." }, 404);
     if (error.code === "P2002") return json({ error: "That name is already in use here." }, 409);
-    if (error.code === "P2003") return json({ error: "Your session has expired. Please sign in again." }, 401);
+    if (error.code === "P2003") {
+      // A foreign key failed: the layer was deleted under us, or the user row is gone.
+      const field = String(error.meta?.field_name ?? "");
+      if (field.includes("layerId")) return json({ error: "That layer no longer exists. Reload and try again." }, 409);
+      return json({ error: "Your session has expired. Please sign in again." }, 401);
+    }
   }
   console.error(`${req.method} ${new URL(req.url).pathname} failed:`, error);
   return json({ error: "Something went wrong on our side. Please try again." }, 500);

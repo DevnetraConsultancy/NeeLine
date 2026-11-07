@@ -1,18 +1,9 @@
 import type { ReactNode } from "react";
-import { AlertTriangle, Loader2, type LucideIcon } from "lucide-react";
+import { AlertTriangle, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 export function Skeleton({ className }: { className?: string }) {
   return <div aria-hidden className={cn("skeleton rounded-md", className)} />;
-}
-
-export function Spinner({ label = "Loading", className }: { label?: string; className?: string }) {
-  return (
-    <span role="status" className={cn("inline-flex items-center gap-2 text-sm text-fg-muted", className)}>
-      <Loader2 className="size-5 animate-spin text-accent" aria-hidden />
-      <span>{label}</span>
-    </span>
-  );
 }
 
 interface StateProps {
@@ -51,16 +42,4 @@ export function ErrorState({ title = "Something went wrong", description, action
 
 export function Card({ children, className, as: Tag = "div" }: { children: ReactNode; className?: string; as?: "div" | "article" | "section" }) {
   return <Tag className={cn("glass rounded-xl", className)}>{children}</Tag>;
-}
-
-/** Plain data table styled to match the glass surfaces. */
-export function Table({ caption, children, className }: { caption: string; children: ReactNode; className?: string }) {
-  return (
-    <div className={cn("glass overflow-x-auto rounded-lg", className)}>
-      <table className="w-full border-collapse text-left text-sm [&_td]:border-t [&_td]:border-line [&_td]:px-4 [&_td]:py-2.5 [&_th]:px-4 [&_th]:py-2.5 [&_th]:text-xs [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-fg-muted">
-        <caption className="sr-only">{caption}</caption>
-        {children}
-      </table>
-    </div>
-  );
 }

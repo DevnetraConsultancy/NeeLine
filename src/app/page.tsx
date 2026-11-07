@@ -19,7 +19,8 @@ const CAPABILITIES = [
   },
 ];
 
-export default function LandingPage() {
+export default async function LandingPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const expired = (await searchParams).expired !== undefined;
   return (
     <div className="flex min-h-dvh flex-col">
       <AppHeader />
@@ -35,7 +36,7 @@ export default function LandingPage() {
             this morning, layer it in colour, and export it for your paper or your classroom.
           </p>
           <div className="mt-7">
-            <SignInPanel googleEnabled={isGoogleConfigured()} />
+            <SignInPanel googleEnabled={isGoogleConfigured()} expired={expired} />
           </div>
         </section>
 

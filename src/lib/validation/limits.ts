@@ -8,6 +8,7 @@ export const LIMITS = {
   eventNotes: 10_000,
   layerName: MAX_LAYER_NAME_LENGTH,
   importEvents: 5_000,
-  importFileBytes: 5 * 1024 * 1024,
+  /** Below Vercel's 4.5 MB request body limit, so the API sees the file rather than a bare 413. */
+  importFileBytes: 4 * 1024 * 1024,
   bulkDeleteIds: 5_000,
 } as const;

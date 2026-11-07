@@ -52,7 +52,7 @@ export function ImportDialog({ open, onClose, timelineId, layers, defaultLayerId
     reset();
     setFile({ name: selected.name, size: selected.size });
     if (selected.size > LIMITS.importFileBytes) {
-      setFileError("The file is larger than 5 MB. Split it into smaller files.");
+      setFileError("The file is larger than 4 MB. Split it into smaller files.");
       return;
     }
     try {
@@ -132,7 +132,7 @@ export function ImportDialog({ open, onClose, timelineId, layers, defaultLayerId
           <FileJson className="size-8 text-accent" aria-hidden />
           <span className="text-sm font-medium text-fg">{file ? file.name : "Drop a .json file here, or click to choose one"}</span>
           <span className="text-xs text-fg-muted">
-            {file ? `${(file.size / 1024).toFixed(1)} KB` : `Up to ${LIMITS.importEvents.toLocaleString("en-US")} events and 5 MB`}
+            {file ? `${(file.size / 1024).toFixed(1)} KB` : `Up to ${LIMITS.importEvents.toLocaleString("en-US")} events and 4 MB`}
           </span>
           <input
             ref={inputRef}

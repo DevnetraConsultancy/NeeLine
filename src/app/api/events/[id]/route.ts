@@ -21,7 +21,9 @@ export const PATCH = route<{ id: string }>(async (req, { params }) => {
   if (existing.timeline.deletedAt) throw new ApiError(409, "This timeline is in the trash. Restore it to make changes.");
 
   const defaultLayer = await getDefaultLayer(existing.timelineId);
-  const merged = eventFieldsSchema.parse({ ...eventFields(toEventDTO(existing, defaultLayer.id)), ...patch });
+  // Dropping the end year turns a period back into a single date, so the other end fields go too.
+  const clearEnd = patch.endYear === null ? { endIsBce: null, endMonth: null, endDay: null } : {};
+  const merged = eventFieldsSchema.parse({ ...eventFields(toEventDTO(existing, defaultLayer.id)), ...clearEnd, ...patch });
   if (patch.layerId !== undefined) await assertLayerInTimeline(patch.layerId, existing.timelineId);
 
   const row = await prisma.$transaction(async (tx) => {

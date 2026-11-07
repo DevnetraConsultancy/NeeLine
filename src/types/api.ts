@@ -49,8 +49,4 @@ export interface LayerDeleteResult {
   movedToLayerId: string | null;
 }
 
-export interface ApiErrorBody {
-  error: string;
-}
-
 export type { TimelineEvent };

@@ -15,7 +15,7 @@ import { cn } from "@/lib/cn";
 export function AppHeader({ children, className, wide = false }: { children?: ReactNode; className?: string; wide?: boolean }) {
   return (
     <header className={cn("glass glass-blur sticky top-0 z-40 rounded-none border-x-0 border-t-0", className)}>
-      <div className={cn("mx-auto flex h-12 items-center gap-1 px-3 sm:px-4", !wide && "max-w-7xl sm:px-6")}>
+      <div className={cn("mx-auto flex h-16 items-center gap-1 px-3 sm:px-4", !wide && "max-w-7xl sm:px-6")}>
         <BrandLink />
         <div className="flex-1">{children}</div>
         <ThemeToggle />

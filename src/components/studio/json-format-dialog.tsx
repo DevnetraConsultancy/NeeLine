@@ -31,7 +31,8 @@ const FIELDS: Array<[string, string]> = [
   ["month, day", "Optional. Month 1-12; a day needs a month and must exist in that month."],
   ["endYear, endIsBce, endMonth, endDay", "Optional. Makes the event a period drawn as a bracket. Must end on or after the start."],
   ["layer", "Optional. Layer name. Missing layers can be created during import."],
-  ["layers[].color", "Optional. One colour per layer as #rrggbb, used for its cards, stems and brackets."],
+  ["layers[].color", "Optional. One colour per layer, used for its cards, stems and brackets. Must be one of the 16 palette colours; anything else gets the next free palette colour."],
+  ["timeline", "Optional and informational. The name and description are not imported; events go into the timeline you are editing."],
   ["description", "Optional. Notes, up to 10,000 characters."],
 ];
 

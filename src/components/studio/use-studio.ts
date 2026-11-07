@@ -73,20 +73,58 @@ export function useStudio(timelineId: string) {
     const ids = new Set(incoming.map((e) => e.id));
     return sortByDate([...events.filter((e) => !ids.has(e.id)), ...incoming]);
   };
-  const showLayer = (layers: Layer[], layerId: string) => layers.map((l) => (l.id === layerId ? { ...l, visible: true } : l));
+  // ─── Layer visibility and order ─────────────────────────────────────
+
+  /**
+   * Layer visibility and order update the screen at once and are saved in the
+   * background, one request at a time with only the latest state sent, so
+   * quick toggles cannot reach the server out of order. On failure the studio
+   * reloads from the server. Resolves to whether the save succeeded.
+   */
+  const layerSync = useRef<{ running: boolean; queued: { path: string; body: unknown; failure: string } | null; waiters: Array<(ok: boolean) => void> }>({ running: false, queued: null, waiters: [] });
+
+  const syncLayers = useCallback((path: string, body: unknown, failure: string) => {
+    const sync = layerSync.current;
+    sync.queued = { path, body, failure };
+    const done = new Promise<boolean>((resolve) => sync.waiters.push(resolve));
+    if (!sync.running) {
+      sync.running = true;
+      void (async () => {
+        let ok = true;
+        while (sync.queued) {
+          const next = sync.queued;
+          sync.queued = null;
+          const result = await attempt(() => api.post(next.path, next.body), next.failure);
+          if (result === undefined) ok = false;
+        }
+        sync.running = false;
+        if (!ok) await load();
+        for (const resolve of sync.waiters.splice(0)) resolve(ok);
+      })();
+    }
+    return done;
+  }, [attempt, load]);
+
+  const setVisibleLayers = useCallback((visibleIds: string[]) => {
+    const visible = new Set(visibleIds);
+    patchData((d) => ({ ...d, layers: d.layers.map((l) => ({ ...l, visible: visible.has(l.id) })) }));
+    return syncLayers("/api/layers/visibility", { timelineId, visibleIds }, "Could not save layer visibility");
+  }, [patchData, syncLayers, timelineId]);
 
   // ─── Events ─────────────────────────────────────────────────────────
 
   const createEvent = useCallback(async (fields: EventFields) => {
     const created = await track(() => api.post<TimelineEvent>("/api/events", { timelineId, ...fields }));
-    const layer = data?.layers.find((l) => l.id === created.layerId);
-    if (layer && !layer.visible) {
-      void api.patch(`/api/layers/${layer.id}`, { visible: true }).catch(() => undefined);
-    }
-    patchData((d) => ({ ...d, events: upsertEvents(d.events, [created]), layers: showLayer(d.layers, created.layerId) }));
+    patchData((d) => ({ ...d, events: upsertEvents(d.events, [created]) }));
     setHistory((h) => record(h, { kind: "create", label: `Add "${created.title}"`, event: created }));
+    // An event added to a hidden layer shows that layer, through the same
+    // queued save as the Layers menu so failures are reported and order is kept.
+    const layers = data?.layers ?? [];
+    if (layers.some((l) => l.id === created.layerId && !l.visible)) {
+      void setVisibleLayers([...layers.filter((l) => l.visible).map((l) => l.id), created.layerId]);
+    }
     return created;
-  }, [data?.layers, patchData, timelineId, track]);
+  }, [data?.layers, patchData, setVisibleLayers, timelineId, track]);
 
   const updateEvent = useCallback(async (id: string, fields: EventFields) => {
     const before = data?.events.find((e) => e.id === id);
@@ -135,42 +173,6 @@ export function useStudio(timelineId: string) {
     patchData((d) => ({ ...d, layers: d.layers.map((l) => (l.id === id ? { ...l, ...layer, eventCount: l.eventCount } : l)) }));
     return layer;
   }, [patchData, track]);
-
-  /**
-   * Layer visibility and order update the screen at once and are saved in the
-   * background, one request at a time with only the latest state sent, so
-   * quick toggles cannot reach the server out of order. On failure the studio
-   * reloads from the server. Resolves to whether the save succeeded.
-   */
-  const layerSync = useRef<{ running: boolean; queued: { path: string; body: unknown; failure: string } | null; waiters: Array<(ok: boolean) => void> }>({ running: false, queued: null, waiters: [] });
-
-  const syncLayers = useCallback((path: string, body: unknown, failure: string) => {
-    const sync = layerSync.current;
-    sync.queued = { path, body, failure };
-    const done = new Promise<boolean>((resolve) => sync.waiters.push(resolve));
-    if (!sync.running) {
-      sync.running = true;
-      void (async () => {
-        let ok = true;
-        while (sync.queued) {
-          const next = sync.queued;
-          sync.queued = null;
-          const result = await attempt(() => api.post(next.path, next.body), next.failure);
-          if (result === undefined) ok = false;
-        }
-        sync.running = false;
-        if (!ok) await load();
-        for (const resolve of sync.waiters.splice(0)) resolve(ok);
-      })();
-    }
-    return done;
-  }, [attempt, load]);
-
-  const setVisibleLayers = useCallback((visibleIds: string[]) => {
-    const visible = new Set(visibleIds);
-    patchData((d) => ({ ...d, layers: d.layers.map((l) => ({ ...l, visible: visible.has(l.id) })) }));
-    return syncLayers("/api/layers/visibility", { timelineId, visibleIds }, "Could not save layer visibility");
-  }, [patchData, syncLayers, timelineId]);
 
   const reorderLayers = useCallback((orderedIds: string[]) => {
     const position = new Map(orderedIds.map((id, i) => [id, i]));

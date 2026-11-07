@@ -14,6 +14,21 @@ export class ApiRequestError extends Error {
 
 type Method = "GET" | "POST" | "PATCH" | "DELETE";
 
+let signingOut = false;
+
+/**
+ * A 401 means the session is gone (expired, or a guest account that was
+ * purged). The cookie may still look valid, so clear it and return to the
+ * landing page rather than leaving the user stuck on pages that cannot save.
+ */
+function endSession(): void {
+  if (signingOut || typeof window === "undefined") return;
+  signingOut = true;
+  void import("next-auth/react")
+    .then(({ signOut }) => signOut({ callbackUrl: "/?expired=1" }))
+    .catch(() => window.location.assign("/?expired=1"));
+}
+
 /** A request that takes longer than this is abandoned with a clear message. */
 const REQUEST_TIMEOUT_MS = 20_000;
 
@@ -59,6 +74,7 @@ export async function apiRequest<T>(method: Method, path: string, body?: unknown
 
   const data: unknown = await res.json().catch(() => null);
   if (!res.ok) {
+    if (res.status === 401) endSession();
     const message =
       data && typeof data === "object" && "error" in data && typeof data.error === "string"
         ? data.error

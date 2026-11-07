@@ -19,11 +19,11 @@ function GoogleMark() {
 }
 
 /** The hero's two ways in: guest first (instant), Google beside it. */
-export function SignInPanel({ googleEnabled }: { googleEnabled: boolean }) {
+export function SignInPanel({ googleEnabled, expired = false }: { googleEnabled: boolean; expired?: boolean }) {
   const router = useRouter();
   const [guestLoading, setGuestLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(expired ? "Your session has ended. Sign in again to continue." : null);
 
   const continueAsGuest = async () => {
     setGuestLoading(true);
@@ -70,7 +70,7 @@ export function SignInPanel({ googleEnabled }: { googleEnabled: boolean }) {
         </p>
       )}
       <p className="mt-3 text-xs text-fg-subtle">
-        No account needed. Guest work is kept for 30 days; sign in with Google to keep it for good.
+        No account needed. Guest work is deleted after 30 days without use; sign in with Google to keep it for good.
       </p>
     </div>
   );

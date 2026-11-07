@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
-  AlertTriangle, ArrowLeft, Check, CircleDashed, Eye, EyeOff, FileJson, FileText, ImageDown, Layers, Loader2, MoreHorizontal,
+  AlertTriangle, ArrowLeft, Check, CircleDashed, Eye, EyeOff, FileJson, FileText, ImageDown, Loader2, MoreHorizontal,
   Plus, Redo2, Settings2, Undo2, Upload,
 } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
@@ -220,7 +220,6 @@ export function Studio({ timelineId }: { timelineId: string }) {
                 },
                 { label: "JSON format and template", icon: FileJson, onSelect: () => setDialog("format") },
                 "separator",
-                { label: "Manage layers", icon: Layers, onSelect: () => setDialog("layers") },
                 { label: "Timeline settings", icon: Settings2, onSelect: () => setDialog("settings") },
                 { label: showControls ? "Hide zoom controls (V)" : "Show zoom controls (V)", icon: showControls ? EyeOff : Eye, onSelect: toggleControls },
               ]}
@@ -325,16 +324,20 @@ function SaveIndicator({ state }: { state: SaveState }) {
 function TimelineName({ name, onRename }: { name: string; onRename: (name: string) => Promise<unknown> }) {
   const [value, setValue] = useState<string | null>(null);
   const toast = useToast();
+  // Enter saves and unmounts the input, which fires blur: this stops that second save.
+  const saving = useRef(false);
 
   const save = async () => {
-    if (value === null) return;
+    if (value === null || saving.current) return;
+    saving.current = true;
     const next = value.trim();
     setValue(null);
-    if (!next || next === name) return;
     try {
-      await onRename(next);
+      if (next && next !== name) await onRename(next);
     } catch (error) {
       toast.error("Could not rename the timeline", { description: errorMessage(error) });
+    } finally {
+      saving.current = false;
     }
   };
 

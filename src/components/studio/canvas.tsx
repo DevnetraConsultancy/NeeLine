@@ -6,7 +6,7 @@ import { exportSvgAsPng } from "@/lib/client/export";
 import { dateValue, formatDateLabel, formatSpanLabel } from "@/lib/domain/dates";
 import { endDate, startDate, type TimelineEvent } from "@/lib/domain/events";
 import {
-  axisMarkers, baseX, buildScale, clampPan, fitView, gapBadges, inView, layoutItems, panPreservingFocus, valueAtBaseX, zoomAt,
+  axisMarkers, baseX, buildScale, clampPan, clampZoom, fitView, gapBadges, inView, layoutItems, panPreservingFocus, valueAtBaseX, zoomAt,
   collapsedDotY, pointCardTop, spinePosition, stackGeometry, stackScale, TICK, type ItemLayout, type LayoutInput, type LayoutMode, type Scale, type Viewport,
 } from "@/lib/domain/layout";
 import type { Layer } from "@/types/api";
@@ -62,7 +62,9 @@ function readSavedViewport(timelineId: string): SavedViewport | null {
     const raw = JSON.parse(localStorage.getItem(viewportKey(timelineId)) ?? "null") as Record<string, unknown> | null;
     if (!raw || typeof raw.zoom !== "number" || typeof raw.panX !== "number") return null;
     const mode = raw.layoutMode === "proportional" ? "proportional" : "even";
-    return Number.isFinite(raw.zoom) && Number.isFinite(raw.panX) ? { zoom: raw.zoom, panX: raw.panX, mode } : null;
+    if (!Number.isFinite(raw.zoom) || !Number.isFinite(raw.panX)) return null;
+    // A stored zoom outside the limits (older versions, edited storage) would divide by zero in zoomAt.
+    return { zoom: clampZoom(mode, raw.zoom), panX: raw.panX, mode };
   } catch {
     return null;
   }

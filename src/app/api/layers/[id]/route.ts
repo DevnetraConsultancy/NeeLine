@@ -37,7 +37,11 @@ export const PATCH = route<Params>(async (req, { params }) => {
   if (input.color !== undefined) data.color = input.color;
   if (input.visible !== undefined) data.visible = input.visible;
 
-  const updated = await prisma.layer.update({ where: { id }, data });
+  const updated = await prisma.$transaction(async (tx) => {
+    const row = await tx.layer.update({ where: { id }, data });
+    await touchTimeline(tx, layer.timelineId);
+    return row;
+  });
   return json<Layer>(toLayerDTO(updated));
 });
 

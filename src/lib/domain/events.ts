@@ -30,10 +30,6 @@ export function endDate(e: Pick<TimelineEvent, "endYear" | "endIsBce" | "endMont
   return { year: e.endYear, isBce: e.endIsBce ?? false, month: e.endMonth, day: e.endDay };
 }
 
-export function isPeriod(e: Pick<TimelineEvent, "endYear">): boolean {
-  return e.endYear !== null;
-}
-
 export function eventFields(e: TimelineEvent): EventFields {
   const { id: _id, timelineId: _timelineId, ...fields } = e;
   return fields;

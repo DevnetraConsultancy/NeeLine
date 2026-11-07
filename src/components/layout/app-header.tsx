@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import { ChevronDown, CircleHelp, LogOut, User } from "lucide-react";
 import { BrandLink } from "@/components/layout/brand";
@@ -30,13 +29,8 @@ function AccountMenu() {
   const { openHelp } = useHelp();
   if (status === "loading") return <span className="skeleton size-9 rounded-md" aria-hidden />;
 
-  if (!session?.user) {
-    return (
-      <Link href="/#get-started" className="inline-flex h-8 items-center rounded-full border border-line px-3.5 text-sm font-medium text-fg transition-colors hover:border-line-strong hover:bg-surface-hover">
-        Sign in
-      </Link>
-    );
-  }
+  // Signed out: the landing page's own sign-in buttons are the way in, so the header shows nothing here.
+  if (!session?.user) return null;
 
   const { name, email, image, isGuest } = session.user;
   const displayName = isGuest ? "Guest" : name || email || "Account";

@@ -1,10 +1,15 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { ImageResponse } from "next/og";
 
 export const alt = "NeeLine: all of history on one line";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-export default function OpengraphImage() {
+export default async function OpengraphImage() {
+  const logo = await readFile(join(process.cwd(), "public", "logo.png"));
+  const logoSrc = `data:image/png;base64,${logo.toString("base64")}`;
+
   return new ImageResponse(
     (
       <div
@@ -15,15 +20,21 @@ export default function OpengraphImage() {
           flexDirection: "column",
           justifyContent: "center",
           alignItems: "center",
-          padding: 80,
+          padding: 70,
           backgroundColor: "#000000",
           backgroundImage: "radial-gradient(900px 500px at 15% -10%, rgba(255,255,255,0.06), transparent 60%)",
           color: "#f5f0e8",
           textAlign: "center",
         }}
       >
-        <div style={{ fontSize: 34, color: "#d4af37", letterSpacing: 1 }}>NeeLine</div>
-        <div style={{ fontSize: 84, fontWeight: 700, marginTop: 18, lineHeight: 1.05 }}>All of history, on one line.</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 36 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={logoSrc} width={150} height={150} alt="" />
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left" }}>
+            <div style={{ fontSize: 40, color: "#d4af37", letterSpacing: 1 }}>NeeLine</div>
+            <div style={{ fontSize: 76, fontWeight: 700, marginTop: 6, lineHeight: 1.05 }}>All of history, on one line.</div>
+          </div>
+        </div>
         <div style={{ display: "flex", alignItems: "center", width: "100%", marginTop: 70 }}>
           <div style={{ height: 6, flex: 1, borderRadius: 3, background: "linear-gradient(90deg, #9a7420, #d4af37 56%, #f0cf7e)" }} />
         </div>

@@ -112,8 +112,13 @@ export function zoomAt(mode: LayoutMode, view: Viewport, factor: number, focusX:
 export function fitView(scale: Scale, values: number[], width: number, edgePadding?: number): Viewport | null {
   if (values.length === 0) return null;
   const bases = values.map((v) => baseX(scale, v));
-  const min = Math.min(...bases);
-  const max = Math.max(...bases);
+  // A loop rather than Math.min(...bases): spreading throws past ~100k values.
+  let min = Infinity;
+  let max = -Infinity;
+  for (const b of bases) {
+    if (b < min) min = b;
+    if (b > max) max = b;
+  }
   const span = max - min;
   const padding = Math.min(width / 3, Math.max(edgePadding ?? 0, scale.mode === "proportional" ? 100 : 140));
   const available = Math.max(200, width - padding * 2);

@@ -39,7 +39,3 @@ export function ErrorState({ title = "Something went wrong", description, action
     </div>
   );
 }
-
-export function Card({ children, className, as: Tag = "div" }: { children: ReactNode; className?: string; as?: "div" | "article" | "section" }) {
-  return <Tag className={cn("glass rounded-xl", className)}>{children}</Tag>;
-}

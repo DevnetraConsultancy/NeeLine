@@ -89,12 +89,31 @@ export function LayersDialog({ open, onClose, layers, events, studio, onDeleted 
     });
     return i === -1 ? rows.length : i;
   };
+  // While dragging near the top or bottom edge of the scrolling body, keep
+  // scrolling until the pointer leaves the edge zone or the drag ends.
+  const edgeScroll = useRef<{ scroller: HTMLElement; direction: -1 | 1 } | null>(null);
+  const stopEdgeScroll = () => {
+    edgeScroll.current = null;
+  };
   const autoScroll = (target: HTMLElement, clientY: number) => {
     const scroller = target.closest<HTMLElement>(".overflow-y-auto");
     if (!scroller) return;
     const r = scroller.getBoundingClientRect();
-    if (clientY < r.top + 32) scroller.scrollTop -= 12;
-    else if (clientY > r.bottom - 32) scroller.scrollTop += 12;
+    const direction = clientY < r.top + 32 ? -1 : clientY > r.bottom - 32 ? 1 : 0;
+    if (direction === 0) {
+      stopEdgeScroll();
+      return;
+    }
+    const wasRunning = edgeScroll.current !== null;
+    edgeScroll.current = { scroller, direction };
+    if (wasRunning) return;
+    const tick = () => {
+      const current = edgeScroll.current;
+      if (!current) return;
+      current.scroller.scrollTop += 6 * current.direction;
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
   };
   const grip = (index: number, layerName: string) => ({
     "aria-label": `Reorder ${layerName}. Drag, or use the up and down arrow keys.`,
@@ -112,10 +131,14 @@ export function LayersDialog({ open, onClose, layers, events, studio, onDeleted 
       if (before !== drag.before) setDrag({ ...drag, before });
     },
     onPointerUp: () => {
+      stopEdgeScroll();
       if (drag) moveTo(drag.from, drag.before);
       setDrag(null);
     },
-    onPointerCancel: () => setDrag(null),
+    onPointerCancel: () => {
+      stopEdgeScroll();
+      setDrag(null);
+    },
     onKeyDown: (e: ReactKeyboardEvent<HTMLButtonElement>) => {
       if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
       e.preventDefault();

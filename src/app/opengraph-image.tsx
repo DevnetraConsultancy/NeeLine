@@ -7,7 +7,7 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 export default async function OpengraphImage() {
-  const logo = await readFile(join(process.cwd(), "public", "logo.png"));
+  const logo = await readFile(join(process.cwd(), "public", "brand", "og-mark.png"));
   const logoSrc = `data:image/png;base64,${logo.toString("base64")}`;
 
   return new ImageResponse(
@@ -35,14 +35,15 @@ export default async function OpengraphImage() {
               justifyContent: "center",
               width: 180,
               height: 180,
-              borderRadius: 28,
-              border: "3px solid #b8912a",
+              borderRadius: 40,
+              border: "2px solid rgba(212,175,55,0.45)",
               backgroundColor: "#000000",
-              boxShadow: "inset 0 0 28px rgba(212,175,55,0.25)",
+              boxShadow: "0 8px 30px -8px rgba(233,189,80,0.45)",
+              overflow: "hidden",
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={logoSrc} width={140} height={140} alt="" />
+            <img src={logoSrc} width={176} height={176} alt="" style={{ borderRadius: 38 }} />
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left" }}>
             <div style={{ fontSize: 40, color: "#d4af37", letterSpacing: 1 }}>NeeLine</div>

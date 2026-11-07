@@ -55,6 +55,8 @@
   --strata-dawn: rgb(212 175 55 / 0.30);
   /* Headline gradient: a metallic sheen, each stop at least 7:1 on --bg. */
   --strata-text: linear-gradient(105deg, #f6e7b4 0%, #e7c158 38%, #c59a28 68%, #f0d183 100%);
+  /* Wordmark gold, the same sweep as the FamilyVista brand. */
+  --brand-grad: linear-gradient(135deg, #f6dd96, #cf9c33);
   /* No gold wash over the black: surfaces stay pure, gold lives on the
      accents alone. A whisper of neutral depth keeps the page from going flat. */
   --mesh:
@@ -102,6 +104,8 @@
   --strata-dawn: rgb(230 190 90 / 0.30);
   /* Deep stops, each at least 5:1 on --bg. */
   --strata-text: linear-gradient(105deg, #4a3a06 0%, #7d5e10 55%, #936d0a 100%);
+  /* Deep golds so the wordmark keeps contrast on the cream background. */
+  --brand-grad: linear-gradient(135deg, #8a6612, #5f4708);
   --mesh:
     radial-gradient(55rem 38rem at 12% -8%, rgb(201 168 76 / 0.18), transparent 62%),
     radial-gradient(48rem 34rem at 88% 2%, rgb(176 126 24 / 0.12), transparent 60%),
@@ -112,6 +116,7 @@
 @theme inline {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-serif: var(--font-marcellus), ui-serif, Georgia, serif;
+  --font-display: var(--font-fraunces), Georgia, "Times New Roman", serif;
   --font-mono: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 
   --color-bg: var(--bg);
@@ -261,6 +266,12 @@
   /* Headline treatment: the strata gradient clipped to the type. */
   .text-strata {
     background: var(--strata-text);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .text-brand-grad {
+    background: var(--brand-grad);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;

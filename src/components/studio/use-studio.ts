@@ -81,20 +81,22 @@ export function useStudio(timelineId: string) {
    * quick toggles cannot reach the server out of order. On failure the studio
    * reloads from the server. Resolves to whether the save succeeded.
    */
-  const layerSync = useRef<{ running: boolean; queued: { path: string; body: unknown; failure: string } | null; waiters: Array<(ok: boolean) => void> }>({ running: false, queued: null, waiters: [] });
+  // One pending request per endpoint: a burst of visibility toggles collapses
+  // to the latest, but a queued reorder is never dropped by a later toggle.
+  const layerSync = useRef<{ running: boolean; queued: Map<string, { body: unknown; failure: string }>; waiters: Array<(ok: boolean) => void> }>({ running: false, queued: new Map(), waiters: [] });
 
   const syncLayers = useCallback((path: string, body: unknown, failure: string) => {
     const sync = layerSync.current;
-    sync.queued = { path, body, failure };
+    sync.queued.set(path, { body, failure });
     const done = new Promise<boolean>((resolve) => sync.waiters.push(resolve));
     if (!sync.running) {
       sync.running = true;
       void (async () => {
         let ok = true;
-        while (sync.queued) {
-          const next = sync.queued;
-          sync.queued = null;
-          const result = await attempt(() => api.post(next.path, next.body), next.failure);
+        while (sync.queued.size > 0) {
+          const [path, next] = sync.queued.entries().next().value as [string, { body: unknown; failure: string }];
+          sync.queued.delete(path);
+          const result = await attempt(() => api.post(path, next.body), next.failure);
           if (result === undefined) ok = false;
         }
         sync.running = false;
@@ -219,6 +221,10 @@ export function useStudio(timelineId: string) {
           events: op.events.map((e) => ({ id: e.id, ...eventFields(e) })),
         });
         patchData((d) => ({ ...d, events: upsertEvents(d.events, restored) }));
+        // Like createEvent: an event brought back onto a hidden layer shows that layer.
+        const layers = data?.layers ?? [];
+        const hidden = new Set(restored.map((e) => e.layerId).filter((id) => layers.some((l) => l.id === id && !l.visible)));
+        if (hidden.size > 0) void setVisibleLayers([...layers.filter((l) => l.visible).map((l) => l.id), ...hidden]);
         return;
       }
       case "update-event": {
@@ -232,7 +238,7 @@ export function useStudio(timelineId: string) {
         return;
       }
     }
-  }, [patchData, timelineId]);
+  }, [data?.layers, patchData, setVisibleLayers, timelineId]);
 
   const step = useCallback(async (direction: "undo" | "redo") => {
     const action: HistoryAction | undefined = (direction === "undo" ? history.undo : history.redo).at(-1);

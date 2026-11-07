@@ -70,6 +70,17 @@ function readSavedViewport(timelineId: string): SavedViewport | null {
   }
 }
 
+/** Min and max without spreading into Math.min/max, which throws past ~100k arguments. */
+function extent(values: number[]): { min: number; max: number } {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const v of values) {
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  return { min, max };
+}
+
 function describe(e: CanvasEvent): string {
   const end = endDate(e.source);
   const when = end ? formatSpanLabel(startDate(e.source), end) : formatDateLabel(startDate(e.source));
@@ -145,7 +156,7 @@ export function TimelineCanvas({
   const bounds = useMemo(() => {
     if (visibleValues.length === 0) return null;
     const bases = visibleValues.map((v) => baseX(scale, v));
-    return { min: Math.min(...bases), max: Math.max(...bases) };
+    return extent(bases);
   }, [scale, visibleValues]);
 
   const clampView = useCallback((v: Viewport): Viewport => {
@@ -383,7 +394,7 @@ export function TimelineCanvas({
   const viewLeft = -offsetX;
   const viewRight = size.width - offsetX;
   const [spineLeft, spineRight] = visibleValues.length
-    ? [Math.min(...visibleValues.map(worldX)) - 60, Math.max(...visibleValues.map(worldX)) + 60]
+    ? (({ min, max }) => [min - 60, max + 60])(extent(visibleValues.map(worldX)))
     : [viewLeft + size.width * 0.15, viewRight - size.width * 0.15];
   const spineGradientId = useId();
   const spineStroke = spineStrata ? `url(#${spineGradientId})` : colors.spine;

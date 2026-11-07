@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import NextAuth, { CredentialsSignin } from "next-auth";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
@@ -46,7 +47,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!(await consume(RATE_RULES.guestSignIn, hashedClientIp(request.headers)))) {
           throw new GuestRateLimited();
         }
-        await deleteExpiredGuests().catch((error: unknown) => console.error("Guest cleanup failed:", error));
+        // Runs once the sign-in response is sent, so the first guest after a
+        // quiet spell does not wait for the cascading deletes.
+        after(() => deleteExpiredGuests().catch((error: unknown) => console.error("Guest cleanup failed:", error)));
         const user = await prisma.user.create({
           data: { name: "Guest", email: `guest-${crypto.randomUUID()}@guest.neeline.invalid`, isGuest: true },
         });

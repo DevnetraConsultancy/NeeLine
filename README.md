@@ -17,7 +17,7 @@ Developed in Collaboration with Academia | Devnetra Consultancy
 
 ## Stack
 
-Next.js 15 (App Router), React 19, TypeScript (strict), Tailwind CSS 4, Prisma 7 with PostgreSQL, Auth.js v5 (beta), zod, Lucide icons, Inter.
+Next.js 15 (App Router), React 19, TypeScript (strict), Tailwind CSS 4, Prisma 7 with PostgreSQL, Auth.js v5 (beta), zod, Lucide icons; Inter for text, Marcellus for headings, Fraunces for the wordmark.
 
 ## Getting started
 

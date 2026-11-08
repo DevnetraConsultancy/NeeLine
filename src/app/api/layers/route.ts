@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ApiError, json, readBody, route } from "@/lib/server/api";
 import { requireWriter } from "@/lib/server/session";
-import { MAX_LAYERS_PER_TIMELINE, ownedTimeline, toLayerDTO } from "@/lib/server/timelines";
+import { MAX_LAYERS_PER_TIMELINE, ownedTimeline, toLayerDTO, touchTimeline } from "@/lib/server/timelines";
 import { layerNameKey, normalizeLayerName } from "@/lib/domain/layers";
 import { layerCreateSchema } from "@/lib/validation/schemas";
 import type { Layer } from "@/types/api";
@@ -21,14 +21,19 @@ export const POST = route(async (req) => {
     throw new ApiError(409, `There is already a layer called "${name}".`);
   }
 
-  const layer = await prisma.layer.create({
-    data: {
-      timelineId: input.timelineId,
-      name,
-      nameKey: layerNameKey(name),
-      color: input.color,
-      position: existing.reduce((max, l) => Math.max(max, l.position + 1), 0),
-    },
+  const layer = await prisma.$transaction(async (tx) => {
+    const created = await tx.layer.create({
+      data: {
+        timelineId: input.timelineId,
+        name,
+        nameKey: layerNameKey(name),
+        color: input.color,
+        position: existing.reduce((max, l) => Math.max(max, l.position + 1), 0),
+      },
+    });
+    // Like every other change, a new layer counts as activity on the dashboard.
+    await touchTimeline(tx, input.timelineId);
+    return created;
   });
   return json<Layer>(toLayerDTO(layer), 201);
 });

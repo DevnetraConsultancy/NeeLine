@@ -189,10 +189,11 @@ export function Studio({ timelineId }: { timelineId: string }) {
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
-      <AppHeader wide />
+      <AppHeader />
       <div className="glass glass-blur relative z-30 rounded-none border-x-0 border-t-0">
         <span className="hairline-strata absolute inset-x-0 bottom-0 opacity-70" aria-hidden />
-        <div className="flex flex-wrap items-center gap-x-1 gap-y-1 px-2 py-1 sm:px-3">
+        {/* Same side gutter as the header, so the Back arrow sits under the logo. */}
+        <div className="mx-auto flex w-full max-w-[120rem] flex-wrap items-center gap-x-1 gap-y-1 px-4 py-1 sm:px-6">
           <Link href="/dashboard" aria-label="Back to dashboard" className="flex size-8 items-center justify-center rounded-md text-fg-muted hover:bg-surface-hover hover:text-fg">
             <ArrowLeft className="size-4" aria-hidden />
           </Link>

@@ -10,11 +10,15 @@ import { ThemeToggle } from "@/components/layout/theme";
 import { Menu } from "@/components/ui/menu";
 import { cn } from "@/lib/cn";
 
-/** Site header. `wide` spans the full window (the studio); otherwise it matches the page width. */
-export function AppHeader({ children, className, wide = false }: { children?: ReactNode; className?: string; wide?: boolean }) {
+/**
+ * Site header. The brand and controls sit in one app-shell row with a fixed
+ * side gutter, so the logo stays pinned to the same spot on every page
+ * (landing, dashboard, studio) regardless of page width or scrollbar.
+ */
+export function AppHeader({ children, className }: { children?: ReactNode; className?: string }) {
   return (
     <header className={cn("glass glass-blur sticky top-0 z-40 rounded-none border-x-0 border-t-0", className)}>
-      <div className={cn("mx-auto flex h-16 items-center gap-1 px-3 sm:px-4", !wide && "max-w-7xl sm:px-6")}>
+      <div className="mx-auto flex h-16 w-full max-w-[120rem] items-center gap-1 px-4 sm:px-6">
         <BrandLink />
         <div className="flex-1">{children}</div>
         <ThemeToggle />

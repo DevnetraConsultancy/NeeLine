@@ -175,6 +175,9 @@
   html {
     -webkit-text-size-adjust: 100%;
     text-rendering: optimizeLegibility;
+    /* Always reserve the scrollbar's width so the header and centred content
+       never shift sideways between a scrolling page and a short one. */
+    scrollbar-gutter: stable;
   }
   body {
     min-height: 100dvh;

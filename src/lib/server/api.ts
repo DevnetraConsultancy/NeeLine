@@ -40,6 +40,8 @@ function errorResponse(error: unknown, req: Request): Response {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2025") return json({ error: "That item was not found. It may have been deleted." }, 404);
     if (error.code === "P2002") return json({ error: "That name is already in use here." }, 409);
+    // Two saves touched the same rows at once (for example from two tabs); the change was rolled back.
+    if (error.code === "P2034") return json({ error: "Another change was saving at the same time. Please try again." }, 409);
     if (error.code === "P2003") {
       // A foreign key failed: the layer was deleted under us, or the user row is gone.
       const field = String(error.meta?.field_name ?? "");

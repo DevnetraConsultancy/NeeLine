@@ -10,10 +10,16 @@ export const POST = route(async (req) => {
   const { timelineId, visibleIds } = await readBody(req, layerVisibilitySchema);
   await ownedTimeline(user.id, timelineId);
 
-  await prisma.$transaction([
-    prisma.layer.updateMany({ where: { timelineId, id: { in: visibleIds } }, data: { visible: true } }),
-    prisma.layer.updateMany({ where: { timelineId, id: { notIn: visibleIds } }, data: { visible: false } }),
-    touchTimeline(prisma, timelineId),
-  ]);
+  // One statement for the whole timeline. Two separate updates (show these,
+  // hide the rest) lock rows in different orders when two saves overlap, which
+  // deadlocked in production (P2034).
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`
+      UPDATE "Layer"
+      SET "visible" = ("id" = ANY(${visibleIds}::text[])), "updatedAt" = now()
+      WHERE "timelineId" = ${timelineId}
+        AND "visible" IS DISTINCT FROM ("id" = ANY(${visibleIds}::text[]))`;
+    await touchTimeline(tx, timelineId);
+  });
   return json({ ok: true });
 });

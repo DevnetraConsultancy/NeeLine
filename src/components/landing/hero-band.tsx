@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 interface BandEvent {
   id: string;
@@ -38,6 +38,7 @@ const EVENTS: BandEvent[] = [
 
 const SPINE_Y = 214;
 const TIER_Y = [168, 128, 88];
+const STAGE_WIDTH = 1220;
 
 function cardWidth(title: string): number {
   return Math.round(title.length * 7.2 + 26);
@@ -46,6 +47,21 @@ function cardWidth(title: string): number {
 export function HeroBand() {
   const [selectedId, setSelectedId] = useState("gutenberg");
   const selected = EVENTS.find((e) => e.id === selectedId) ?? EVENTS[8];
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  // On narrow screens the band is wider than the page and opens at its left
+  // edge, leaving the highlighted event (and the caption below) out of view.
+  // Start with that event centred instead.
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    const svg = svgRef.current;
+    if (!scroller || !svg || scroller.scrollWidth <= scroller.clientWidth) return;
+    const x = (selected.x / STAGE_WIDTH) * svg.getBoundingClientRect().width;
+    scroller.scrollLeft = Math.max(0, x - scroller.clientWidth / 2);
+    // Only when the band first appears; later picks must not yank the view around.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const pick = (id: string) => () => setSelectedId(id);
   const pickKey = (id: string) => (e: KeyboardEvent) => {
@@ -58,10 +74,11 @@ export function HeroBand() {
   return (
     <section aria-label="A sample NeeLine timeline, 3200 BCE to today" className="hero-band">
       <div
+        ref={scrollerRef}
         className="overflow-x-auto overflow-y-hidden [scrollbar-width:none]"
         style={{ maskImage: "linear-gradient(90deg, transparent, black 5%, black 95%, transparent)" }}
       >
-        <svg viewBox="0 0 1220 268" className="mx-auto block h-auto w-full min-w-[1080px] max-w-[1600px]" style={{ fontFamily: "var(--font-sans)" }}>
+        <svg ref={svgRef} viewBox={`0 0 ${STAGE_WIDTH} 268`} className="mx-auto block h-auto w-full min-w-[1080px] max-w-[1600px]" style={{ fontFamily: "var(--font-sans)" }}>
           <defs>
             <linearGradient id="strata-spine" gradientUnits="userSpaceOnUse" x1="30" y1="0" x2="1190" y2="0">
               <stop offset="0" stopColor="var(--strata-past)" />

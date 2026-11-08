@@ -86,7 +86,7 @@ export function Dashboard() {
   return (
     <div className="flex min-h-dvh flex-col">
       <AppHeader />
-      <main id="main" className="mx-auto w-full max-w-7xl flex-1 px-4 py-5 sm:px-6">
+      <main id="main" className="mx-auto w-full max-w-[120rem] flex-1 px-4 py-5 sm:px-6">
         <div className="flex items-center justify-between gap-3">
           <h1 className="font-serif text-3xl tracking-tight text-fg">Your timelines</h1>
           <Button variant="primary" icon={Plus} onClick={() => setCreating(true)}>New timeline</Button>
@@ -113,7 +113,7 @@ export function Dashboard() {
           {loadError ? (
             <ErrorState title="Your timelines could not be loaded" description={loadError} action={<Button variant="primary" onClick={load}>Try again</Button>} />
           ) : filtered === null ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5" aria-busy="true">
               <span className="sr-only" role="status">Loading timelines</span>
               {Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
             </div>
@@ -131,7 +131,7 @@ export function Dashboard() {
               <EmptyState icon={Trash2} title="The trash is empty" description="Timelines you move to the trash stay here until you restore them or delete them permanently." />
             )
           ) : (
-            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {filtered.map((t) => (
                 <li key={t.id}>
                   <TimelineCard

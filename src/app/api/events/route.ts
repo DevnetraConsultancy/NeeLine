@@ -1,9 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { json, notFound, readBody, route } from "@/lib/server/api";
+import { ApiError, json, notFound, readBody, route } from "@/lib/server/api";
 import { requireWriter } from "@/lib/server/session";
 import { newEventColumns } from "@/lib/server/events";
 import { assertLayerInTimeline, getDefaultLayer, ownedTimeline, toEventDTO, touchTimeline } from "@/lib/server/timelines";
 import { eventCreateSchema, eventDeleteSchema } from "@/lib/validation/schemas";
+import { LIMITS } from "@/lib/validation/limits";
 import type { TimelineEvent } from "@/types/api";
 
 /** POST /api/events — add one event. */
@@ -12,6 +13,11 @@ export const POST = route(async (req) => {
   const { timelineId, ...fields } = await readBody(req, eventCreateSchema);
   await ownedTimeline(user.id, timelineId);
   await assertLayerInTimeline(fields.layerId, timelineId);
+
+  const count = await prisma.event.count({ where: { timelineId } });
+  if (count >= LIMITS.eventsPerTimeline) {
+    throw new ApiError(400, `A timeline can have at most ${LIMITS.eventsPerTimeline.toLocaleString("en-US")} events.`);
+  }
 
   const row = await prisma.$transaction(async (tx) => {
     const created = await tx.event.create({ data: newEventColumns(timelineId, { ...fields, notes: fields.notes ?? null }) });

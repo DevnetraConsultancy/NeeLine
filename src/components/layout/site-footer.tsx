@@ -7,7 +7,7 @@ const linkClass = "inline-flex items-center gap-1.5 text-fg-muted hover:text-fg"
 export function SiteFooter() {
   return (
     <footer className="border-t border-line">
-      <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 text-xs sm:px-6 md:flex-row md:items-center md:justify-between">
+      <div className="mx-auto flex w-full max-w-[120rem] flex-col gap-3 px-4 py-4 text-xs sm:px-6 md:flex-row md:items-center md:justify-between">
         <nav aria-label="Footer" className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <HelpLink className={linkClass} />
           <a href={`mailto:${CONTACT_EMAIL}`} className={linkClass}>

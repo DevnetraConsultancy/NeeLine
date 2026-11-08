@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import { json, readBody, route } from "@/lib/server/api";
+import { ApiError, json, readBody, route } from "@/lib/server/api";
 import { requireUser, requireWriter } from "@/lib/server/session";
 import { defaultLayerData, toTimelineSummary } from "@/lib/server/timelines";
 import { timelineCreateSchema } from "@/lib/validation/schemas";
+import { LIMITS } from "@/lib/validation/limits";
 import { DEFAULT_EVENT_COLOR } from "@/lib/domain/colors";
 import type { TimelineSummary } from "@/types/api";
 
@@ -22,6 +23,11 @@ export const GET = route(async (req) => {
 export const POST = route(async (req) => {
   const user = await requireWriter();
   const input = await readBody(req, timelineCreateSchema);
+
+  const owned = await prisma.timeline.count({ where: { userId: user.id } });
+  if (owned >= LIMITS.timelinesPerUser) {
+    throw new ApiError(400, `You can have at most ${LIMITS.timelinesPerUser.toLocaleString("en-US")} timelines. Delete one (including from the trash) to make room.`);
+  }
 
   const created = await prisma.$transaction(async (tx) => {
     const timeline = await tx.timeline.create({

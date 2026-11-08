@@ -1,10 +1,11 @@
 import { sortByDate } from "@/lib/domain/events";
 import { prisma } from "@/lib/prisma";
-import { json, readBody, route } from "@/lib/server/api";
+import { ApiError, json, readBody, route } from "@/lib/server/api";
 import { requireWriter } from "@/lib/server/session";
 import { newEventColumns } from "@/lib/server/events";
 import { getDefaultLayer, ownedTimeline, toEventDTO, touchTimeline } from "@/lib/server/timelines";
 import { eventRestoreSchema } from "@/lib/validation/schemas";
+import { LIMITS } from "@/lib/validation/limits";
 import type { TimelineEvent } from "@/types/api";
 
 /**
@@ -16,6 +17,11 @@ export const POST = route(async (req) => {
   const user = await requireWriter();
   const { timelineId, events } = await readBody(req, eventRestoreSchema);
   await ownedTimeline(user.id, timelineId);
+
+  const count = await prisma.event.count({ where: { timelineId } });
+  if (count + events.length > LIMITS.eventsPerTimeline) {
+    throw new ApiError(400, `Restoring these events would exceed the ${LIMITS.eventsPerTimeline.toLocaleString("en-US")}-event limit for a timeline.`);
+  }
 
   const defaultLayer = await getDefaultLayer(timelineId);
   const layerIds = new Set(

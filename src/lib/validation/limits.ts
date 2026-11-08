@@ -7,6 +7,9 @@ export const LIMITS = {
   eventTitle: 200,
   eventNotes: 10_000,
   layerName: MAX_LAYER_NAME_LENGTH,
+  /** Per-account and per-timeline ceilings, so a public, guest-first launch cannot grow the database without bound. Generous for real use. */
+  timelinesPerUser: 200,
+  eventsPerTimeline: 20_000,
   importEvents: 5_000,
   /** Below Vercel's 4.5 MB request body limit, so the API sees the file rather than a bare 413. */
   importFileBytes: 4 * 1024 * 1024,

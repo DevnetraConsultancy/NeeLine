@@ -12,6 +12,7 @@ import { pickLayerColor } from "@/lib/domain/colors";
 import { eventIdentityKey } from "@/lib/domain/events";
 import { layerNameKey, normalizeLayerName } from "@/lib/domain/layers";
 import { importRequestSchema } from "@/lib/validation/schemas";
+import { LIMITS } from "@/lib/validation/limits";
 import type { ImportResult } from "@/types/api";
 
 /**
@@ -81,6 +82,9 @@ export const POST = route(async (req) => {
         toCreate.push(newEventColumns(input.timelineId, fields));
       }
 
+      if (existingRows.length + toCreate.length > LIMITS.eventsPerTimeline) {
+        throw new ApiError(400, `This import would push the timeline past its ${LIMITS.eventsPerTimeline.toLocaleString("en-US")}-event limit.`);
+      }
       const created = toCreate.length > 0 ? await tx.event.createManyAndReturn({ data: toCreate }) : [];
       if (created.length > 0 || createdLayers.length > 0) await touchTimeline(tx, input.timelineId);
       return { created, createdLayers, skippedDuplicates };
